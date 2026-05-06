@@ -1,0 +1,53 @@
+name: SimplePlayout
+options:
+  minimumXcodeGenVersion: 2.42.0
+  deploymentTarget:
+    macOS: "26.0"
+settings:
+  base:
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: minimal
+    CLANG_ENABLE_OBJC_ARC: YES
+targets:
+  SimplePlayout:
+    type: application
+    platform: macOS
+    sources:
+      - SimplePlayout
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.josh.simpleplayout
+        PRODUCT_NAME: Simple Playout
+        INFOPLIST_FILE: SimplePlayout/Support/Info.plist
+        SWIFT_OBJC_BRIDGING_HEADER: SimplePlayout/Support/SimplePlayout-Bridging-Header.h
+        HEADER_SEARCH_PATHS: $(SRCROOT)/SimplePlayout/Output
+    dependencies:
+      - sdk: AVFoundation.framework
+      - sdk: AVKit.framework
+      - sdk: CoreImage.framework
+      - sdk: UniformTypeIdentifiers.framework
+  SimplePlayoutTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - SimplePlayoutTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.josh.simpleplayout.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Simple Playout.app/Contents/MacOS/Simple Playout"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+    dependencies:
+      - target: SimplePlayout
+schemes:
+  SimplePlayout:
+    build:
+      targets:
+        SimplePlayout: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - SimplePlayoutTests

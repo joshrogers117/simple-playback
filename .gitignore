@@ -1,0 +1,16 @@
+.DS_Store
+
+# Xcode local/user state
+xcuserdata/
+*.xcuserstate
+
+# Build products and test artifacts
+build/
+DerivedData/
+*.xcresult
+
+# Local agent/editor configuration
+.claude/
+
+# Third-party SDK installed locally. See README.md.
+Blackmagic DeckLink SDK 16.0/

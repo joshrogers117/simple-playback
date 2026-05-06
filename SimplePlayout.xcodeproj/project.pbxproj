@@ -1,0 +1,552 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0BB67023477AED52B7AA29C7 /* InspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E4CBB770966BF5EF510E714 /* InspectorView.swift */; };
+		0C39944CC2B5FA9584F3713D /* SlideGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 009656A3D8BD6B75184534E4 /* SlideGridView.swift */; };
+		1C77647A1376658D32B933AB /* AVKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 082F4622614E4B8E3C77726F /* AVKit.framework */; };
+		32A6D23F0751775F5BF9D7FF /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F01F82490EC6B3F8642A592 /* ModelTests.swift */; };
+		3CC8B0B439525A53CEF6F86C /* MediaImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A92C1DFC78E64818D20AA73B /* MediaImporter.swift */; };
+		400E1041589A0CEAD7E617C9 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3456E0AF98310B9D4D7E727 /* RootView.swift */; };
+		46EFCCE388B8F3ADCC713C73 /* SimplePlayoutDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F96F27231732E8D6FD1202 /* SimplePlayoutDocument.swift */; };
+		54200AA5B806802F9502EB06 /* UniformTypeIdentifiers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B14A977290CE819A4D56EF2B /* UniformTypeIdentifiers.framework */; };
+		677913D8F90B5A51AB70C92B /* SimplePlayoutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49AAE934E6AA6B7E928E27F3 /* SimplePlayoutApp.swift */; };
+		6E32ED631880BEC12DC7E632 /* DeckLinkDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C723AE7E3FA6AE396BF08EB /* DeckLinkDiagnostics.swift */; };
+		7DADEB00E71D9C8849B99D5F /* OutputPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC832B01AFE9F5C88827B3F4 /* OutputPreviewView.swift */; };
+		923EFA4F6874D339E9E1DFBA /* OutputStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3231D37312802C9DACC3ED8F /* OutputStatusBar.swift */; };
+		978296A45A88E016E16E3F17 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3EA161ABEB3905B9FE31C94 /* AVFoundation.framework */; };
+		9B42105D4C5F7ED092C1678C /* CoreImage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0936570928D77D246D9D4F41 /* CoreImage.framework */; };
+		A170C62152F04F0EB0633D6C /* SPFrameBlend.c in Sources */ = {isa = PBXBuildFile; fileRef = E414017592F14769935C1359 /* SPFrameBlend.c */; settings = {COMPILER_FLAGS = "-O3"; }; };
+		B505AC4275075D4146C716CA /* AudioPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD70E770DF4CBE42911FBF55 /* AudioPump.swift */; };
+		C06126298A47AFCDA192A03B /* DeckLinkSDKDispatch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D96D9D6A6F1BB5C773AE0FE4 /* DeckLinkSDKDispatch.cpp */; };
+		CD8112B7DC2B4B41B57B46ED /* FrameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5929251BCACB7121133DCF2 /* FrameRenderer.swift */; };
+		D30BB8D27B0C47D4B432EDE7 /* MediaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63097D380FE464E53EDECA8A /* MediaModels.swift */; };
+		D596ECFAA16D147A941CE303 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 463E3C9D6F77CCC71B68E5F4 /* PlaybackController.swift */; };
+		E78448C54FC07EC5876FB320 /* DeckLinkBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = E7E7390A6A233B9362801431 /* DeckLinkBridge.mm */; };
+		F3CF585CC15411C0DFD82E2C /* VideoOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D122A0893B9D8554E30810 /* VideoOutput.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		3080C867B6D75441961EB322 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 13EE62916619AF7D8EA7AF14 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 41BB8A8C2D1BC69276737B0A;
+			remoteInfo = SimplePlayout;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		009656A3D8BD6B75184534E4 /* SlideGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideGridView.swift; sourceTree = "<group>"; };
+		07D122A0893B9D8554E30810 /* VideoOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutput.swift; sourceTree = "<group>"; };
+		082F4622614E4B8E3C77726F /* AVKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVKit.framework; path = System/Library/Frameworks/AVKit.framework; sourceTree = SDKROOT; };
+		0936570928D77D246D9D4F41 /* CoreImage.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreImage.framework; path = System/Library/Frameworks/CoreImage.framework; sourceTree = SDKROOT; };
+		1E4CBB770966BF5EF510E714 /* InspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorView.swift; sourceTree = "<group>"; };
+		25E603C3280E3320A9C7996B /* SimplePlayout-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "SimplePlayout-Bridging-Header.h"; sourceTree = "<group>"; };
+		272831B413AA85EBECF28E64 /* SimplePlayout.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SimplePlayout.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3231D37312802C9DACC3ED8F /* OutputStatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputStatusBar.swift; sourceTree = "<group>"; };
+		3E9F4BE457A4C4AEC057E9CB /* SimplePlayoutTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SimplePlayoutTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		463E3C9D6F77CCC71B68E5F4 /* PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackController.swift; sourceTree = "<group>"; };
+		49AAE934E6AA6B7E928E27F3 /* SimplePlayoutApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlayoutApp.swift; sourceTree = "<group>"; };
+		61F96F27231732E8D6FD1202 /* SimplePlayoutDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlayoutDocument.swift; sourceTree = "<group>"; };
+		63097D380FE464E53EDECA8A /* MediaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaModels.swift; sourceTree = "<group>"; };
+		78D746C8949262918285C6CE /* DeckLinkSDK.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DeckLinkSDK.h; sourceTree = "<group>"; };
+		7F01F82490EC6B3F8642A592 /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
+		80B1BA48BF72D42C1D3CBE39 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9C723AE7E3FA6AE396BF08EB /* DeckLinkDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckLinkDiagnostics.swift; sourceTree = "<group>"; };
+		A3EA161ABEB3905B9FE31C94 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		A92C1DFC78E64818D20AA73B /* MediaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporter.swift; sourceTree = "<group>"; };
+		B14A977290CE819A4D56EF2B /* UniformTypeIdentifiers.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UniformTypeIdentifiers.framework; path = System/Library/Frameworks/UniformTypeIdentifiers.framework; sourceTree = SDKROOT; };
+		B3456E0AF98310B9D4D7E727 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		CD629A2B7A9FD9E341F0ED96 /* DeckLinkBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DeckLinkBridge.h; sourceTree = "<group>"; };
+		D5929251BCACB7121133DCF2 /* FrameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameRenderer.swift; sourceTree = "<group>"; };
+		D96D9D6A6F1BB5C773AE0FE4 /* DeckLinkSDKDispatch.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DeckLinkSDKDispatch.cpp; sourceTree = "<group>"; };
+		DC832B01AFE9F5C88827B3F4 /* OutputPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputPreviewView.swift; sourceTree = "<group>"; };
+		E414017592F14769935C1359 /* SPFrameBlend.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SPFrameBlend.c; sourceTree = "<group>"; };
+		E63B95C0DF4A41B9BE4A9459 /* SPFrameBlend.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SPFrameBlend.h; sourceTree = "<group>"; };
+		E7E7390A6A233B9362801431 /* DeckLinkBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DeckLinkBridge.mm; sourceTree = "<group>"; };
+		FD70E770DF4CBE42911FBF55 /* AudioPump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPump.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		7B78B9D81AD6AE263B149628 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				978296A45A88E016E16E3F17 /* AVFoundation.framework in Frameworks */,
+				1C77647A1376658D32B933AB /* AVKit.framework in Frameworks */,
+				9B42105D4C5F7ED092C1678C /* CoreImage.framework in Frameworks */,
+				54200AA5B806802F9502EB06 /* UniformTypeIdentifiers.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		014E7A48686AF886CDC044CB /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A92C1DFC78E64818D20AA73B /* MediaImporter.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		2682F49A01673323A4826212 /* Playback */ = {
+			isa = PBXGroup;
+			children = (
+				FD70E770DF4CBE42911FBF55 /* AudioPump.swift */,
+				D5929251BCACB7121133DCF2 /* FrameRenderer.swift */,
+				463E3C9D6F77CCC71B68E5F4 /* PlaybackController.swift */,
+				E414017592F14769935C1359 /* SPFrameBlend.c */,
+				E63B95C0DF4A41B9BE4A9459 /* SPFrameBlend.h */,
+			);
+			path = Playback;
+			sourceTree = "<group>";
+		};
+		49627E7EFEFAA9B2558C7E58 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A3EA161ABEB3905B9FE31C94 /* AVFoundation.framework */,
+				082F4622614E4B8E3C77726F /* AVKit.framework */,
+				0936570928D77D246D9D4F41 /* CoreImage.framework */,
+				B14A977290CE819A4D56EF2B /* UniformTypeIdentifiers.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		67C0A469251E6F3E46EF80DF = {
+			isa = PBXGroup;
+			children = (
+				CCCB07EDD5E5636E303CE602 /* SimplePlayout */,
+				88687031436DD547BB741A58 /* SimplePlayoutTests */,
+				49627E7EFEFAA9B2558C7E58 /* Frameworks */,
+				E9E75074FC55CA71A02390B5 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		68BB2622A4FFAF8A5DD65098 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				49AAE934E6AA6B7E928E27F3 /* SimplePlayoutApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		6BF0BBBB1A1418D545BE43B1 /* Output */ = {
+			isa = PBXGroup;
+			children = (
+				CD629A2B7A9FD9E341F0ED96 /* DeckLinkBridge.h */,
+				E7E7390A6A233B9362801431 /* DeckLinkBridge.mm */,
+				9C723AE7E3FA6AE396BF08EB /* DeckLinkDiagnostics.swift */,
+				78D746C8949262918285C6CE /* DeckLinkSDK.h */,
+				D96D9D6A6F1BB5C773AE0FE4 /* DeckLinkSDKDispatch.cpp */,
+				07D122A0893B9D8554E30810 /* VideoOutput.swift */,
+			);
+			path = Output;
+			sourceTree = "<group>";
+		};
+		88687031436DD547BB741A58 /* SimplePlayoutTests */ = {
+			isa = PBXGroup;
+			children = (
+				7F01F82490EC6B3F8642A592 /* ModelTests.swift */,
+			);
+			path = SimplePlayoutTests;
+			sourceTree = "<group>";
+		};
+		91EF0121E5EDC6627E400544 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				1E4CBB770966BF5EF510E714 /* InspectorView.swift */,
+				DC832B01AFE9F5C88827B3F4 /* OutputPreviewView.swift */,
+				3231D37312802C9DACC3ED8F /* OutputStatusBar.swift */,
+				B3456E0AF98310B9D4D7E727 /* RootView.swift */,
+				009656A3D8BD6B75184534E4 /* SlideGridView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A583F726B090D51D3736AEF9 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				80B1BA48BF72D42C1D3CBE39 /* Info.plist */,
+				25E603C3280E3320A9C7996B /* SimplePlayout-Bridging-Header.h */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		CCCB07EDD5E5636E303CE602 /* SimplePlayout */ = {
+			isa = PBXGroup;
+			children = (
+				68BB2622A4FFAF8A5DD65098 /* App */,
+				F3CE9B30F0ACA9D8FBCC309B /* Models */,
+				6BF0BBBB1A1418D545BE43B1 /* Output */,
+				2682F49A01673323A4826212 /* Playback */,
+				014E7A48686AF886CDC044CB /* Services */,
+				A583F726B090D51D3736AEF9 /* Support */,
+				91EF0121E5EDC6627E400544 /* Views */,
+			);
+			path = SimplePlayout;
+			sourceTree = "<group>";
+		};
+		E9E75074FC55CA71A02390B5 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				272831B413AA85EBECF28E64 /* SimplePlayout.app */,
+				3E9F4BE457A4C4AEC057E9CB /* SimplePlayoutTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F3CE9B30F0ACA9D8FBCC309B /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				63097D380FE464E53EDECA8A /* MediaModels.swift */,
+				61F96F27231732E8D6FD1202 /* SimplePlayoutDocument.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		41BB8A8C2D1BC69276737B0A /* SimplePlayout */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BB95108A5B11F5574AB58E4E /* Build configuration list for PBXNativeTarget "SimplePlayout" */;
+			buildPhases = (
+				5B008E47E06D18B52D530CD2 /* Sources */,
+				7B78B9D81AD6AE263B149628 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SimplePlayout;
+			packageProductDependencies = (
+			);
+			productName = SimplePlayout;
+			productReference = 272831B413AA85EBECF28E64 /* SimplePlayout.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B88D65C2EA48A286AAF0A587 /* SimplePlayoutTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2AA9D2A393B7FEC6DC134442 /* Build configuration list for PBXNativeTarget "SimplePlayoutTests" */;
+			buildPhases = (
+				70830C577169A868EC318A94 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				61EEE11F341C7FAA77B75BD4 /* PBXTargetDependency */,
+			);
+			name = SimplePlayoutTests;
+			packageProductDependencies = (
+			);
+			productName = SimplePlayoutTests;
+			productReference = 3E9F4BE457A4C4AEC057E9CB /* SimplePlayoutTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		13EE62916619AF7D8EA7AF14 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 192C8D183B1D91FDA07EBA95 /* Build configuration list for PBXProject "SimplePlayout" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 67C0A469251E6F3E46EF80DF;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = E9E75074FC55CA71A02390B5 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				41BB8A8C2D1BC69276737B0A /* SimplePlayout */,
+				B88D65C2EA48A286AAF0A587 /* SimplePlayoutTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5B008E47E06D18B52D530CD2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B505AC4275075D4146C716CA /* AudioPump.swift in Sources */,
+				E78448C54FC07EC5876FB320 /* DeckLinkBridge.mm in Sources */,
+				6E32ED631880BEC12DC7E632 /* DeckLinkDiagnostics.swift in Sources */,
+				C06126298A47AFCDA192A03B /* DeckLinkSDKDispatch.cpp in Sources */,
+				CD8112B7DC2B4B41B57B46ED /* FrameRenderer.swift in Sources */,
+				0BB67023477AED52B7AA29C7 /* InspectorView.swift in Sources */,
+				3CC8B0B439525A53CEF6F86C /* MediaImporter.swift in Sources */,
+				D30BB8D27B0C47D4B432EDE7 /* MediaModels.swift in Sources */,
+				7DADEB00E71D9C8849B99D5F /* OutputPreviewView.swift in Sources */,
+				923EFA4F6874D339E9E1DFBA /* OutputStatusBar.swift in Sources */,
+				D596ECFAA16D147A941CE303 /* PlaybackController.swift in Sources */,
+				400E1041589A0CEAD7E617C9 /* RootView.swift in Sources */,
+				677913D8F90B5A51AB70C92B /* SimplePlayoutApp.swift in Sources */,
+				46EFCCE388B8F3ADCC713C73 /* SimplePlayoutDocument.swift in Sources */,
+				0C39944CC2B5FA9584F3713D /* SlideGridView.swift in Sources */,
+				A170C62152F04F0EB0633D6C /* SPFrameBlend.c in Sources */,
+				F3CF585CC15411C0DFD82E2C /* VideoOutput.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		70830C577169A868EC318A94 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				32A6D23F0751775F5BF9D7FF /* ModelTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		61EEE11F341C7FAA77B75BD4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 41BB8A8C2D1BC69276737B0A /* SimplePlayout */;
+			targetProxy = 3080C867B6D75441961EB322 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		5BB590A3B151774CA48D96BF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		78F30C14B07AB8FED3AAAF98 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/SimplePlayout/Output";
+				INFOPLIST_FILE = SimplePlayout/Support/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.josh.simpleplayout;
+				PRODUCT_NAME = "Simple Playout";
+				SDKROOT = macosx;
+				SWIFT_OBJC_BRIDGING_HEADER = "SimplePlayout/Support/SimplePlayout-Bridging-Header.h";
+			};
+			name = Release;
+		};
+		8BF20B7D80A1167CC43A6C5B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.josh.simpleplayout.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Simple Playout.app/Contents/MacOS/Simple Playout";
+			};
+			name = Debug;
+		};
+		A358385A2262E292B4F909DD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.josh.simpleplayout.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Simple Playout.app/Contents/MacOS/Simple Playout";
+			};
+			name = Release;
+		};
+		C1F6927DF373DF1CDF0B8B1E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/SimplePlayout/Output";
+				INFOPLIST_FILE = SimplePlayout/Support/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.josh.simpleplayout;
+				PRODUCT_NAME = "Simple Playout";
+				SDKROOT = macosx;
+				SWIFT_OBJC_BRIDGING_HEADER = "SimplePlayout/Support/SimplePlayout-Bridging-Header.h";
+			};
+			name = Debug;
+		};
+		D6A281BE8D0869A76B4FCD2D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		192C8D183B1D91FDA07EBA95 /* Build configuration list for PBXProject "SimplePlayout" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5BB590A3B151774CA48D96BF /* Debug */,
+				D6A281BE8D0869A76B4FCD2D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		2AA9D2A393B7FEC6DC134442 /* Build configuration list for PBXNativeTarget "SimplePlayoutTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8BF20B7D80A1167CC43A6C5B /* Debug */,
+				A358385A2262E292B4F909DD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BB95108A5B11F5574AB58E4E /* Build configuration list for PBXNativeTarget "SimplePlayout" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C1F6927DF373DF1CDF0B8B1E /* Debug */,
+				78F30C14B07AB8FED3AAAF98 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 13EE62916619AF7D8EA7AF14 /* Project object */;
+}
