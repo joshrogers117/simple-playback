@@ -4,7 +4,7 @@
 
 #include <atomic>
 
-static NSString * const SPDeckLinkErrorDomain = @"SimplePlayout.DeckLink";
+static NSString * const SPDeckLinkErrorDomain = @"SimplePlayback.DeckLink";
 static constexpr HRESULT SPBMD_OK = 0;
 static constexpr uint32_t SPDeckLinkPrerollFrameCount = 3;
 static constexpr uint32_t SPDeckLinkBufferedFrameTarget = 3;

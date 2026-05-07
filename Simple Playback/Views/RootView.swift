@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct RootView: View {
-    @Binding var document: SimplePlayoutDocument
+    @Binding var document: SimplePlaybackDocument
     @ObservedObject var outputSettings: OutputSettingsStore
     @StateObject private var playback = PlaybackController()
     @State private var selectedSlideID: UUID?

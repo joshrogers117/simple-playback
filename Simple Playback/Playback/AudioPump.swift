@@ -2,7 +2,7 @@ import AVFoundation
 import Foundation
 
 final class AudioPump {
-    private let queue = DispatchQueue(label: "SimplePlayout.AudioPump")
+    private let queue = DispatchQueue(label: "SimplePlayback.AudioPump")
     private let queueKey = DispatchSpecificKey<Void>()
     private var timer: DispatchSourceTimer?
     private var primary: AudioTrack?

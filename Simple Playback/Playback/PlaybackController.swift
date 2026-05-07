@@ -19,10 +19,10 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var isPlaying: Bool = false
 
     private let outputDriver: VideoOutputDriver
-    private let outputQueue = DispatchQueue(label: "SimplePlayout.OutputSubmissions")
+    private let outputQueue = DispatchQueue(label: "SimplePlayback.OutputSubmissions")
     private let outputQueueKey = DispatchSpecificKey<Void>()
-    private let audioOutputQueue = DispatchQueue(label: "SimplePlayout.AudioSubmissions")
-    private let videoPreparationQueue = DispatchQueue(label: "SimplePlayout.VideoPreparation", qos: .userInitiated)
+    private let audioOutputQueue = DispatchQueue(label: "SimplePlayback.AudioSubmissions")
+    private let videoPreparationQueue = DispatchQueue(label: "SimplePlayback.VideoPreparation", qos: .userInitiated)
     private let renderer = FrameRenderer()
     private let audioPump = AudioPump()
     private var videoOutput: AVPlayerItemVideoOutput?

@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct SimplePlayoutApp: App {
+struct SimplePlaybackApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var outputSettings = OutputSettingsStore()
 
@@ -10,7 +10,7 @@ struct SimplePlayoutApp: App {
     }
 
     var body: some Scene {
-        DocumentGroup(newDocument: SimplePlayoutDocument()) { file in
+        DocumentGroup(newDocument: SimplePlaybackDocument()) { file in
             RootView(document: file.$document, outputSettings: outputSettings)
         }
         .commands {

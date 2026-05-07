@@ -1,4 +1,4 @@
-name: SimplePlayout
+name: Simple Playback
 options:
   minimumXcodeGenVersion: 2.42.0
   deploymentTarget:
@@ -10,44 +10,45 @@ settings:
     SWIFT_STRICT_CONCURRENCY: minimal
     CLANG_ENABLE_OBJC_ARC: YES
 targets:
-  SimplePlayout:
+  "Simple Playback":
     type: application
     platform: macOS
     sources:
-      - SimplePlayout
+      - "Simple Playback"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.josh.simpleplayout
-        PRODUCT_NAME: Simple Playout
-        INFOPLIST_FILE: SimplePlayout/Support/Info.plist
-        SWIFT_OBJC_BRIDGING_HEADER: SimplePlayout/Support/SimplePlayout-Bridging-Header.h
-        HEADER_SEARCH_PATHS: $(SRCROOT)/SimplePlayout/Output
+        PRODUCT_BUNDLE_IDENTIFIER: com.josh.simpleplayback
+        PRODUCT_NAME: Simple Playback
+        PRODUCT_MODULE_NAME: Simple_Playback
+        INFOPLIST_FILE: "Simple Playback/Support/Info.plist"
+        SWIFT_OBJC_BRIDGING_HEADER: "Simple Playback/Support/SimplePlayback-Bridging-Header.h"
     dependencies:
       - sdk: AVFoundation.framework
       - sdk: AVKit.framework
       - sdk: CoreImage.framework
       - sdk: UniformTypeIdentifiers.framework
-  SimplePlayoutTests:
+  "Simple PlaybackTests":
     type: bundle.unit-test
     platform: macOS
     sources:
-      - SimplePlayoutTests
+      - "Simple PlaybackTests"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.josh.simpleplayout.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.josh.simpleplayback.tests
+        PRODUCT_MODULE_NAME: Simple_PlaybackTests
         GENERATE_INFOPLIST_FILE: YES
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Simple Playout.app/Contents/MacOS/Simple Playout"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Simple Playback.app/Contents/MacOS/Simple Playback"
         BUNDLE_LOADER: "$(TEST_HOST)"
     dependencies:
-      - target: SimplePlayout
+      - target: "Simple Playback"
 schemes:
-  SimplePlayout:
+  "Simple Playback":
     build:
       targets:
-        SimplePlayout: all
+        "Simple Playback": all
     run:
       config: Debug
     test:
       config: Debug
       targets:
-        - SimplePlayoutTests
+        - "Simple PlaybackTests"

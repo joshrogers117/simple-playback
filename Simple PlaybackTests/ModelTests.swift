@@ -2,7 +2,7 @@ import AVFoundation
 import CoreGraphics
 import Foundation
 import XCTest
-@testable import Simple_Playout
+@testable import Simple_Playback
 
 final class ModelTests: XCTestCase {
     func testProjectRoundTripsThroughJSON() throws {
@@ -27,8 +27,8 @@ final class ModelTests: XCTestCase {
             transitionSettings: PlayoutTransitionSettings(crossfadeEnabled: true, crossfadeDuration: 1.2)
         )
 
-        let data = try JSONEncoder.simplePlayout.encode(project)
-        let decoded = try JSONDecoder.simplePlayout.decode(PlayoutProject.self, from: data)
+        let data = try JSONEncoder.simplePlayback.encode(project)
+        let decoded = try JSONDecoder.simplePlayback.decode(PlayoutProject.self, from: data)
 
         XCTAssertEqual(decoded.slides.count, 1)
         XCTAssertEqual(decoded.slides[0].title, "Countdown")

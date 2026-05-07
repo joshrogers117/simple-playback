@@ -1,2 +1,2 @@
-#import "DeckLinkBridge.h"
+#import "../Output/DeckLinkBridge.h"
 #import "../Playback/SPFrameBlend.h"

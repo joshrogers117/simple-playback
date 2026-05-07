@@ -1,9 +1,9 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct SimplePlayoutDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.simplePlayoutProject] }
-    static var writableContentTypes: [UTType] { [.simplePlayoutProject] }
+struct SimplePlaybackDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.simplePlaybackProject] }
+    static var writableContentTypes: [UTType] { [.simplePlaybackProject] }
 
     var project: PlayoutProject
 
@@ -15,17 +15,17 @@ struct SimplePlayoutDocument: FileDocument {
         guard let data = configuration.file.regularFileContents else {
             throw CocoaError(.fileReadCorruptFile)
         }
-        project = try JSONDecoder.simplePlayout.decode(PlayoutProject.self, from: data)
+        project = try JSONDecoder.simplePlayback.decode(PlayoutProject.self, from: data)
     }
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        let data = try JSONEncoder.simplePlayout.encode(project)
+        let data = try JSONEncoder.simplePlayback.encode(project)
         return FileWrapper(regularFileWithContents: data)
     }
 }
 
 extension JSONEncoder {
-    static var simplePlayout: JSONEncoder {
+    static var simplePlayback: JSONEncoder {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return encoder
@@ -33,7 +33,7 @@ extension JSONEncoder {
 }
 
 extension JSONDecoder {
-    static var simplePlayout: JSONDecoder {
+    static var simplePlayback: JSONDecoder {
         JSONDecoder()
     }
 }

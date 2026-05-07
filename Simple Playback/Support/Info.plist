@@ -16,14 +16,14 @@
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>Simple Playout Project</string>
+			<string>Simple Playback Project</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
 			<string>Owner</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.josh.simpleplayout.project</string>
+				<string>com.josh.simpleplayback.project</string>
 			</array>
 		</dict>
 	</array>
@@ -35,17 +35,17 @@
 				<string>public.json</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Simple Playout Project</string>
+			<string>Simple Playback Project</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.josh.simpleplayout.project</string>
+			<string>com.josh.simpleplayback.project</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>splayout</string>
+					<string>splayback</string>
 				</array>
 				<key>public.mime-type</key>
-				<string>application/vnd.simple-playout.project+json</string>
+				<string>application/vnd.simple-playback.project+json</string>
 			</dict>
 		</dict>
 	</array>

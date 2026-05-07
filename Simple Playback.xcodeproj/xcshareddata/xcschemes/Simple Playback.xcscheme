@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "41BB8A8C2D1BC69276737B0A"
-               BuildableName = "SimplePlayout.app"
-               BlueprintName = "SimplePlayout"
-               ReferencedContainer = "container:SimplePlayout.xcodeproj">
+               BuildableName = "Simple Playback.app"
+               BlueprintName = "Simple Playback"
+               ReferencedContainer = "container:Simple Playback.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "41BB8A8C2D1BC69276737B0A"
-            BuildableName = "SimplePlayout.app"
-            BlueprintName = "SimplePlayout"
-            ReferencedContainer = "container:SimplePlayout.xcodeproj">
+            BuildableName = "Simple Playback.app"
+            BlueprintName = "Simple Playback"
+            ReferencedContainer = "container:Simple Playback.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -45,9 +45,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "B88D65C2EA48A286AAF0A587"
-               BuildableName = "SimplePlayoutTests.xctest"
-               BlueprintName = "SimplePlayoutTests"
-               ReferencedContainer = "container:SimplePlayout.xcodeproj">
+               BuildableName = "Simple PlaybackTests.xctest"
+               BlueprintName = "Simple PlaybackTests"
+               ReferencedContainer = "container:Simple Playback.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -69,9 +69,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "41BB8A8C2D1BC69276737B0A"
-            BuildableName = "SimplePlayout.app"
-            BlueprintName = "SimplePlayout"
-            ReferencedContainer = "container:SimplePlayout.xcodeproj">
+            BuildableName = "Simple Playback.app"
+            BlueprintName = "Simple Playback"
+            ReferencedContainer = "container:Simple Playback.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -88,9 +88,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "41BB8A8C2D1BC69276737B0A"
-            BuildableName = "SimplePlayout.app"
-            BlueprintName = "SimplePlayout"
-            ReferencedContainer = "container:SimplePlayout.xcodeproj">
+            BuildableName = "Simple Playback.app"
+            BlueprintName = "Simple Playback"
+            ReferencedContainer = "container:Simple Playback.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

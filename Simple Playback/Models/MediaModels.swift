@@ -225,5 +225,5 @@ struct ScalingGeometry {
 }
 
 extension UTType {
-    static let simplePlayoutProject = UTType(exportedAs: "com.josh.simpleplayout.project", conformingTo: .json)
+    static let simplePlaybackProject = UTType(exportedAs: "com.josh.simpleplayback.project", conformingTo: .json)
 }

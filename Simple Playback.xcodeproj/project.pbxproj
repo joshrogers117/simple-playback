@@ -13,9 +13,9 @@
 		32A6D23F0751775F5BF9D7FF /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F01F82490EC6B3F8642A592 /* ModelTests.swift */; };
 		3CC8B0B439525A53CEF6F86C /* MediaImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A92C1DFC78E64818D20AA73B /* MediaImporter.swift */; };
 		400E1041589A0CEAD7E617C9 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3456E0AF98310B9D4D7E727 /* RootView.swift */; };
-		46EFCCE388B8F3ADCC713C73 /* SimplePlayoutDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F96F27231732E8D6FD1202 /* SimplePlayoutDocument.swift */; };
+		46EFCCE388B8F3ADCC713C73 /* SimplePlaybackDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F96F27231732E8D6FD1202 /* SimplePlaybackDocument.swift */; };
 		54200AA5B806802F9502EB06 /* UniformTypeIdentifiers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B14A977290CE819A4D56EF2B /* UniformTypeIdentifiers.framework */; };
-		677913D8F90B5A51AB70C92B /* SimplePlayoutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49AAE934E6AA6B7E928E27F3 /* SimplePlayoutApp.swift */; };
+		677913D8F90B5A51AB70C92B /* SimplePlaybackApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49AAE934E6AA6B7E928E27F3 /* SimplePlaybackApp.swift */; };
 		6E32ED631880BEC12DC7E632 /* DeckLinkDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C723AE7E3FA6AE396BF08EB /* DeckLinkDiagnostics.swift */; };
 		7DADEB00E71D9C8849B99D5F /* OutputPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC832B01AFE9F5C88827B3F4 /* OutputPreviewView.swift */; };
 		923EFA4F6874D339E9E1DFBA /* OutputStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3231D37312802C9DACC3ED8F /* OutputStatusBar.swift */; };
@@ -39,7 +39,7 @@
 			containerPortal = 13EE62916619AF7D8EA7AF14 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 41BB8A8C2D1BC69276737B0A;
-			remoteInfo = SimplePlayout;
+			remoteInfo = "Simple Playback";
 		};
 /* End PBXContainerItemProxy section */
 
@@ -49,13 +49,13 @@
 		082F4622614E4B8E3C77726F /* AVKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVKit.framework; path = System/Library/Frameworks/AVKit.framework; sourceTree = SDKROOT; };
 		0936570928D77D246D9D4F41 /* CoreImage.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreImage.framework; path = System/Library/Frameworks/CoreImage.framework; sourceTree = SDKROOT; };
 		1E4CBB770966BF5EF510E714 /* InspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorView.swift; sourceTree = "<group>"; };
-		25E603C3280E3320A9C7996B /* SimplePlayout-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "SimplePlayout-Bridging-Header.h"; sourceTree = "<group>"; };
-		272831B413AA85EBECF28E64 /* SimplePlayout.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SimplePlayout.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		25E603C3280E3320A9C7996B /* SimplePlayback-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "SimplePlayback-Bridging-Header.h"; sourceTree = "<group>"; };
+		272831B413AA85EBECF28E64 /* Simple Playback.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Simple Playback.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3231D37312802C9DACC3ED8F /* OutputStatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputStatusBar.swift; sourceTree = "<group>"; };
-		3E9F4BE457A4C4AEC057E9CB /* SimplePlayoutTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SimplePlayoutTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3E9F4BE457A4C4AEC057E9CB /* Simple PlaybackTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Simple PlaybackTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		463E3C9D6F77CCC71B68E5F4 /* PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackController.swift; sourceTree = "<group>"; };
-		49AAE934E6AA6B7E928E27F3 /* SimplePlayoutApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlayoutApp.swift; sourceTree = "<group>"; };
-		61F96F27231732E8D6FD1202 /* SimplePlayoutDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlayoutDocument.swift; sourceTree = "<group>"; };
+		49AAE934E6AA6B7E928E27F3 /* SimplePlaybackApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackApp.swift; sourceTree = "<group>"; };
+		61F96F27231732E8D6FD1202 /* SimplePlaybackDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackDocument.swift; sourceTree = "<group>"; };
 		63097D380FE464E53EDECA8A /* MediaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaModels.swift; sourceTree = "<group>"; };
 		78D746C8949262918285C6CE /* DeckLinkSDK.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DeckLinkSDK.h; sourceTree = "<group>"; };
 		7F01F82490EC6B3F8642A592 /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
@@ -126,8 +126,8 @@
 		67C0A469251E6F3E46EF80DF = {
 			isa = PBXGroup;
 			children = (
-				CCCB07EDD5E5636E303CE602 /* SimplePlayout */,
-				88687031436DD547BB741A58 /* SimplePlayoutTests */,
+				CCCB07EDD5E5636E303CE602 /* Simple Playback */,
+				88687031436DD547BB741A58 /* Simple PlaybackTests */,
 				49627E7EFEFAA9B2558C7E58 /* Frameworks */,
 				E9E75074FC55CA71A02390B5 /* Products */,
 			);
@@ -136,7 +136,7 @@
 		68BB2622A4FFAF8A5DD65098 /* App */ = {
 			isa = PBXGroup;
 			children = (
-				49AAE934E6AA6B7E928E27F3 /* SimplePlayoutApp.swift */,
+				49AAE934E6AA6B7E928E27F3 /* SimplePlaybackApp.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -154,12 +154,12 @@
 			path = Output;
 			sourceTree = "<group>";
 		};
-		88687031436DD547BB741A58 /* SimplePlayoutTests */ = {
+		88687031436DD547BB741A58 /* Simple PlaybackTests */ = {
 			isa = PBXGroup;
 			children = (
 				7F01F82490EC6B3F8642A592 /* ModelTests.swift */,
 			);
-			path = SimplePlayoutTests;
+			path = "Simple PlaybackTests";
 			sourceTree = "<group>";
 		};
 		91EF0121E5EDC6627E400544 /* Views */ = {
@@ -180,12 +180,12 @@
 				90A1B2C3D4E5F60718293A4B /* AppIcon.icon */,
 				A1B2C3D4E5F60718293A4B5C /* Assets.xcassets */,
 				80B1BA48BF72D42C1D3CBE39 /* Info.plist */,
-				25E603C3280E3320A9C7996B /* SimplePlayout-Bridging-Header.h */,
+				25E603C3280E3320A9C7996B /* SimplePlayback-Bridging-Header.h */,
 			);
 			path = Support;
 			sourceTree = "<group>";
 		};
-		CCCB07EDD5E5636E303CE602 /* SimplePlayout */ = {
+		CCCB07EDD5E5636E303CE602 /* Simple Playback */ = {
 			isa = PBXGroup;
 			children = (
 				68BB2622A4FFAF8A5DD65098 /* App */,
@@ -196,14 +196,14 @@
 				A583F726B090D51D3736AEF9 /* Support */,
 				91EF0121E5EDC6627E400544 /* Views */,
 			);
-			path = SimplePlayout;
+			path = "Simple Playback";
 			sourceTree = "<group>";
 		};
 		E9E75074FC55CA71A02390B5 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				272831B413AA85EBECF28E64 /* SimplePlayout.app */,
-				3E9F4BE457A4C4AEC057E9CB /* SimplePlayoutTests.xctest */,
+				272831B413AA85EBECF28E64 /* Simple Playback.app */,
+				3E9F4BE457A4C4AEC057E9CB /* Simple PlaybackTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -212,7 +212,7 @@
 			isa = PBXGroup;
 			children = (
 				63097D380FE464E53EDECA8A /* MediaModels.swift */,
-				61F96F27231732E8D6FD1202 /* SimplePlayoutDocument.swift */,
+				61F96F27231732E8D6FD1202 /* SimplePlaybackDocument.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -220,9 +220,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		41BB8A8C2D1BC69276737B0A /* SimplePlayout */ = {
+		41BB8A8C2D1BC69276737B0A /* Simple Playback */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = BB95108A5B11F5574AB58E4E /* Build configuration list for PBXNativeTarget "SimplePlayout" */;
+			buildConfigurationList = BB95108A5B11F5574AB58E4E /* Build configuration list for PBXNativeTarget "Simple Playback" */;
 			buildPhases = (
 				5B008E47E06D18B52D530CD2 /* Sources */,
 				7B78B9D81AD6AE263B149628 /* Frameworks */,
@@ -232,16 +232,16 @@
 			);
 			dependencies = (
 			);
-			name = SimplePlayout;
+			name = "Simple Playback";
 			packageProductDependencies = (
 			);
-			productName = SimplePlayout;
-			productReference = 272831B413AA85EBECF28E64 /* SimplePlayout.app */;
+			productName = "Simple Playback";
+			productReference = 272831B413AA85EBECF28E64 /* Simple Playback.app */;
 			productType = "com.apple.product-type.application";
 		};
-		B88D65C2EA48A286AAF0A587 /* SimplePlayoutTests */ = {
+		B88D65C2EA48A286AAF0A587 /* Simple PlaybackTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2AA9D2A393B7FEC6DC134442 /* Build configuration list for PBXNativeTarget "SimplePlayoutTests" */;
+			buildConfigurationList = 2AA9D2A393B7FEC6DC134442 /* Build configuration list for PBXNativeTarget "Simple PlaybackTests" */;
 			buildPhases = (
 				70830C577169A868EC318A94 /* Sources */,
 			);
@@ -250,11 +250,11 @@
 			dependencies = (
 				61EEE11F341C7FAA77B75BD4 /* PBXTargetDependency */,
 			);
-			name = SimplePlayoutTests;
+			name = "Simple PlaybackTests";
 			packageProductDependencies = (
 			);
-			productName = SimplePlayoutTests;
-			productReference = 3E9F4BE457A4C4AEC057E9CB /* SimplePlayoutTests.xctest */;
+			productName = "Simple PlaybackTests";
+			productReference = 3E9F4BE457A4C4AEC057E9CB /* Simple PlaybackTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -268,7 +268,7 @@
 				TargetAttributes = {
 				};
 			};
-			buildConfigurationList = 192C8D183B1D91FDA07EBA95 /* Build configuration list for PBXProject "SimplePlayout" */;
+			buildConfigurationList = 192C8D183B1D91FDA07EBA95 /* Build configuration list for PBXProject "Simple Playback" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -282,8 +282,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				41BB8A8C2D1BC69276737B0A /* SimplePlayout */,
-				B88D65C2EA48A286AAF0A587 /* SimplePlayoutTests */,
+				41BB8A8C2D1BC69276737B0A /* Simple Playback */,
+				B88D65C2EA48A286AAF0A587 /* Simple PlaybackTests */,
 			);
 		};
 /* End PBXProject section */
@@ -317,8 +317,8 @@
 				923EFA4F6874D339E9E1DFBA /* OutputStatusBar.swift in Sources */,
 				D596ECFAA16D147A941CE303 /* PlaybackController.swift in Sources */,
 				400E1041589A0CEAD7E617C9 /* RootView.swift in Sources */,
-				677913D8F90B5A51AB70C92B /* SimplePlayoutApp.swift in Sources */,
-				46EFCCE388B8F3ADCC713C73 /* SimplePlayoutDocument.swift in Sources */,
+				677913D8F90B5A51AB70C92B /* SimplePlaybackApp.swift in Sources */,
+				46EFCCE388B8F3ADCC713C73 /* SimplePlaybackDocument.swift in Sources */,
 				0C39944CC2B5FA9584F3713D /* SlideGridView.swift in Sources */,
 				A170C62152F04F0EB0633D6C /* SPFrameBlend.c in Sources */,
 				F3CF585CC15411C0DFD82E2C /* VideoOutput.swift in Sources */,
@@ -338,7 +338,7 @@
 /* Begin PBXTargetDependency section */
 		61EEE11F341C7FAA77B75BD4 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 41BB8A8C2D1BC69276737B0A /* SimplePlayout */;
+			target = 41BB8A8C2D1BC69276737B0A /* Simple Playback */;
 			targetProxy = 3080C867B6D75441961EB322 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -413,16 +413,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
-				HEADER_SEARCH_PATHS = "$(SRCROOT)/SimplePlayout/Output";
-				INFOPLIST_FILE = SimplePlayout/Support/Info.plist;
+				INFOPLIST_FILE = "Simple Playback/Support/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.josh.simpleplayout;
-				PRODUCT_NAME = "Simple Playout";
+				PRODUCT_BUNDLE_IDENTIFIER = com.josh.simpleplayback;
+				PRODUCT_MODULE_NAME = Simple_Playback;
+				PRODUCT_NAME = "Simple Playback";
 				SDKROOT = macosx;
-				SWIFT_OBJC_BRIDGING_HEADER = "SimplePlayout/Support/SimplePlayout-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "Simple Playback/Support/SimplePlayback-Bridging-Header.h";
 			};
 			name = Release;
 		};
@@ -437,9 +437,10 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.josh.simpleplayout.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josh.simpleplayback.tests;
+				PRODUCT_MODULE_NAME = Simple_PlaybackTests;
 				SDKROOT = macosx;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Simple Playout.app/Contents/MacOS/Simple Playout";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Simple Playback.app/Contents/MacOS/Simple Playback";
 			};
 			name = Debug;
 		};
@@ -454,9 +455,10 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.josh.simpleplayout.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josh.simpleplayback.tests;
+				PRODUCT_MODULE_NAME = Simple_PlaybackTests;
 				SDKROOT = macosx;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Simple Playout.app/Contents/MacOS/Simple Playout";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Simple Playback.app/Contents/MacOS/Simple Playback";
 			};
 			name = Release;
 		};
@@ -465,16 +467,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
-				HEADER_SEARCH_PATHS = "$(SRCROOT)/SimplePlayout/Output";
-				INFOPLIST_FILE = SimplePlayout/Support/Info.plist;
+				INFOPLIST_FILE = "Simple Playback/Support/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.josh.simpleplayout;
-				PRODUCT_NAME = "Simple Playout";
+				PRODUCT_BUNDLE_IDENTIFIER = com.josh.simpleplayback;
+				PRODUCT_MODULE_NAME = Simple_Playback;
+				PRODUCT_NAME = "Simple Playback";
 				SDKROOT = macosx;
-				SWIFT_OBJC_BRIDGING_HEADER = "SimplePlayout/Support/SimplePlayout-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "Simple Playback/Support/SimplePlayback-Bridging-Header.h";
 			};
 			name = Debug;
 		};
@@ -538,7 +540,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		192C8D183B1D91FDA07EBA95 /* Build configuration list for PBXProject "SimplePlayout" */ = {
+		192C8D183B1D91FDA07EBA95 /* Build configuration list for PBXProject "Simple Playback" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				5BB590A3B151774CA48D96BF /* Debug */,
@@ -547,7 +549,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		2AA9D2A393B7FEC6DC134442 /* Build configuration list for PBXNativeTarget "SimplePlayoutTests" */ = {
+		2AA9D2A393B7FEC6DC134442 /* Build configuration list for PBXNativeTarget "Simple PlaybackTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				8BF20B7D80A1167CC43A6C5B /* Debug */,
@@ -556,7 +558,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		BB95108A5B11F5574AB58E4E /* Build configuration list for PBXNativeTarget "SimplePlayout" */ = {
+		BB95108A5B11F5574AB58E4E /* Build configuration list for PBXNativeTarget "Simple Playback" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				C1F6927DF373DF1CDF0B8B1E /* Debug */,
