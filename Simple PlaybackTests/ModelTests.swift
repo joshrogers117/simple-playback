@@ -153,6 +153,101 @@ final class ModelTests: XCTestCase {
         XCTAssertThrowsError(try SimplePlaybackProjectDocument.projectData(from: bundleWrapper))
     }
 
+    // MARK: - Cue model (A2 / A3)
+
+    func testCueDefaultsToHoldContinuationAndZeroWaits() {
+        let cue = Cue(number: "INTRO", title: "Intro", assetID: UUID())
+        XCTAssertEqual(cue.continuation, .hold)
+        XCTAssertEqual(cue.preWait, 0)
+        XCTAssertEqual(cue.postWait, 0)
+        XCTAssertEqual(cue.notes, "")
+        XCTAssertTrue(cue.overrides.isEmpty)
+    }
+
+    func testCueOverridesEmptyByDefaultAndDetectsAnyField() {
+        var overrides = CueOverrides()
+        XCTAssertTrue(overrides.isEmpty)
+        overrides.fadeIn = 1.0
+        XCTAssertFalse(overrides.isEmpty)
+
+        var overrides2 = CueOverrides()
+        overrides2.holdLastFrame = true
+        XCTAssertFalse(overrides2.isEmpty)
+
+        var overrides3 = CueOverrides()
+        overrides3.inPoint = 2.5
+        XCTAssertFalse(overrides3.isEmpty)
+    }
+
+    func testCueRoundTripsThroughJSONPreservingAllFields() throws {
+        let assetID = UUID()
+        let cueID = UUID()
+        var overrides = CueOverrides()
+        overrides.fadeIn = 0.4
+        overrides.crossfadeDuration = 1.2
+        overrides.holdLastFrame = true
+        overrides.loop = false
+        overrides.inPoint = 3.0
+        overrides.outPoint = 12.5
+
+        let cue = Cue(
+            id: cueID,
+            number: "Q12.5",
+            title: "Sponsor Reel",
+            assetID: assetID,
+            continuation: .autoContinue,
+            preWait: 0.5,
+            postWait: 1.0,
+            notes: "wait for VO",
+            overrides: overrides
+        )
+
+        let data = try JSONEncoder.simplePlayback.encode(cue)
+        let decoded = try JSONDecoder.simplePlayback.decode(Cue.self, from: data)
+
+        XCTAssertEqual(decoded.id, cueID)
+        XCTAssertEqual(decoded.number, "Q12.5")
+        XCTAssertEqual(decoded.title, "Sponsor Reel")
+        XCTAssertEqual(decoded.assetID, assetID)
+        XCTAssertEqual(decoded.continuation, .autoContinue)
+        XCTAssertEqual(decoded.preWait, 0.5, accuracy: 0.001)
+        XCTAssertEqual(decoded.postWait, 1.0, accuracy: 0.001)
+        XCTAssertEqual(decoded.notes, "wait for VO")
+        XCTAssertEqual(decoded.overrides.fadeIn, 0.4)
+        XCTAssertEqual(decoded.overrides.crossfadeDuration, 1.2)
+        XCTAssertEqual(decoded.overrides.holdLastFrame, true)
+        XCTAssertEqual(decoded.overrides.loop, false)
+        XCTAssertEqual(decoded.overrides.inPoint, 3.0)
+        XCTAssertEqual(decoded.overrides.outPoint, 12.5)
+    }
+
+    func testCueDecodesWithMissingOptionalFields() throws {
+        let assetID = UUID()
+        let json = """
+        {
+          "id": "\(UUID().uuidString)",
+          "number": "1",
+          "assetID": "\(assetID.uuidString)"
+        }
+        """
+        let data = try XCTUnwrap(json.data(using: .utf8))
+        let decoded = try JSONDecoder.simplePlayback.decode(Cue.self, from: data)
+        XCTAssertEqual(decoded.number, "1")
+        XCTAssertEqual(decoded.title, "")
+        XCTAssertEqual(decoded.continuation, .hold)
+        XCTAssertEqual(decoded.preWait, 0)
+        XCTAssertEqual(decoded.postWait, 0)
+        XCTAssertEqual(decoded.notes, "")
+        XCTAssertTrue(decoded.overrides.isEmpty)
+    }
+
+    func testCueContinuationHasAllExpectedCases() {
+        XCTAssertEqual(CueContinuation.allCases, [.hold, .autoContinue, .autoFollow])
+        XCTAssertEqual(CueContinuation.hold.label, "Hold")
+        XCTAssertEqual(CueContinuation.autoContinue.label, "Auto-continue")
+        XCTAssertEqual(CueContinuation.autoFollow.label, "Auto-follow")
+    }
+
     func testFitScalingCentersLetterboxedMedia() {
         let rect = ScalingGeometry.mediaRect(
             sourceSize: CGSize(width: 1000, height: 1000),

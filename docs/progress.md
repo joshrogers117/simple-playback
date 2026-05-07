@@ -9,7 +9,7 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 ## Current state
 
 - **Active phase**: A
-- **Last commit**: A1 — bundle format with formatVersion + legacy flat-file read
+- **Last commit**: A2/A3 — Cue, CueContinuation, CueOverrides
 - **Branch**: `development`
 
 ---
@@ -17,8 +17,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 ## Phase A — Show runtime + UX scaffolding
 
 - [x] A1: Convert `.splayback` to bundle format with `formatVersion` and read-flat / write-bundle migration
-- [ ] A2: Cue model — id (any non-empty string, case-insensitive uniqueness), continuation (hold/auto-continue/auto-follow), pre-wait, post-wait, notes
-- [ ] A3: Per-cue overrides — fade in/out, crossfade duration, hold-last-frame, loop, in/out points; defaults inherit from project
+- [x] A2: Cue model — id (any non-empty string, case-insensitive uniqueness), continuation (hold/auto-continue/auto-follow), pre-wait, post-wait, notes
+- [x] A3: Per-cue overrides — fade in/out, crossfade duration, hold-last-frame, loop, in/out points; defaults inherit from project
 - [ ] A4: Playhead + GO / PREV / PANIC / CLEAR / BLACKOUT semantics, with debounce
 - [ ] A5: Show List view alongside `SlideGridView`; drag-from-palette-to-list; per-cue inspector
 - [ ] A6: Edit / Show Mode toggle in title bar; lockouts in Show Mode (no destructive shortcuts, no editing affordances, confirm-on-quit while live, modal-forbidden invariant)

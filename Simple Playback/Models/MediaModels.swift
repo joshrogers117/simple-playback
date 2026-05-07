@@ -107,6 +107,133 @@ struct MediaSlide: Identifiable, Codable, Hashable {
     }
 }
 
+/// How a cue chains into the next cue when GO advances the playhead.
+/// Mirrors QLab's three-state continuation flag.
+enum CueContinuation: String, Codable, CaseIterable, Identifiable {
+    /// Operator must press GO again to advance.
+    case hold
+    /// Fires the next cue when this cue's pre-wait completes — the two cues overlap.
+    case autoContinue
+    /// Fires the next cue when this cue ends — the two cues are sequential.
+    case autoFollow
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .hold: "Hold"
+        case .autoContinue: "Auto-continue"
+        case .autoFollow: "Auto-follow"
+        }
+    }
+}
+
+/// Optional per-cue overrides on top of the underlying asset's settings and the project defaults.
+/// `nil` means "inherit from parent (asset settings or project defaults)".
+struct CueOverrides: Codable, Hashable {
+    var fadeIn: TimeInterval?
+    var fadeOut: TimeInterval?
+    var crossfadeDuration: TimeInterval?
+    var holdLastFrame: Bool?
+    var loop: Bool?
+    /// Trim points relative to media start, in seconds. `nil` means use full asset.
+    var inPoint: TimeInterval?
+    var outPoint: TimeInterval?
+
+    static let none = CueOverrides()
+
+    var isEmpty: Bool {
+        fadeIn == nil &&
+        fadeOut == nil &&
+        crossfadeDuration == nil &&
+        holdLastFrame == nil &&
+        loop == nil &&
+        inPoint == nil &&
+        outPoint == nil
+    }
+}
+
+/// A single playable item in a `ShowList`. References an asset by ID and carries cue-runtime
+/// metadata (number, title, continuation, pre/post-wait, notes, overrides).
+///
+/// Cue identifiers are operator-supplied strings (`"INTRO"`, `"Q12"`, `"Steve"`); the `Cue.id`
+/// is a stable UUID so cue numbers can change without breaking external references.
+/// Uniqueness of `number` is enforced at the `ShowList` level (case-insensitive).
+struct Cue: Identifiable, Codable, Hashable {
+    var id: UUID = UUID()
+
+    /// Operator-visible cue number/name. Free-form non-empty string. Unique within a `ShowList`,
+    /// case-insensitive.
+    var number: String
+
+    /// Operator-visible title. Defaults to the asset's title; can be overridden.
+    var title: String
+
+    /// References a `MediaSlide.id` in the asset library.
+    var assetID: UUID
+
+    var continuation: CueContinuation = .hold
+
+    /// Seconds to wait before this cue actually starts after GO. Drives the auto-continue overlap.
+    var preWait: TimeInterval = 0
+
+    /// Seconds to wait after this cue's natural end before auto-follow fires the next cue.
+    var postWait: TimeInterval = 0
+
+    /// Operator notes — visible on the standing-by cue, lifted into the Director View.
+    var notes: String = ""
+
+    /// Per-cue overrides; nil-valued fields inherit from the asset's `SlideSettings` or project defaults.
+    var overrides: CueOverrides = .none
+
+    init(
+        id: UUID = UUID(),
+        number: String,
+        title: String,
+        assetID: UUID,
+        continuation: CueContinuation = .hold,
+        preWait: TimeInterval = 0,
+        postWait: TimeInterval = 0,
+        notes: String = "",
+        overrides: CueOverrides = .none
+    ) {
+        self.id = id
+        self.number = number
+        self.title = title
+        self.assetID = assetID
+        self.continuation = continuation
+        self.preWait = preWait
+        self.postWait = postWait
+        self.notes = notes
+        self.overrides = overrides
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case number
+        case title
+        case assetID
+        case continuation
+        case preWait
+        case postWait
+        case notes
+        case overrides
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        number = try container.decode(String.self, forKey: .number)
+        title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
+        assetID = try container.decode(UUID.self, forKey: .assetID)
+        continuation = try container.decodeIfPresent(CueContinuation.self, forKey: .continuation) ?? .hold
+        preWait = try container.decodeIfPresent(TimeInterval.self, forKey: .preWait) ?? 0
+        postWait = try container.decodeIfPresent(TimeInterval.self, forKey: .postWait) ?? 0
+        notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
+        overrides = try container.decodeIfPresent(CueOverrides.self, forKey: .overrides) ?? .none
+    }
+}
+
 struct PlayoutTransitionSettings: Codable, Hashable {
     static let minimumDuration = 0.1
     static let maximumDuration = 30.0
