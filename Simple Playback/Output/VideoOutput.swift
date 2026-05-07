@@ -2,6 +2,8 @@ import Foundation
 import SwiftUI
 
 final class OutputSettingsStore: ObservableObject {
+    static let shared = OutputSettingsStore()
+
     private static let selectedDeviceKey = "output.selectedDeviceID"
     private static let selectedModeKey = "output.selectedModeID"
 

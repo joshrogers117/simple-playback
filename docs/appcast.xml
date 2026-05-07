@@ -3,6 +3,18 @@
     <channel>
         <title>Simple Playback</title>
         <item>
+            <title>0.1.2</title>
+            <pubDate>Wed, 06 May 2026 22:05:57 -0700</pubDate>
+            <sparkle:version>3</sparkle:version>
+            <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://joshrogers117.github.io/simple-playback/Simple%20Playback-0.1.2.zip" length="2669021" type="application/octet-stream" sparkle:edSignature="3tr7gcgJWg5doY0yJVVdOFVoCF3aTCRF+4/T0M5gYuezQHVdsCK43YapyzFWNVU+XcU4J4NZrXLEk8NGxbNADg=="/>
+            <sparkle:deltas>
+                <enclosure url="https://joshrogers117.github.io/simple-playback/Simple%20Playback3-2.delta" sparkle:deltaFrom="2" length="112070" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="8Z9OxFIy5hvmDIpvVFGp15Gxt/2O9nWYyeBBZN23NFbZrDVWUb0Nd0LaZFPwZa+U/dttXHVwzx2BpQB6oXx1BA=="/>
+                <enclosure url="https://joshrogers117.github.io/simple-playback/Simple%20Playback3-1.delta" sparkle:deltaFrom="1" length="112974" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="NpfqeDLSPRdj55hRWEa3hMO7R/tcBxCrWIv0pSP70pHjZdGbj6UzOT2j0eTNH0d9i54bEUolyTN3o6kq6LEdCg=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.1.1</title>
             <pubDate>Wed, 06 May 2026 20:23:03 -0700</pubDate>
             <sparkle:version>2</sparkle:version>

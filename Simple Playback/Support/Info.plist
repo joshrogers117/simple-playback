@@ -29,6 +29,8 @@
 			<array>
 				<string>com.josh.simpleplayback.project</string>
 			</array>
+			<key>NSDocumentClass</key>
+			<string>$(PRODUCT_MODULE_NAME).SimplePlaybackProjectDocument</string>
 		</dict>
 	</array>
 	<key>UTExportedTypeDeclarations</key>

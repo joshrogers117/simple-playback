@@ -1,4 +1,5 @@
 import AVFoundation
+import AppKit
 import CoreGraphics
 import Foundation
 import XCTest
@@ -15,6 +16,30 @@ final class ModelTests: XCTestCase {
 
         XCTAssertEqual(extensions.first, "spb")
         XCTAssertTrue(extensions.contains("splayback"))
+    }
+
+    func testProjectDocumentTypeRegistersNSDocumentClass() throws {
+        let documentTypes = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "CFBundleDocumentTypes") as? [[String: Any]])
+        let projectType = try XCTUnwrap(documentTypes.first { documentType in
+            documentType["CFBundleTypeName"] as? String == "Simple Playback Project"
+        })
+        let documentClassName = try XCTUnwrap(projectType["NSDocumentClass"] as? String)
+
+        XCTAssertTrue(documentClassName.hasSuffix(".SimplePlaybackProjectDocument"))
+        XCTAssertNotNil(NSClassFromString(documentClassName) as? NSDocument.Type)
+    }
+
+    func testStartupProjectLaunchUsesFirstExistingRecentProject() {
+        let missingProject = URL(fileURLWithPath: "/tmp/missing-project.spb")
+        let existingProject = URL(fileURLWithPath: "/tmp/existing-project.spb")
+        let olderProject = URL(fileURLWithPath: "/tmp/older-project.spb")
+
+        let selectedURL = StartupProjectLaunch.firstExistingRecentProjectURL(
+            from: [missingProject, existingProject, olderProject],
+            fileExists: { $0 == existingProject || $0 == olderProject }
+        )
+
+        XCTAssertEqual(selectedURL, existingProject)
     }
 
     func testProjectRoundTripsThroughJSON() throws {
