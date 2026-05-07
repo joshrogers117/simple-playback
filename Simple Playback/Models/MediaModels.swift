@@ -234,6 +234,183 @@ struct Cue: Identifiable, Codable, Hashable {
     }
 }
 
+/// Reasons an attempt to add or rename a cue can fail.
+enum ShowListValidationError: Error, Equatable {
+    case emptyCueNumber
+    case duplicateCueNumber(String)
+    case unknownCueID(UUID)
+    case unknownAssetID(UUID)
+}
+
+/// An ordered list of `Cue`s with a playhead. Multiple `ShowList`s can coexist in a project
+/// (e.g. main show vs. preshow vs. backups). Cue numbers are unique within a list,
+/// case-insensitively.
+struct ShowList: Identifiable, Codable, Hashable {
+    var id: UUID = UUID()
+    var name: String = "Show"
+    var cues: [Cue] = []
+
+    /// UUID of the cue currently armed (the next to fire on GO). `nil` ⇔ playhead at end.
+    var playheadCueID: UUID?
+
+    init(
+        id: UUID = UUID(),
+        name: String = "Show",
+        cues: [Cue] = [],
+        playheadCueID: UUID? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.cues = cues
+        self.playheadCueID = playheadCueID ?? cues.first?.id
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case cues
+        case playheadCueID
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? "Show"
+        cues = try container.decodeIfPresent([Cue].self, forKey: .cues) ?? []
+        playheadCueID = try container.decodeIfPresent(UUID.self, forKey: .playheadCueID)
+    }
+
+    // MARK: Lookups
+
+    func cue(id cueID: UUID) -> Cue? {
+        cues.first(where: { $0.id == cueID })
+    }
+
+    func cueIndex(id cueID: UUID) -> Int? {
+        cues.firstIndex(where: { $0.id == cueID })
+    }
+
+    /// Looks up a cue by its operator-visible number, case-insensitively.
+    /// `"INTRO"` and `"intro"` resolve to the same cue.
+    func cue(number: String) -> Cue? {
+        let normalized = number.lowercased()
+        return cues.first(where: { $0.number.lowercased() == normalized })
+    }
+
+    func cueIndex(number: String) -> Int? {
+        let normalized = number.lowercased()
+        return cues.firstIndex(where: { $0.number.lowercased() == normalized })
+    }
+
+    /// The cue currently armed at the playhead, or `nil` if the playhead is past the end.
+    var playheadCue: Cue? {
+        guard let playheadCueID else { return nil }
+        return cue(id: playheadCueID)
+    }
+
+    var playheadIndex: Int? {
+        guard let playheadCueID else { return nil }
+        return cueIndex(id: playheadCueID)
+    }
+
+    /// Cue immediately after the playhead, or `nil` if playhead is at end.
+    var nextCueAfterPlayhead: Cue? {
+        guard let idx = playheadIndex else { return nil }
+        let nextIdx = idx + 1
+        return cues.indices.contains(nextIdx) ? cues[nextIdx] : nil
+    }
+
+    // MARK: Validation
+
+    /// All current uniqueness/well-formedness violations. Empty array == valid.
+    func validate() -> [ShowListValidationError] {
+        var errors: [ShowListValidationError] = []
+        var seen: [String: Int] = [:]
+        for cue in cues {
+            if cue.number.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                errors.append(.emptyCueNumber)
+                continue
+            }
+            let normalized = cue.number.lowercased()
+            if let prior = seen[normalized] {
+                _ = prior
+                errors.append(.duplicateCueNumber(cue.number))
+            } else {
+                seen[normalized] = 1
+            }
+        }
+        return errors
+    }
+
+    var isValid: Bool { validate().isEmpty }
+
+    // MARK: Mutation helpers
+
+    /// Inserts a cue at `index`, validating uniqueness first. Throws on collision or empty number.
+    mutating func insert(_ cue: Cue, at index: Int) throws {
+        let trimmed = cue.number.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            throw ShowListValidationError.emptyCueNumber
+        }
+        if cueIndex(number: cue.number) != nil {
+            throw ShowListValidationError.duplicateCueNumber(cue.number)
+        }
+        let bounded = max(0, min(index, cues.count))
+        cues.insert(cue, at: bounded)
+        if playheadCueID == nil {
+            playheadCueID = cues.first?.id
+        }
+    }
+
+    /// Appends a cue, validating uniqueness first.
+    mutating func append(_ cue: Cue) throws {
+        try insert(cue, at: cues.count)
+    }
+
+    /// Removes the cue at `index`, advancing the playhead if it sat on the removed cue.
+    mutating func remove(at index: Int) {
+        guard cues.indices.contains(index) else { return }
+        let removed = cues.remove(at: index)
+        if playheadCueID == removed.id {
+            // Move playhead to the cue that took the removed slot, or the previous cue,
+            // or nil if the list is empty.
+            if cues.indices.contains(index) {
+                playheadCueID = cues[index].id
+            } else if !cues.isEmpty {
+                playheadCueID = cues.last?.id
+            } else {
+                playheadCueID = nil
+            }
+        }
+    }
+
+    /// Moves the playhead to a specific cue. No-op if `cueID` is unknown.
+    mutating func movePlayhead(to cueID: UUID) {
+        guard cueIndex(id: cueID) != nil else { return }
+        playheadCueID = cueID
+    }
+
+    /// Moves the playhead one cue forward. No-op if at end.
+    mutating func advancePlayhead() {
+        guard let idx = playheadIndex else { return }
+        let nextIdx = idx + 1
+        playheadCueID = cues.indices.contains(nextIdx) ? cues[nextIdx].id : nil
+    }
+
+    /// Moves the playhead one cue back. No-op if at the start.
+    mutating func retreatPlayhead() {
+        if let idx = playheadIndex {
+            let prevIdx = idx - 1
+            if cues.indices.contains(prevIdx) {
+                playheadCueID = cues[prevIdx].id
+            }
+        } else if let last = cues.last {
+            // Playhead past the end → step back to the last cue.
+            playheadCueID = last.id
+        }
+    }
+}
+
 struct PlayoutTransitionSettings: Codable, Hashable {
     static let minimumDuration = 0.1
     static let maximumDuration = 30.0

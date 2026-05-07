@@ -248,6 +248,145 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(CueContinuation.autoFollow.label, "Auto-follow")
     }
 
+    // MARK: - ShowList (A4a)
+
+    func testEmptyShowListHasNoPlayhead() {
+        let list = ShowList()
+        XCTAssertNil(list.playheadCue)
+        XCTAssertNil(list.playheadIndex)
+        XCTAssertNil(list.nextCueAfterPlayhead)
+        XCTAssertTrue(list.isValid)
+    }
+
+    func testShowListInitializesPlayheadToFirstCue() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let list = ShowList(cues: [cueA, cueB])
+        XCTAssertEqual(list.playheadCue?.id, cueA.id)
+        XCTAssertEqual(list.playheadIndex, 0)
+        XCTAssertEqual(list.nextCueAfterPlayhead?.id, cueB.id)
+    }
+
+    func testShowListLooksUpCueByNumberCaseInsensitively() {
+        let asset = UUID()
+        let intro = Cue(number: "INTRO", title: "Intro", assetID: asset)
+        let bumper = Cue(number: "Q12.5", title: "Bumper", assetID: asset)
+        let list = ShowList(cues: [intro, bumper])
+
+        XCTAssertEqual(list.cue(number: "intro")?.id, intro.id)
+        XCTAssertEqual(list.cue(number: "Intro")?.id, intro.id)
+        XCTAssertEqual(list.cue(number: "INTRO")?.id, intro.id)
+        XCTAssertEqual(list.cue(number: "q12.5")?.id, bumper.id)
+        XCTAssertNil(list.cue(number: "missing"))
+    }
+
+    func testShowListAppendRejectsDuplicateNumberCaseInsensitively() throws {
+        let asset = UUID()
+        var list = ShowList()
+        try list.append(Cue(number: "INTRO", title: "Intro", assetID: asset))
+        XCTAssertThrowsError(try list.append(Cue(number: "intro", title: "Dup", assetID: asset))) { error in
+            guard case ShowListValidationError.duplicateCueNumber(let number) = error else {
+                XCTFail("Expected duplicateCueNumber, got \(error)")
+                return
+            }
+            XCTAssertEqual(number, "intro")
+        }
+        XCTAssertEqual(list.cues.count, 1)
+    }
+
+    func testShowListAppendRejectsEmptyOrWhitespaceCueNumber() {
+        var list = ShowList()
+        XCTAssertThrowsError(try list.append(Cue(number: "", title: "Bad", assetID: UUID())))
+        XCTAssertThrowsError(try list.append(Cue(number: "   ", title: "Bad", assetID: UUID())))
+        XCTAssertTrue(list.cues.isEmpty)
+    }
+
+    func testShowListValidateReportsAllDuplicates() {
+        let asset = UUID()
+        let list = ShowList(cues: [
+            Cue(number: "1", title: "a", assetID: asset),
+            Cue(number: "1", title: "b", assetID: asset),
+            Cue(number: "Intro", title: "c", assetID: asset),
+            Cue(number: "INTRO", title: "d", assetID: asset)
+        ])
+        let errors = list.validate()
+        XCTAssertEqual(errors.count, 2)
+        XCTAssertTrue(errors.contains(.duplicateCueNumber("1")))
+        XCTAssertTrue(errors.contains(.duplicateCueNumber("INTRO")))
+        XCTAssertFalse(list.isValid)
+    }
+
+    func testAdvancePlayheadStepsForwardThenLandsAtEnd() throws {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let cueC = Cue(number: "3", title: "C", assetID: asset)
+        var list = ShowList(cues: [cueA, cueB, cueC])
+
+        XCTAssertEqual(list.playheadCue?.id, cueA.id)
+        list.advancePlayhead()
+        XCTAssertEqual(list.playheadCue?.id, cueB.id)
+        list.advancePlayhead()
+        XCTAssertEqual(list.playheadCue?.id, cueC.id)
+        list.advancePlayhead()
+        XCTAssertNil(list.playheadCue, "Playhead should land off the end after the last cue")
+    }
+
+    func testRetreatPlayheadFromEndReturnsToLastCue() throws {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        var list = ShowList(cues: [cueA, cueB])
+        list.advancePlayhead() // → B
+        list.advancePlayhead() // → off the end
+        XCTAssertNil(list.playheadCue)
+        list.retreatPlayhead()
+        XCTAssertEqual(list.playheadCue?.id, cueB.id)
+        list.retreatPlayhead()
+        XCTAssertEqual(list.playheadCue?.id, cueA.id)
+        list.retreatPlayhead()
+        XCTAssertEqual(list.playheadCue?.id, cueA.id, "Retreat at start is a no-op")
+    }
+
+    func testRemoveCueAtPlayheadAdvancesPlayheadToCueThatTookItsSlot() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let cueC = Cue(number: "3", title: "C", assetID: asset)
+        var list = ShowList(cues: [cueA, cueB, cueC])
+        list.advancePlayhead() // → cueB
+        list.remove(at: 1) // remove cueB
+        XCTAssertEqual(list.playheadCue?.id, cueC.id)
+        XCTAssertEqual(list.cues.count, 2)
+    }
+
+    func testMovePlayheadIgnoresUnknownCueID() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        var list = ShowList(cues: [cueA])
+        let originalPlayhead = list.playheadCueID
+        list.movePlayhead(to: UUID())
+        XCTAssertEqual(list.playheadCueID, originalPlayhead)
+    }
+
+    func testShowListRoundTripsThroughJSON() throws {
+        let asset = UUID()
+        let cueA = Cue(number: "INTRO", title: "Intro", assetID: asset, continuation: .autoFollow)
+        let cueB = Cue(number: "BUMPER", title: "Bumper", assetID: asset, preWait: 1.5)
+        var list = ShowList(name: "Main", cues: [cueA, cueB])
+        list.movePlayhead(to: cueB.id)
+
+        let data = try JSONEncoder.simplePlayback.encode(list)
+        let decoded = try JSONDecoder.simplePlayback.decode(ShowList.self, from: data)
+        XCTAssertEqual(decoded.id, list.id)
+        XCTAssertEqual(decoded.name, "Main")
+        XCTAssertEqual(decoded.cues.count, 2)
+        XCTAssertEqual(decoded.cues[0].number, "INTRO")
+        XCTAssertEqual(decoded.cues[1].preWait, 1.5, accuracy: 0.001)
+        XCTAssertEqual(decoded.playheadCueID, cueB.id)
+    }
+
     func testFitScalingCentersLetterboxedMedia() {
         let rect = ScalingGeometry.mediaRect(
             sourceSize: CGSize(width: 1000, height: 1000),
