@@ -370,6 +370,238 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(list.playheadCueID, originalPlayhead)
     }
 
+    // MARK: - CueRuntime (A4b)
+
+    /// Helper: builds a CueRuntime with a controllable clock and an event log.
+    private func makeRuntime(cues: [Cue]) -> (CueRuntime, ManualClock, RuntimeEventLog) {
+        let list = ShowList(cues: cues)
+        let clock = ManualClock()
+        let runtime = CueRuntime(showList: list, clock: { clock.now })
+        let log = RuntimeEventLog()
+        log.attach(runtime)
+        return (runtime, clock, log)
+    }
+
+    func testCueRuntimeStartsAllCuesIdle() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let (runtime, _, _) = makeRuntime(cues: [cueA, cueB])
+        XCTAssertEqual(runtime.state(of: cueA.id), .idle)
+        XCTAssertEqual(runtime.state(of: cueB.id), .idle)
+        XCTAssertFalse(runtime.blackout)
+        XCTAssertFalse(runtime.panicActive)
+    }
+
+    func testGoFiresPlayheadAndAdvances() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let (runtime, _, log) = makeRuntime(cues: [cueA, cueB])
+
+        let fired = runtime.go()
+        XCTAssertEqual(fired?.id, cueA.id)
+        XCTAssertEqual(runtime.state(of: cueA.id), .running)
+        XCTAssertEqual(runtime.showList.playheadCue?.id, cueB.id)
+        XCTAssertTrue(log.contains(.cueFired(cueA.id, dueToContinuation: false)))
+        XCTAssertTrue(log.contains(.cueStateChanged(cueA.id, .running)))
+        XCTAssertTrue(log.contains(.playheadChanged(cueB.id)))
+    }
+
+    func testGoOnEmptyListReturnsNoCueAtPlayhead() {
+        let (runtime, _, log) = makeRuntime(cues: [])
+        XCTAssertNil(runtime.go())
+        XCTAssertTrue(log.contains(.goRejected(.noCueAtPlayhead)))
+    }
+
+    func testGoDebouncesRapidCalls() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let cueC = Cue(number: "3", title: "C", assetID: asset)
+        let (runtime, clock, log) = makeRuntime(cues: [cueA, cueB, cueC])
+        runtime.minimumGoInterval = 0.25
+
+        clock.now = 100.0
+        XCTAssertNotNil(runtime.go()) // fires A, playhead → B
+
+        clock.now = 100.10 // 100 ms later — within 250 ms debounce
+        XCTAssertNil(runtime.go())
+        XCTAssertTrue(log.contains(.goRejected(.debounced)))
+        XCTAssertEqual(runtime.showList.playheadCue?.id, cueB.id, "Playhead must not advance on debounced GO")
+        XCTAssertEqual(runtime.state(of: cueB.id), .idle, "B must not have fired")
+
+        clock.now = 100.30 // 300 ms later — past debounce
+        XCTAssertNotNil(runtime.go())
+        XCTAssertEqual(runtime.state(of: cueB.id), .running)
+    }
+
+    func testGoTargetNumberJumpsAndFires() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "INTRO", title: "B", assetID: asset)
+        let cueC = Cue(number: "BUMPER", title: "C", assetID: asset)
+        let (runtime, _, log) = makeRuntime(cues: [cueA, cueB, cueC])
+
+        let fired = runtime.go(targetNumber: "intro") // case-insensitive
+        XCTAssertEqual(fired?.id, cueB.id)
+        XCTAssertEqual(runtime.state(of: cueB.id), .running)
+        XCTAssertEqual(runtime.showList.playheadCue?.id, cueC.id)
+        XCTAssertFalse(log.contains(.goRejected(.unknownCueNumber("intro"))))
+    }
+
+    func testGoTargetNumberRejectsUnknown() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let (runtime, _, log) = makeRuntime(cues: [cueA])
+        XCTAssertNil(runtime.go(targetNumber: "missing"))
+        XCTAssertTrue(log.contains(.goRejected(.unknownCueNumber("missing"))))
+        XCTAssertEqual(runtime.state(of: cueA.id), .idle)
+    }
+
+    func testPreviousMovesPlayheadBackWithoutFiring() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let (runtime, _, log) = makeRuntime(cues: [cueA, cueB])
+        runtime.go() // playhead → B
+
+        log.clear()
+        runtime.previous()
+        XCTAssertEqual(runtime.showList.playheadCue?.id, cueA.id)
+        XCTAssertFalse(log.events.contains(where: {
+            if case .cueFired = $0 { return true } else { return false }
+        }))
+    }
+
+    func testPanicMovesRunningCuesToTailAndBlocksGo() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let cueC = Cue(number: "3", title: "C", assetID: asset)
+        let (runtime, _, log) = makeRuntime(cues: [cueA, cueB, cueC])
+        runtime.go() // A running, playhead → B
+
+        runtime.panic()
+        XCTAssertTrue(runtime.panicActive)
+        XCTAssertEqual(runtime.state(of: cueA.id), .tail)
+        XCTAssertTrue(log.contains(.panicChanged(true)))
+
+        XCTAssertNil(runtime.go(), "GO must be rejected while panic is active")
+        XCTAssertTrue(log.contains(.goRejected(.panicInProgress)))
+    }
+
+    func testPanicCompletedDrainsTailAndUnlocksGo() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let (runtime, clock, log) = makeRuntime(cues: [cueA, cueB])
+        runtime.go() // A running
+
+        runtime.panic(fade: 0.4)
+        XCTAssertEqual(runtime.state(of: cueA.id), .tail)
+        runtime.panicCompleted()
+        XCTAssertFalse(runtime.panicActive)
+        XCTAssertEqual(runtime.state(of: cueA.id), .idle)
+        XCTAssertTrue(log.contains(.cueEnded(cueA.id)))
+        XCTAssertTrue(log.contains(.panicChanged(false)))
+
+        clock.now = 1.0 // sufficiently past any prior GO debounce
+        XCTAssertNotNil(runtime.go(), "GO must succeed after panicCompleted")
+    }
+
+    func testClearForcesAllRunningAndTailCuesToIdle() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let (runtime, _, log) = makeRuntime(cues: [cueA, cueB])
+        runtime.go() // A running
+
+        runtime.clear()
+        XCTAssertEqual(runtime.state(of: cueA.id), .idle)
+        XCTAssertTrue(log.contains(.cueEnded(cueA.id)))
+        XCTAssertTrue(log.contains(.cleared))
+        XCTAssertFalse(runtime.panicActive)
+    }
+
+    func testToggleBlackoutFlipsAndEmits() {
+        let (runtime, _, log) = makeRuntime(cues: [])
+        XCTAssertFalse(runtime.blackout)
+        runtime.toggleBlackout()
+        XCTAssertTrue(runtime.blackout)
+        XCTAssertTrue(log.contains(.blackoutChanged(true)))
+        runtime.toggleBlackout()
+        XCTAssertFalse(runtime.blackout)
+    }
+
+    func testSetBlackoutIdempotent() {
+        let (runtime, _, log) = makeRuntime(cues: [])
+        runtime.setBlackout(false) // no-op, already false
+        XCTAssertFalse(log.contains(.blackoutChanged(false)))
+        runtime.setBlackout(true)
+        XCTAssertTrue(log.contains(.blackoutChanged(true)))
+    }
+
+    func testCueDidEndTransitionsRunningToIdleAndEmits() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let (runtime, _, log) = makeRuntime(cues: [cueA])
+        runtime.go()
+        XCTAssertEqual(runtime.state(of: cueA.id), .running)
+        runtime.cueDidEnd(cueID: cueA.id)
+        XCTAssertEqual(runtime.state(of: cueA.id), .idle)
+        XCTAssertTrue(log.contains(.cueEnded(cueA.id)))
+    }
+
+    func testMarkLoadedAndUnloadIsRoundTripable() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let (runtime, _, log) = makeRuntime(cues: [cueA])
+        runtime.markLoaded(cueID: cueA.id)
+        XCTAssertEqual(runtime.state(of: cueA.id), .loaded)
+        XCTAssertTrue(log.contains(.cueStateChanged(cueA.id, .loaded)))
+        runtime.unloadCue(cueID: cueA.id)
+        XCTAssertEqual(runtime.state(of: cueA.id), .idle)
+    }
+
+    func testMarkLoadedNoOpWhenAlreadyLoaded() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let (runtime, _, log) = makeRuntime(cues: [cueA])
+        runtime.markLoaded(cueID: cueA.id)
+        log.clear()
+        runtime.markLoaded(cueID: cueA.id)
+        XCTAssertFalse(log.events.contains(where: {
+            if case .cueStateChanged = $0 { return true } else { return false }
+        }))
+    }
+
+    func testMutateShowListDropsStateForRemovedCues() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let (runtime, _, _) = makeRuntime(cues: [cueA, cueB])
+        runtime.markLoaded(cueID: cueA.id)
+        XCTAssertEqual(runtime.state(of: cueA.id), .loaded)
+
+        runtime.mutateShowList { list in
+            list.remove(at: 0) // remove A
+        }
+        XCTAssertEqual(runtime.cueStates[cueA.id], nil)
+        XCTAssertEqual(runtime.state(of: cueB.id), .idle)
+    }
+
+    func testReplaceShowListPreservesStateForOverlappingCueIDs() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let (runtime, _, _) = makeRuntime(cues: [cueA])
+        runtime.markLoaded(cueID: cueA.id)
+        runtime.replaceShowList(ShowList(cues: [cueA, cueB]))
+        XCTAssertEqual(runtime.state(of: cueA.id), .loaded, "Overlapping cue ID retains its state")
+        XCTAssertEqual(runtime.state(of: cueB.id), .idle)
+    }
+
     func testShowListRoundTripsThroughJSON() throws {
         let asset = UUID()
         let cueA = Cue(number: "INTRO", title: "Intro", assetID: asset, continuation: .autoFollow)
@@ -386,6 +618,8 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(decoded.cues[1].preWait, 1.5, accuracy: 0.001)
         XCTAssertEqual(decoded.playheadCueID, cueB.id)
     }
+
+    // MARK: - Pre-existing tests (rendering, scaling, importing, drivers)
 
     func testFitScalingCentersLetterboxedMedia() {
         let rect = ScalingGeometry.mediaRect(
@@ -594,6 +828,60 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(writer.status, .completed)
         if let error = writer.error {
             throw error
+        }
+    }
+}
+
+// MARK: - Test helpers
+
+/// Manual clock for deterministic time-based tests.
+private final class ManualClock {
+    var now: TimeInterval = 0
+}
+
+/// Captures every CueRuntime callback as an enum event so tests can assert ordering / presence.
+private final class RuntimeEventLog {
+    enum Event: Equatable {
+        case cueFired(UUID, dueToContinuation: Bool)
+        case cueEnded(UUID)
+        case cueStateChanged(UUID, CueStandbyState)
+        case playheadChanged(UUID?)
+        case panicChanged(Bool)
+        case blackoutChanged(Bool)
+        case goRejected(CueRuntimeRejection)
+        case cleared
+    }
+
+    private(set) var events: [Event] = []
+
+    func clear() { events.removeAll() }
+
+    func contains(_ event: Event) -> Bool { events.contains(event) }
+
+    func attach(_ runtime: CueRuntime) {
+        runtime.onCueFired = { [weak self] cue, due in
+            self?.events.append(.cueFired(cue.id, dueToContinuation: due))
+        }
+        runtime.onCueEnded = { [weak self] cue in
+            self?.events.append(.cueEnded(cue.id))
+        }
+        runtime.onCueStateChanged = { [weak self] cue, state in
+            self?.events.append(.cueStateChanged(cue.id, state))
+        }
+        runtime.onPlayheadChanged = { [weak self] cue in
+            self?.events.append(.playheadChanged(cue?.id))
+        }
+        runtime.onPanicChanged = { [weak self] active, _ in
+            self?.events.append(.panicChanged(active))
+        }
+        runtime.onBlackoutChanged = { [weak self] active in
+            self?.events.append(.blackoutChanged(active))
+        }
+        runtime.onGoRejected = { [weak self] reason in
+            self?.events.append(.goRejected(reason))
+        }
+        runtime.onCleared = { [weak self] in
+            self?.events.append(.cleared)
         }
     }
 }

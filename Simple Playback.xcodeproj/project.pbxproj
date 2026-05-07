@@ -17,6 +17,7 @@
 		51CA5DA530C6B560FA1A7989 /* SimplePlaybackProjectDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB740EFC960FD945A655941 /* SimplePlaybackProjectDocument.swift */; };
 		54CEA8F876D2A59653C1D8EE /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 4213C51E238E88088B4700FC /* Sparkle */; };
 		5602C3EC7F566873E1629051 /* FrameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45B0A7CB7DDDC72B747F7C8 /* FrameRenderer.swift */; };
+		5B7913C72F3E6AF0B894DE59 /* CueRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD749649E2DEED56E2B8C243 /* CueRuntime.swift */; };
 		62CDF088556B0DAA473AC800 /* AudioPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3906CB66B7CA3652EABFE931 /* AudioPump.swift */; };
 		67765CD777AA4E30553D4126 /* SimplePlaybackApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECEAD362FE5313C14713663D /* SimplePlaybackApp.swift */; };
 		7903F319F280ADCB53522EA0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9E5D5CE935540C98B6BAAAEF /* Assets.xcassets */; };
@@ -79,6 +80,7 @@
 		EB3CFD9074943CC8F73C637C /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		ECEAD362FE5313C14713663D /* SimplePlaybackApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackApp.swift; sourceTree = "<group>"; };
 		F1E1F27FCEA1C60E3C601307 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		FD749649E2DEED56E2B8C243 /* CueRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueRuntime.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -101,6 +103,7 @@
 			isa = PBXGroup;
 			children = (
 				3906CB66B7CA3652EABFE931 /* AudioPump.swift */,
+				FD749649E2DEED56E2B8C243 /* CueRuntime.swift */,
 				A45B0A7CB7DDDC72B747F7C8 /* FrameRenderer.swift */,
 				8A5E1B676CDA189E4C8C26CB /* PlaybackController.swift */,
 				4FFDD7785740559EEB94F4CA /* SPFrameBlend.c */,
@@ -320,6 +323,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				62CDF088556B0DAA473AC800 /* AudioPump.swift in Sources */,
+				5B7913C72F3E6AF0B894DE59 /* CueRuntime.swift in Sources */,
 				C9842DF5C4DF8FAA50B74011 /* DeckLinkBridge.mm in Sources */,
 				4A94C48FF22B0552314D441E /* DeckLinkDiagnostics.swift in Sources */,
 				DF9D9D2A7D5D102CC20FCD95 /* DeckLinkSDKDispatch.cpp in Sources */,
