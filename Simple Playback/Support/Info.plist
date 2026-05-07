@@ -10,6 +10,10 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleDocumentTypes</key>
@@ -53,5 +57,9 @@
 	<true/>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>SUFeedURL</key>
+	<string>$(SPARKLE_FEED_URL)</string>
+	<key>SUPublicEDKey</key>
+	<string>$(SPARKLE_PUBLIC_ED_KEY)</string>
 </dict>
 </plist>

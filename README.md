@@ -29,3 +29,7 @@ xcodebuild -project "Simple Playback.xcodeproj" -scheme "Simple Playback" -desti
 ## Notes
 
 Projects save as `.splayback` documents. Those files store the slide list, settings, and security-scoped media bookmarks; they do not embed the original media files.
+
+## Distribution
+
+Release packaging, notarization, Sparkle updates, and GitHub Pages staging are documented in [Distribution/README.md](Distribution/README.md).

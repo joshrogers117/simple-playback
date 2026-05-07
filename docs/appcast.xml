@@ -1,0 +1,14 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Simple Playback</title>
+        <item>
+            <title>0.1.0</title>
+            <pubDate>Wed, 06 May 2026 19:14:41 -0700</pubDate>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://joshrogers117.github.io/simple-playback/Simple%20Playback-0.1.0.zip" length="2646640" type="application/octet-stream" sparkle:edSignature="kqXpIa1MR4grJZJDjdqOQoNEYITFU6Foj6G1skN5Va/4UFuUyPe/V/L7wSin31V0W5mzHl8j11aHb7NC8yfLDw=="/>
+        </item>
+    </channel>
+</rss>

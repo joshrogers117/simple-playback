@@ -15,7 +15,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "41BB8A8C2D1BC69276737B0A"
+               BlueprintIdentifier = "254E6CD3CFEEA6DCF7804E5B"
                BuildableName = "Simple Playback.app"
                BlueprintName = "Simple Playback"
                ReferencedContainer = "container:Simple Playback.xcodeproj">
@@ -32,7 +32,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "41BB8A8C2D1BC69276737B0A"
+            BlueprintIdentifier = "254E6CD3CFEEA6DCF7804E5B"
             BuildableName = "Simple Playback.app"
             BlueprintName = "Simple Playback"
             ReferencedContainer = "container:Simple Playback.xcodeproj">
@@ -44,7 +44,7 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "B88D65C2EA48A286AAF0A587"
+               BlueprintIdentifier = "867D1334612645B439F74D61"
                BuildableName = "Simple PlaybackTests.xctest"
                BlueprintName = "Simple PlaybackTests"
                ReferencedContainer = "container:Simple Playback.xcodeproj">
@@ -68,7 +68,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "41BB8A8C2D1BC69276737B0A"
+            BlueprintIdentifier = "254E6CD3CFEEA6DCF7804E5B"
             BuildableName = "Simple Playback.app"
             BlueprintName = "Simple Playback"
             ReferencedContainer = "container:Simple Playback.xcodeproj">
@@ -87,7 +87,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "41BB8A8C2D1BC69276737B0A"
+            BlueprintIdentifier = "254E6CD3CFEEA6DCF7804E5B"
             BuildableName = "Simple Playback.app"
             BlueprintName = "Simple Playback"
             ReferencedContainer = "container:Simple Playback.xcodeproj">

@@ -1,0 +1,2 @@
+da30c8f2c0aa74eb372f6fb76067507d127d0d0da525348cdf5666ac3cdf1b93  docs/Simple Playback-0.1.0.dmg
+485e7731cef1e525e645b8d8ac830e54b1f94ece4b6cd69f545ba17aadac709a  docs/Simple Playback-0.1.0.zip
