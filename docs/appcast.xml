@@ -3,6 +3,17 @@
     <channel>
         <title>Simple Playback</title>
         <item>
+            <title>0.1.1</title>
+            <pubDate>Wed, 06 May 2026 20:23:03 -0700</pubDate>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://joshrogers117.github.io/simple-playback/Simple%20Playback-0.1.1.zip" length="2646758" type="application/octet-stream" sparkle:edSignature="XdLdtcG4A+/+ETZ3ewMZpZf/peEASFl1+UkoWsCu7uEakIKOYh1HP/aPly+0gH1xmOSrc7Yo12qtrJVl4P2NCQ=="/>
+            <sparkle:deltas>
+                <enclosure url="https://joshrogers117.github.io/simple-playback/Simple%20Playback2-1.delta" sparkle:deltaFrom="1" length="63866" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="x3VEoF472qLB+ggFRC66JqfXXDo+cMaaYN84Zns6kd/jL7j2mUS3guJbXsrWIkzffY00n9p7aQnkacf9+InHDg=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.1.0</title>
             <pubDate>Wed, 06 May 2026 19:14:41 -0700</pubDate>
             <sparkle:version>1</sparkle:version>

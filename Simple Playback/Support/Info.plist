@@ -46,6 +46,7 @@
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
+					<string>spb</string>
 					<string>splayback</string>
 				</array>
 				<key>public.mime-type</key>

@@ -5,6 +5,18 @@ import XCTest
 @testable import Simple_Playback
 
 final class ModelTests: XCTestCase {
+    func testProjectDocumentTypeUsesSPBAsPrimaryExtension() throws {
+        let declarations = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "UTExportedTypeDeclarations") as? [[String: Any]])
+        let projectType = try XCTUnwrap(declarations.first { declaration in
+            declaration["UTTypeIdentifier"] as? String == "com.josh.simpleplayback.project"
+        })
+        let tagSpecification = try XCTUnwrap(projectType["UTTypeTagSpecification"] as? [String: Any])
+        let extensions = try XCTUnwrap(tagSpecification["public.filename-extension"] as? [String])
+
+        XCTAssertEqual(extensions.first, "spb")
+        XCTAssertTrue(extensions.contains("splayback"))
+    }
+
     func testProjectRoundTripsThroughJSON() throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)

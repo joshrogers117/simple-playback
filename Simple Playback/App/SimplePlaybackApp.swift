@@ -22,7 +22,7 @@ struct SimplePlaybackApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Project") {
-                    NSDocumentController.shared.newDocument(nil)
+                    DocumentLifecycle.openBlankProject()
                 }
                 .keyboardShortcut("n")
             }
@@ -78,12 +78,36 @@ private struct CheckForUpdatesView: View {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
-        DispatchQueue.main.async {
-            self.openStartupProject()
+private enum DocumentLifecycle {
+    static func openBlankProject() {
+        do {
+            _ = try NSDocumentController.shared.openUntitledDocumentAndDisplay(true)
+        } catch {
+            NSApplication.shared.presentError(error)
         }
-        return false
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var handledStartupOpen = false
+
+    func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
+        true
+    }
+
+    func applicationOpenUntitledFile(_ sender: NSApplication) -> Bool {
+        if handledStartupOpen {
+            openBlankProject()
+        } else {
+            openStartupProjectIfNeeded()
+        }
+        return true
+    }
+
+    private func openStartupProjectIfNeeded() {
+        guard !handledStartupOpen else { return }
+        handledStartupOpen = true
+        openStartupProject()
     }
 
     private func openStartupProject() {
@@ -103,6 +127,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func openBlankProject() {
-        NSDocumentController.shared.newDocument(nil)
+        DocumentLifecycle.openBlankProject()
     }
 }

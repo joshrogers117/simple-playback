@@ -25,11 +25,12 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.josh.simpleplayback
         PRODUCT_NAME: Simple Playback
         PRODUCT_MODULE_NAME: Simple_Playback
-        MARKETING_VERSION: 0.1.0
-        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 0.1.1
+        CURRENT_PROJECT_VERSION: 2
         SPARKLE_FEED_URL: https://joshrogers117.github.io/simple-playback/appcast.xml
         SPARKLE_PUBLIC_ED_KEY: "WwIwpidfq9zee0P+4LTuFvIY96vjEg1Tip37co2GZHM="
         INFOPLIST_FILE: "Simple Playback/Support/Info.plist"
+        CODE_SIGN_ENTITLEMENTS: "Simple Playback/Support/SimplePlayback.entitlements"
         SWIFT_OBJC_BRIDGING_HEADER: "Simple Playback/Support/SimplePlayback-Bridging-Header.h"
       configs:
         Release:

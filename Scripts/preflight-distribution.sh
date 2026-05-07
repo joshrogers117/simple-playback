@@ -53,7 +53,7 @@ else
   fail "Sparkle generate_appcast was not found; resolve packages first"
 fi
 
-build_settings="$(xcodebuild -project "$project" -scheme "$scheme" -configuration Release -showBuildSettings 2>/dev/null || true)"
+build_settings="$(xcodebuild -project "$project" -scheme "$scheme" -configuration Release -showBuildSettings 2>&1 || true)"
 if [[ -n "$build_settings" ]]; then
   ok "Release build settings can be read"
 else

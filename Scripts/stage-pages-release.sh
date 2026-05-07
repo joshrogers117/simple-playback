@@ -37,8 +37,10 @@ mkdir -p "$pages_dir"
 touch "${pages_dir}/.nojekyll"
 
 cp "$dmg_source" "${pages_dir}/${app_name}-${version}.dmg"
-cp "$zip_source" "${pages_dir}/${app_name}-${version}.zip"
 cp "$appcast_source" "${pages_dir}/appcast.xml"
+for update_artifact in "${build_root}/appcast/"*.zip(N) "${build_root}/appcast/"*.delta(N); do
+  cp "$update_artifact" "${pages_dir}/${update_artifact:t}"
+done
 
 if command -v magick >/dev/null 2>&1; then
   magick -size 1024x1024 xc:none \
@@ -251,8 +253,9 @@ cat > "${pages_dir}/index.html" <<EOF
         <div class="notes">
           <h2>Release Notes</h2>
           <ul>
-            <li>Initial signed and notarized macOS distribution build.</li>
-            <li>Sparkle update feed is enabled for future releases.</li>
+            <li>Launch now opens the last project when available, or a blank project without showing an open-file picker.</li>
+            <li>DeckLink output now works with Blackmagic Desktop Video under hardened runtime signing.</li>
+            <li>Project saves now use the .spb extension while still accepting older .splayback files.</li>
             <li>Requires macOS 26.0 or later.</li>
           </ul>
         </div>
@@ -285,7 +288,7 @@ EOF
 cat <<EOF
 Staged GitHub Pages release files in ${pages_dir}:
   ${app_name}-${version}.dmg
-  ${app_name}-${version}.zip
+  Sparkle update artifacts from ${build_root}/appcast
   appcast.xml
   checksums.txt
   icon.png

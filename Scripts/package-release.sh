@@ -18,10 +18,10 @@ mkdir -p "$build_root"
 rm -rf "$archive_path" "$export_path"
 
 if [[ -z "$development_team" ]]; then
-  development_team="$(xcodebuild -project "$project" -scheme "$scheme" -configuration Release -showBuildSettings 2>/dev/null | sed -n 's/^[[:space:]]*DEVELOPMENT_TEAM = //p' | tail -n 1)"
+  development_team="$(xcodebuild -project "$project" -scheme "$scheme" -configuration Release -showBuildSettings 2>&1 | sed -n 's/^[[:space:]]*DEVELOPMENT_TEAM = //p' | tail -n 1)"
 fi
 
-sparkle_public_key="$(xcodebuild -project "$project" -scheme "$scheme" -configuration Release -showBuildSettings 2>/dev/null | sed -n 's/^[[:space:]]*SPARKLE_PUBLIC_ED_KEY = //p' | tail -n 1)"
+sparkle_public_key="$(xcodebuild -project "$project" -scheme "$scheme" -configuration Release -showBuildSettings 2>&1 | sed -n 's/^[[:space:]]*SPARKLE_PUBLIC_ED_KEY = //p' | tail -n 1)"
 if [[ -z "$sparkle_public_key" || "$sparkle_public_key" == "\"\"" ]]; then
   cat >&2 <<EOF
 Sparkle public key is not configured.
