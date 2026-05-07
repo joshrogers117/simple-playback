@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A
-- **Last commit**: A11/A12 — bundle round-trip with showLists + end-to-end GO chain test
+- **Active phase**: A complete; B not started
+- **Last commit**: A13 — Phase A summary
 - **Branch**: `development`
 
 ---
@@ -31,7 +31,7 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 - [x] A10: Per-cue notes field (CueInspectorView uses TextEditor, full visibility)
 - [x] A11: Show List integration tests (covered in CueRuntime/ShowList tests in A4)
 - [x] A12: Project-bundle round-trip tests (showLists round-trip + legacy migration verified)
-- [ ] A13: Phase A summary + manual rehearsal steps
+- [x] A13: Phase A summary + manual rehearsal steps (`docs/phase_a_summary.md`)
 
 ## Phase B — Output pipeline rework
 
