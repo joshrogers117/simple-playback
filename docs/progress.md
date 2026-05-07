@@ -9,7 +9,7 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 ## Current state
 
 - **Active phase**: A
-- **Last commit**: A4b — CueRuntime state machine
+- **Last commit**: A4c — Continuation timing
 - **Branch**: `development`
 
 ---
@@ -19,10 +19,10 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 - [x] A1: Convert `.splayback` to bundle format with `formatVersion` and read-flat / write-bundle migration
 - [x] A2: Cue model — id (any non-empty string, case-insensitive uniqueness), continuation (hold/auto-continue/auto-follow), pre-wait, post-wait, notes
 - [x] A3: Per-cue overrides — fade in/out, crossfade duration, hold-last-frame, loop, in/out points; defaults inherit from project
-- [~] A4: Playhead + GO / PREV / PANIC / CLEAR / BLACKOUT semantics, with debounce
+- [x] A4: Playhead + GO / PREV / PANIC / CLEAR / BLACKOUT semantics, with debounce
   - [x] A4a: ShowList struct (ordered cues, lookup by id/number, validation, playhead, mutation helpers)
   - [x] A4b: CueRuntime state machine — GO / PREV / PANIC / CLEAR / BLACKOUT with debounce
-  - [ ] A4c: Continuation timing — autoContinue (overlap on pre-wait) and autoFollow (sequential on cue-end + post-wait)
+  - [x] A4c: Continuation timing — autoContinue (immediate chain) and autoFollow (postWait on cue-end)
 - [ ] A5: Show List view alongside `SlideGridView`; drag-from-palette-to-list; per-cue inspector
 - [ ] A6: Edit / Show Mode toggle in title bar; lockouts in Show Mode (no destructive shortcuts, no editing affordances, confirm-on-quit while live, modal-forbidden invariant)
 - [ ] A7: Hotkey table (rebindable, local + global scope, printable export)

@@ -602,6 +602,163 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(runtime.state(of: cueB.id), .idle)
     }
 
+    // MARK: - Continuation timing (A4c)
+
+    /// Helper for continuation tests — uses a manual scheduler so auto-follow timing is deterministic.
+    private func makeRuntimeWithScheduler(cues: [Cue]) -> (CueRuntime, ManualClock, ManualCueScheduler, RuntimeEventLog) {
+        let list = ShowList(cues: cues)
+        let clock = ManualClock()
+        let scheduler = ManualCueScheduler()
+        let runtime = CueRuntime(showList: list, clock: { clock.now }, scheduler: scheduler)
+        let log = RuntimeEventLog()
+        log.attach(runtime)
+        return (runtime, clock, scheduler, log)
+    }
+
+    func testAutoContinueChainsImmediatelyToNextCue() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset, continuation: .autoContinue)
+        let cueB = Cue(number: "2", title: "B", assetID: asset, continuation: .hold)
+        let cueC = Cue(number: "3", title: "C", assetID: asset)
+        let (runtime, _, _, log) = makeRuntimeWithScheduler(cues: [cueA, cueB, cueC])
+
+        runtime.go()
+        XCTAssertEqual(runtime.state(of: cueA.id), .running)
+        XCTAssertEqual(runtime.state(of: cueB.id), .running, "auto-continue must fire B as well")
+        XCTAssertEqual(runtime.state(of: cueC.id), .idle, "B is hold, chain must stop at B")
+        XCTAssertEqual(runtime.showList.playheadCue?.id, cueC.id, "Playhead lands on the cue after the last fired")
+        XCTAssertTrue(log.contains(.cueFired(cueA.id, dueToContinuation: false)))
+        XCTAssertTrue(log.contains(.cueFired(cueB.id, dueToContinuation: true)))
+    }
+
+    func testAutoContinueChainStopsAtEndOfList() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset, continuation: .autoContinue)
+        let cueB = Cue(number: "2", title: "B", assetID: asset, continuation: .autoContinue)
+        let (runtime, _, _, _) = makeRuntimeWithScheduler(cues: [cueA, cueB])
+
+        runtime.go()
+        XCTAssertEqual(runtime.state(of: cueA.id), .running)
+        XCTAssertEqual(runtime.state(of: cueB.id), .running)
+        XCTAssertNil(runtime.showList.playheadCue, "Chain runs off the end without error")
+    }
+
+    func testAutoFollowSchedulesNextCueAfterPostWaitOnCueDidEnd() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset, continuation: .autoFollow, postWait: 1.0)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let (runtime, _, scheduler, log) = makeRuntimeWithScheduler(cues: [cueA, cueB])
+
+        runtime.go() // A running, playhead → B
+        XCTAssertEqual(runtime.state(of: cueA.id), .running)
+        XCTAssertEqual(runtime.state(of: cueB.id), .idle)
+
+        runtime.cueDidEnd(cueID: cueA.id)
+        XCTAssertEqual(runtime.state(of: cueA.id), .idle)
+        XCTAssertEqual(runtime.state(of: cueB.id), .idle, "B must NOT fire until postWait elapses")
+
+        scheduler.advance(by: 0.5)
+        XCTAssertEqual(runtime.state(of: cueB.id), .idle, "Mid-postWait, B still must not fire")
+
+        scheduler.advance(by: 0.6) // total 1.1s elapsed
+        XCTAssertEqual(runtime.state(of: cueB.id), .running, "B fires after postWait expires")
+        XCTAssertTrue(log.contains(.cueFired(cueB.id, dueToContinuation: true)))
+    }
+
+    func testAutoFollowWithZeroPostWaitFiresImmediatelyOnNextSchedulerTick() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset, continuation: .autoFollow, postWait: 0)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let (runtime, _, scheduler, _) = makeRuntimeWithScheduler(cues: [cueA, cueB])
+
+        runtime.go()
+        runtime.cueDidEnd(cueID: cueA.id)
+        scheduler.advance(by: 0)
+        XCTAssertEqual(runtime.state(of: cueB.id), .running)
+    }
+
+    func testPanicCancelsPendingAutoFollow() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset, continuation: .autoFollow, postWait: 2.0)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let (runtime, _, scheduler, _) = makeRuntimeWithScheduler(cues: [cueA, cueB])
+
+        runtime.go()
+        runtime.cueDidEnd(cueID: cueA.id)
+        runtime.panic()
+
+        scheduler.advance(by: 5.0) // well past postWait
+        XCTAssertEqual(runtime.state(of: cueB.id), .idle, "Panic must cancel pending auto-follow")
+    }
+
+    func testClearCancelsPendingAutoFollow() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset, continuation: .autoFollow, postWait: 2.0)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let (runtime, _, scheduler, _) = makeRuntimeWithScheduler(cues: [cueA, cueB])
+
+        runtime.go()
+        runtime.cueDidEnd(cueID: cueA.id)
+        runtime.clear()
+
+        scheduler.advance(by: 5.0)
+        XCTAssertEqual(runtime.state(of: cueB.id), .idle, "Clear must cancel pending auto-follow")
+    }
+
+    func testRemovingNextCueCancelsPendingAutoFollow() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset, continuation: .autoFollow, postWait: 1.0)
+        let cueB = Cue(number: "2", title: "B", assetID: asset)
+        let (runtime, _, scheduler, _) = makeRuntimeWithScheduler(cues: [cueA, cueB])
+
+        runtime.go()
+        runtime.cueDidEnd(cueID: cueA.id)
+        runtime.mutateShowList { list in
+            list.remove(at: 1) // remove B
+        }
+
+        scheduler.advance(by: 2.0)
+        XCTAssertEqual(runtime.state(of: cueA.id), .idle)
+        // No assertion on B because it has been removed. Important: no crash, no fire.
+    }
+
+    func testAutoFollowChainsThroughMultipleCues() {
+        let asset = UUID()
+        let cueA = Cue(number: "1", title: "A", assetID: asset, continuation: .autoFollow, postWait: 0.5)
+        let cueB = Cue(number: "2", title: "B", assetID: asset, continuation: .autoFollow, postWait: 0.5)
+        let cueC = Cue(number: "3", title: "C", assetID: asset, continuation: .hold)
+        let (runtime, _, scheduler, _) = makeRuntimeWithScheduler(cues: [cueA, cueB, cueC])
+
+        runtime.go()
+        XCTAssertEqual(runtime.state(of: cueA.id), .running)
+
+        runtime.cueDidEnd(cueID: cueA.id)
+        scheduler.advance(by: 0.5)
+        XCTAssertEqual(runtime.state(of: cueB.id), .running)
+
+        runtime.cueDidEnd(cueID: cueB.id)
+        scheduler.advance(by: 0.5)
+        XCTAssertEqual(runtime.state(of: cueC.id), .running)
+    }
+
+    func testCancelledScheduledTaskDoesNotFire() {
+        let scheduler = ManualCueScheduler()
+        var fired = false
+        let task = scheduler.schedule(after: 1.0) { fired = true }
+        task.cancel()
+        scheduler.advance(by: 5.0)
+        XCTAssertFalse(fired)
+        XCTAssertTrue(task.isCancelled)
+    }
+
+    func testCancelOnAlreadyCancelledTaskIsIdempotent() {
+        let scheduler = ManualCueScheduler()
+        let task = scheduler.schedule(after: 1.0) { }
+        task.cancel()
+        task.cancel() // must not crash
+        XCTAssertTrue(task.isCancelled)
+    }
+
     func testShowListRoundTripsThroughJSON() throws {
         let asset = UUID()
         let cueA = Cue(number: "INTRO", title: "Intro", assetID: asset, continuation: .autoFollow)
@@ -837,6 +994,66 @@ final class ModelTests: XCTestCase {
 /// Manual clock for deterministic time-based tests.
 private final class ManualClock {
     var now: TimeInterval = 0
+}
+
+/// Scheduler used by continuation-timing tests. Holds tasks until `advance(by:)` is called,
+/// then fires every task whose deadline has elapsed (in deadline order). Repeats until no
+/// further tasks become ready, so a chain of auto-follows resolves in one `advance` call.
+final class ManualCueScheduler: CueScheduler {
+    private struct PendingTask {
+        let id: UUID
+        let fireAt: TimeInterval
+        var cancelled: Bool
+        let work: () -> Void
+    }
+
+    private(set) var now: TimeInterval = 0
+    private var tasks: [PendingTask] = []
+
+    @discardableResult
+    func schedule(after delay: TimeInterval, _ work: @escaping () -> Void) -> CueScheduledTask {
+        let id = UUID()
+        let task = PendingTask(id: id, fireAt: now + max(0, delay), cancelled: false, work: work)
+        tasks.append(task)
+        return CueScheduledTask { [weak self] in
+            guard let self else { return }
+            if let idx = self.tasks.firstIndex(where: { $0.id == id }) {
+                self.tasks[idx].cancelled = true
+            }
+        }
+    }
+
+    /// Advances virtual time by `delta` seconds and fires every task whose deadline has elapsed,
+    /// in deadline order. Tasks scheduled by fired tasks are eligible if their new deadline is
+    /// also reached, until no further tasks fire.
+    func advance(by delta: TimeInterval) {
+        now += max(0, delta)
+        flushReady()
+    }
+
+    /// Sets virtual time to `time` (must be ≥ current `now`).
+    func advance(to time: TimeInterval) {
+        guard time >= now else { return }
+        now = time
+        flushReady()
+    }
+
+    private func flushReady() {
+        var fired = true
+        while fired {
+            fired = false
+            // Pick the earliest non-cancelled task whose fireAt has elapsed.
+            let readyIndex = tasks.indices
+                .filter { !tasks[$0].cancelled && tasks[$0].fireAt <= now }
+                .min(by: { tasks[$0].fireAt < tasks[$1].fireAt })
+            guard let idx = readyIndex else { break }
+            let task = tasks.remove(at: idx)
+            task.work()
+            fired = true
+        }
+        // Drop cancelled tasks so they don't pile up.
+        tasks.removeAll(where: { $0.cancelled })
+    }
 }
 
 /// Captures every CueRuntime callback as an enum event so tests can assert ordering / presence.

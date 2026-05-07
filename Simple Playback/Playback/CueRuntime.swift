@@ -25,6 +25,68 @@ public enum CueRuntimeRejection: Equatable {
     case panicInProgress
 }
 
+/// Cancellable handle returned by a `CueScheduler` schedule.
+final class CueScheduledTask {
+    private let cancelClosure: () -> Void
+    private(set) var isCancelled = false
+
+    init(cancel: @escaping () -> Void) {
+        self.cancelClosure = cancel
+    }
+
+    func cancel() {
+        guard !isCancelled else { return }
+        isCancelled = true
+        cancelClosure()
+    }
+}
+
+/// Schedules a closure to run after a delay. Injected into `CueRuntime` so production uses
+/// real timers and tests use deterministic virtual time.
+protocol CueScheduler: AnyObject {
+    @discardableResult
+    func schedule(after delay: TimeInterval, _ work: @escaping () -> Void) -> CueScheduledTask
+}
+
+/// Production scheduler backed by `DispatchSourceTimer`. Default scheduler used when callers
+/// do not inject one.
+final class DispatchCueScheduler: CueScheduler {
+    private let queue: DispatchQueue
+
+    init(queue: DispatchQueue = .main) {
+        self.queue = queue
+    }
+
+    @discardableResult
+    func schedule(after delay: TimeInterval, _ work: @escaping () -> Void) -> CueScheduledTask {
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        let clamped = max(0, delay)
+        timer.schedule(deadline: .now() + clamped, leeway: .milliseconds(1))
+        let cancelled = ManagedAtomicFlag()
+        timer.setEventHandler {
+            guard !cancelled.value else { return }
+            work()
+            timer.cancel()
+        }
+        timer.resume()
+        return CueScheduledTask {
+            cancelled.value = true
+            timer.cancel()
+        }
+    }
+}
+
+/// Tiny lock-free flag used by `DispatchCueScheduler` to suppress already-cancelled fires.
+/// Not exposed outside this file.
+private final class ManagedAtomicFlag {
+    private let queue = DispatchQueue(label: "CueRuntime.atomicFlag", attributes: [])
+    private var _value: Bool = false
+    var value: Bool {
+        get { queue.sync { _value } }
+        set { queue.sync { _value = newValue } }
+    }
+}
+
 /// Pure show-runtime state machine.
 ///
 /// `CueRuntime` owns a `ShowList` and exposes the GO / PREV / PANIC / CLEAR / BLACKOUT verbs that
@@ -32,7 +94,8 @@ public enum CueRuntimeRejection: Equatable {
 /// happened and lets the playback layer react.
 ///
 /// Time enters the runtime via the injectable `clock`, so tests can drive debounce and continuation
-/// timing deterministically without `Thread.sleep`.
+/// timing deterministically without `Thread.sleep`. Continuation timing flows through the injected
+/// `scheduler` for the same reason.
 final class CueRuntime {
     /// The show list this runtime is driving. Mutations to the list go through the runtime's
     /// methods so the playhead and per-cue state stay coherent; direct edits are allowed but
@@ -50,6 +113,10 @@ final class CueRuntime {
 
     private var lastGoAt: TimeInterval = -.infinity
     private let clock: () -> TimeInterval
+    private let scheduler: CueScheduler
+
+    /// Pending auto-follow continuation tasks, keyed by the cue whose end will fire the chain.
+    private var pendingContinuationTasks: [UUID: CueScheduledTask] = [:]
 
     // MARK: - Callbacks
 
@@ -83,10 +150,12 @@ final class CueRuntime {
 
     init(
         showList: ShowList = ShowList(),
-        clock: @escaping () -> TimeInterval = { Date().timeIntervalSinceReferenceDate }
+        clock: @escaping () -> TimeInterval = { Date().timeIntervalSinceReferenceDate },
+        scheduler: CueScheduler? = nil
     ) {
         self.showList = showList
         self.clock = clock
+        self.scheduler = scheduler ?? DispatchCueScheduler()
         for cue in showList.cues {
             cueStates[cue.id] = .idle
         }
@@ -106,6 +175,8 @@ final class CueRuntime {
     // MARK: - GO / PREV
 
     /// Fires the cue at the playhead and advances. Returns the fired cue, or nil if rejected.
+    /// `auto-continue` chains expand inside `fire(cue:)`, so the returned cue is just the
+    /// first one fired by this GO.
     @discardableResult
     func go() -> Cue? {
         guard !panicActive else {
@@ -123,8 +194,6 @@ final class CueRuntime {
         }
         lastGoAt = now
         fire(cue: cue, dueToContinuation: false)
-        showList.advancePlayhead()
-        onPlayheadChanged?(showList.playheadCue)
         return cue
     }
 
@@ -136,7 +205,7 @@ final class CueRuntime {
             onGoRejected?(.panicInProgress)
             return nil
         }
-        guard showList.cue(number: targetNumber) != nil else {
+        guard let target = showList.cue(number: targetNumber) else {
             onGoRejected?(.unknownCueNumber(targetNumber))
             return nil
         }
@@ -145,15 +214,10 @@ final class CueRuntime {
             onGoRejected?(.debounced)
             return nil
         }
-        guard let target = showList.cue(number: targetNumber) else {
-            onGoRejected?(.unknownCueNumber(targetNumber))
-            return nil
-        }
         showList.movePlayhead(to: target.id)
+        onPlayheadChanged?(showList.playheadCue)
         lastGoAt = now
         fire(cue: target, dueToContinuation: false)
-        showList.advancePlayhead()
-        onPlayheadChanged?(showList.playheadCue)
         return target
     }
 
@@ -166,12 +230,12 @@ final class CueRuntime {
     // MARK: - PANIC / CLEAR / BLACKOUT
 
     /// Soft panic. Fades all running cues out over `fade` seconds (default `defaultPanicFade`),
-    /// flips them through `tail` to `idle`, leaves the playhead untouched, and locks GO until
-    /// `panicCompleted()` is called by the playback layer (or the caller resolves with the
-    /// completion handler form).
+    /// flips them through `tail` to `idle`, leaves the playhead untouched, cancels every pending
+    /// continuation, and locks GO until `panicCompleted()` is called by the playback layer.
     func panic(fade: TimeInterval? = nil) {
         let fadeDuration = max(0, fade ?? defaultPanicFade)
         panicActive = true
+        cancelAllPendingContinuations()
         for cue in activeCues {
             transition(cue: cue, to: .tail)
         }
@@ -189,10 +253,11 @@ final class CueRuntime {
         onPanicChanged?(false, 0)
     }
 
-    /// Hard kill. Instantly stops every running cue. Audio mute is the playback layer's job;
-    /// the runtime contract is "tell observers everything is now idle". Does NOT engage panic
-    /// lock — CLEAR is non-blocking.
+    /// Hard kill. Instantly stops every running cue, cancels every pending continuation. Audio
+    /// mute is the playback layer's job; the runtime contract is "tell observers everything is
+    /// now idle". Does NOT engage panic lock — CLEAR is non-blocking.
     func clear() {
+        cancelAllPendingContinuations()
         for cue in activeCues {
             transition(cue: cue, to: .idle)
             onCueEnded?(cue)
@@ -223,10 +288,15 @@ final class CueRuntime {
     /// any non-CLEAR reason). Drives `running → tail → idle`. The actual `tail` window is
     /// the playback layer's fade-out duration; the runtime treats `cueDidEnd` as the moment
     /// the audience can no longer see the cue, transitioning straight to idle.
+    ///
+    /// If the cue's `continuation` is `autoFollow`, schedules the next cue to fire after
+    /// `cue.postWait` seconds. The schedule is cancelled by panic, clear, or list mutation
+    /// that removes the next cue.
     func cueDidEnd(cueID: UUID) {
         guard let cue = showList.cue(id: cueID) else { return }
         transition(cue: cue, to: .idle)
         onCueEnded?(cue)
+        scheduleAutoFollowIfNeeded(after: cue)
     }
 
     /// Called by the playback layer to mark a cue as pre-rolled and ready for instant fire.
@@ -263,16 +333,86 @@ final class CueRuntime {
         for cue in showList.cues where cueStates[cue.id] == nil {
             cueStates[cue.id] = .idle
         }
-        // Drop state for cues that have been removed.
+        // Drop state and pending tasks for cues that have been removed.
         let livingIDs = Set(showList.cues.map(\.id))
         cueStates = cueStates.filter { livingIDs.contains($0.key) }
+        for (cueID, task) in pendingContinuationTasks where !livingIDs.contains(cueID) {
+            task.cancel()
+            pendingContinuationTasks.removeValue(forKey: cueID)
+        }
     }
 
     // MARK: - Private
 
+    /// Fires the given cue and, if it is auto-continue, recursively fires the next cue in the
+    /// list (which may itself chain further). Auto-follow does NOT chain here — it waits for
+    /// `cueDidEnd` to schedule its follow-up via the injected scheduler.
+    ///
+    /// Each fire advances the playhead past the just-fired cue, so a chain of auto-continues
+    /// leaves the playhead on the first cue that did NOT chain.
     private func fire(cue: Cue, dueToContinuation: Bool) {
+        // Cancel any pending follow that this cue had scheduled — we're firing fresh.
+        cancelPendingContinuation(for: cue.id)
+
         transition(cue: cue, to: .running)
         onCueFired?(cue, dueToContinuation)
+
+        // Always advance playhead past this cue, regardless of how it was triggered.
+        if showList.playheadCue?.id == cue.id {
+            showList.advancePlayhead()
+            onPlayheadChanged?(showList.playheadCue)
+        }
+
+        // Auto-continue: chain immediately into the next cue.
+        if cue.continuation == .autoContinue, let next = nextCueAfter(cue) {
+            fire(cue: next, dueToContinuation: true)
+        }
+    }
+
+    /// Schedules an auto-follow chain to fire the next cue after `cue.postWait`, if `cue`
+    /// has `autoFollow` continuation and a next cue exists. Idempotent if called twice for
+    /// the same cue: cancels any prior schedule first.
+    private func scheduleAutoFollowIfNeeded(after cue: Cue) {
+        guard cue.continuation == .autoFollow,
+              let next = nextCueAfter(cue),
+              !panicActive else {
+            return
+        }
+
+        cancelPendingContinuation(for: cue.id)
+        let delay = max(0, cue.postWait)
+        let nextID = next.id
+        let task = scheduler.schedule(after: delay) { [weak self] in
+            guard let self else { return }
+            self.pendingContinuationTasks.removeValue(forKey: cue.id)
+            // Re-resolve `next` from the current show list — it may have been removed since.
+            guard let resolvedNext = self.showList.cue(id: nextID) else { return }
+            // Don't fire if a panic engaged while we were waiting.
+            guard !self.panicActive else { return }
+            self.showList.movePlayhead(to: resolvedNext.id)
+            self.onPlayheadChanged?(self.showList.playheadCue)
+            self.fire(cue: resolvedNext, dueToContinuation: true)
+        }
+        pendingContinuationTasks[cue.id] = task
+    }
+
+    private func nextCueAfter(_ cue: Cue) -> Cue? {
+        guard let idx = showList.cueIndex(id: cue.id) else { return nil }
+        let nextIdx = idx + 1
+        return showList.cues.indices.contains(nextIdx) ? showList.cues[nextIdx] : nil
+    }
+
+    private func cancelPendingContinuation(for cueID: UUID) {
+        if let task = pendingContinuationTasks.removeValue(forKey: cueID) {
+            task.cancel()
+        }
+    }
+
+    private func cancelAllPendingContinuations() {
+        for (_, task) in pendingContinuationTasks {
+            task.cancel()
+        }
+        pendingContinuationTasks.removeAll()
     }
 
     private func transition(cue: Cue, to newState: CueStandbyState) {
