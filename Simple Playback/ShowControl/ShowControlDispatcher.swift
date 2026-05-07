@@ -2,23 +2,23 @@ import Foundation
 
 /// API version emitted in every reply envelope. Bumped when the address shape
 /// changes in a backward-incompatible way.
-public let SHOW_CONTROL_API_VERSION = 1
+let SHOW_CONTROL_API_VERSION = 1
 
 /// Default per-action retrigger lockout window — duplicate actions arriving
 /// within this window collapse to a single dispatch (per spec §3.14 / research §6).
-public let SHOW_CONTROL_RETRIGGER_LOCKOUT: TimeInterval = 0.05
+let SHOW_CONTROL_RETRIGGER_LOCKOUT: TimeInterval = 0.05
 
 /// Source attribution attached to every dispatched action. Phase E will use
 /// this to write to the show log; Phase D records it in subscription pushes
 /// and reply envelopes.
-public enum ShowControlSource: Equatable {
+enum ShowControlSource: Equatable {
     case local
     case osc(host: String, port: UInt16, transport: OSCTransportKind)
     case http(token: String, host: String)
     case timecode
     case test
 
-    public var label: String {
+    var label: String {
         switch self {
         case .local: return "local"
         case let .osc(host, port, transport):
@@ -30,7 +30,7 @@ public enum ShowControlSource: Equatable {
     }
 }
 
-public enum OSCTransportKind: String, Equatable {
+enum OSCTransportKind: String, Equatable {
     case udp
     case tcp
 }
@@ -40,38 +40,38 @@ public enum OSCTransportKind: String, Equatable {
 ///
 /// All transports talk to the same dispatcher. Idempotency, capability checks,
 /// show-mode capability stripping, and source attribution all happen here.
-public final class ShowControlDispatcher {
-    public weak var runtime: CueRuntime?
-    public let state: ShowControlState
-    public var clock: () -> TimeInterval
+final class ShowControlDispatcher {
+    weak var runtime: CueRuntime?
+    let state: ShowControlState
+    var clock: () -> TimeInterval
 
     /// Hook so the host can intercept actions that don't map directly onto
     /// `CueRuntime` (output freeze, look recall, workspace save…). Returns
     /// `nil` if the dispatcher should handle the action with default semantics.
-    public var hostInterceptor: ((ShowControlAction, ShowControlSource) -> ShowControlActionResult?)?
+    var hostInterceptor: ((ShowControlAction, ShowControlSource) -> ShowControlActionResult?)?
 
     /// Notified after every successful dispatch (post-idempotency, post-cap-check).
     /// Used by the show log writer in Phase E.
-    public var onActionDispatched: ((ShowControlAction, ShowControlSource, ShowControlActionResult) -> Void)?
+    var onActionDispatched: ((ShowControlAction, ShowControlSource, ShowControlActionResult) -> Void)?
 
     /// When set, controls TC source. Phase D wires the timecode reader through this.
-    public var timecodeSourceSetter: ((String) -> Bool)?
-    public var timecodeEngagementSetter: ((Bool) -> Bool)?
-    public var timecodeOffsetSetter: ((TimeInterval) -> Void)?
+    var timecodeSourceSetter: ((String) -> Bool)?
+    var timecodeEngagementSetter: ((Bool) -> Bool)?
+    var timecodeOffsetSetter: ((TimeInterval) -> Void)?
 
     /// Show-mode toggle (defers to host so the SwiftUI side can confirm).
-    public var showModeToggle: ((Bool) -> Void)?
+    var showModeToggle: ((Bool) -> Void)?
 
     /// Subscription manager invoked by `subscribe`/`unsubscribe`.
-    public var subscribe: ((String, UInt16) -> Void)?
-    public var unsubscribe: ((String, UInt16) -> Void)?
+    var subscribe: ((String, UInt16) -> Void)?
+    var unsubscribe: ((String, UInt16) -> Void)?
 
     private let lockoutQueue = DispatchQueue(label: "com.josh.simpleplayback.showcontrol.dispatch")
     private var lastFireByKey: [String: TimeInterval] = [:]
 
-    public var retriggerLockout: TimeInterval = SHOW_CONTROL_RETRIGGER_LOCKOUT
+    var retriggerLockout: TimeInterval = SHOW_CONTROL_RETRIGGER_LOCKOUT
 
-    public init(
+    init(
         runtime: CueRuntime?,
         state: ShowControlState,
         clock: @escaping () -> TimeInterval = { Date().timeIntervalSinceReferenceDate }
@@ -84,7 +84,7 @@ public final class ShowControlDispatcher {
     /// Dispatches an action against the runtime. Honors capability flags,
     /// show-mode lockouts, and per-action retrigger debounce.
     @discardableResult
-    public func dispatch(
+    func dispatch(
         _ action: ShowControlAction,
         source: ShowControlSource,
         capabilities: Set<ShowControlCapability>
@@ -128,7 +128,7 @@ public final class ShowControlDispatcher {
 
     /// Computes the *effective* capability set for a token in the current
     /// show mode. Show Mode strips `edit` from every non-admin token.
-    public func effectiveCapabilities(_ caps: Set<ShowControlCapability>) -> Set<ShowControlCapability> {
+    func effectiveCapabilities(_ caps: Set<ShowControlCapability>) -> Set<ShowControlCapability> {
         if state.snapshot().showModeEnabled {
             return caps.subtracting([.edit])
         }

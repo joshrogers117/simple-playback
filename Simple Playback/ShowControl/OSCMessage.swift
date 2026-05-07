@@ -16,7 +16,7 @@ import Foundation
 /// show-control spec. We do NOT implement OSC's `[abc]`, `{a,b}`, or `?` glob
 /// forms — the spec curates a small enough action surface that pattern wildcards
 /// only need `*` for whole-segment matching.
-public enum OSCArgument: Equatable {
+enum OSCArgument: Equatable {
     case string(String)
     case int(Int32)
     case float(Float)
@@ -32,17 +32,17 @@ public enum OSCArgument: Equatable {
         }
     }
 
-    public var stringValue: String? {
+    var stringValue: String? {
         if case let .string(s) = self { return s }
         return nil
     }
 
-    public var intValue: Int32? {
+    var intValue: Int32? {
         if case let .int(i) = self { return i }
         return nil
     }
 
-    public var floatValue: Float? {
+    var floatValue: Float? {
         switch self {
         case let .float(f): return f
         case let .int(i): return Float(i)
@@ -50,25 +50,25 @@ public enum OSCArgument: Equatable {
         }
     }
 
-    public var blobValue: Data? {
+    var blobValue: Data? {
         if case let .blob(d) = self { return d }
         return nil
     }
 }
 
 /// One OSC message: an address (e.g. `/sp/go`) and zero or more arguments.
-public struct OSCMessage: Equatable {
-    public let address: String
-    public let arguments: [OSCArgument]
+struct OSCMessage: Equatable {
+    let address: String
+    let arguments: [OSCArgument]
 
-    public init(address: String, arguments: [OSCArgument] = []) {
+    init(address: String, arguments: [OSCArgument] = []) {
         self.address = address
         self.arguments = arguments
     }
 }
 
 /// Errors raised by the OSC encoder / decoder.
-public enum OSCDecodingError: Error, Equatable {
+enum OSCDecodingError: Error, Equatable {
     case truncated
     case notNULTerminated
     case invalidTypeTag(Character)
@@ -80,7 +80,7 @@ public enum OSCDecodingError: Error, Equatable {
 
 extension OSCMessage {
     /// Big-endian binary representation per OSC 1.0.
-    public func data() -> Data {
+    func data() -> Data {
         var out = Data()
         out.appendOSCString(address)
 
@@ -120,17 +120,19 @@ extension OSCMessage {
 extension OSCMessage {
     /// Decodes a single OSC packet (which may be a bundle containing multiple
     /// messages). Returns the flattened list of messages.
-    public static func decodePacket(_ data: Data) throws -> [OSCMessage] {
-        if data.starts(with: Array("#bundle".utf8) + [0]) {
-            return try decodeBundle(data)
+    static func decodePacket(_ data: Data) throws -> [OSCMessage] {
+        let d = Data(data)
+        if d.starts(with: Array("#bundle".utf8) + [0]) {
+            return try decodeBundle(d)
         }
-        return [try decodeMessage(data)]
+        return [try decodeMessage(d)]
     }
 
     static func decodeMessage(_ data: Data) throws -> OSCMessage {
+        let normalized = Data(data)
         var cursor = 0
-        let address = try data.readOSCString(at: &cursor)
-        let tagString = try data.readOSCString(at: &cursor)
+        let address = try normalized.readOSCString(at: &cursor)
+        let tagString = try normalized.readOSCString(at: &cursor)
         guard tagString.hasPrefix(",") else {
             return OSCMessage(address: address, arguments: [])
         }
@@ -138,13 +140,13 @@ extension OSCMessage {
         for tag in tagString.dropFirst() {
             switch tag {
             case "s":
-                args.append(.string(try data.readOSCString(at: &cursor)))
+                args.append(.string(try normalized.readOSCString(at: &cursor)))
             case "i":
-                args.append(.int(try data.readInt32BE(at: &cursor)))
+                args.append(.int(try normalized.readInt32BE(at: &cursor)))
             case "f":
-                args.append(.float(try data.readFloat32BE(at: &cursor)))
+                args.append(.float(try normalized.readFloat32BE(at: &cursor)))
             case "b":
-                args.append(.blob(try data.readOSCBlob(at: &cursor)))
+                args.append(.blob(try normalized.readOSCBlob(at: &cursor)))
             case "T":
                 args.append(.int(1))
             case "F":
@@ -161,16 +163,18 @@ extension OSCMessage {
     }
 
     static func decodeBundle(_ data: Data) throws -> [OSCMessage] {
+        // Normalize so subscript indexing is always 0-based.
+        let normalized = Data(data)
         var cursor = 8 // skip "#bundle\0"
         // Skip the 8-byte time tag.
         cursor += 8
         var messages: [OSCMessage] = []
-        while cursor < data.count {
-            let size = Int(try data.readInt32BE(at: &cursor))
-            guard cursor + size <= data.count else {
+        while cursor < normalized.count {
+            let size = Int(try normalized.readInt32BE(at: &cursor))
+            guard cursor + size <= normalized.count else {
                 throw OSCDecodingError.truncated
             }
-            let elem = data.subdata(in: cursor..<(cursor + size))
+            let elem = normalized.subdata(in: cursor..<(cursor + size))
             cursor += size
             if elem.starts(with: Array("#bundle".utf8) + [0]) {
                 messages.append(contentsOf: try decodeBundle(elem))
@@ -191,7 +195,7 @@ extension OSCMessage {
     ///
     /// Example: `/sp/cue/*/stop` matches `/sp/cue/INTRO/stop` but not
     /// `/sp/cue/INTRO/scrub`.
-    public static func addressMatches(pattern: String, address: String) -> Bool {
+    static func addressMatches(pattern: String, address: String) -> Bool {
         let pSegs = pattern.split(separator: "/", omittingEmptySubsequences: true)
         let aSegs = address.split(separator: "/", omittingEmptySubsequences: true)
         guard pSegs.count == aSegs.count else { return false }
@@ -218,12 +222,13 @@ extension Data {
 
     func readOSCString(at cursor: inout Int) throws -> String {
         guard cursor < count else { throw OSCDecodingError.truncated }
+        let base = startIndex
         var end = cursor
-        while end < count, self[end] != 0 {
+        while end < count, self[base + end] != 0 {
             end += 1
         }
         guard end < count else { throw OSCDecodingError.notNULTerminated }
-        let bytes = self.subdata(in: cursor..<end)
+        let bytes = self.subdata(in: (base + cursor)..<(base + end))
         let s = String(data: bytes, encoding: .utf8) ?? ""
         // Move cursor past the NUL and align to 4-byte boundary.
         let consumed = end - cursor + 1
@@ -234,28 +239,33 @@ extension Data {
 
     func readInt32BE(at cursor: inout Int) throws -> Int32 {
         guard cursor + 4 <= count else { throw OSCDecodingError.truncated }
-        var be: Int32 = 0
-        _ = withUnsafeMutableBytes(of: &be) { buf in
-            self.subdata(in: cursor..<(cursor + 4)).copyBytes(to: buf, count: 4)
-        }
+        let s = startIndex
+        let b0 = UInt32(self[s + cursor])
+        let b1 = UInt32(self[s + cursor + 1])
+        let b2 = UInt32(self[s + cursor + 2])
+        let b3 = UInt32(self[s + cursor + 3])
+        let raw: UInt32 = (b0 << 24) | (b1 << 16) | (b2 << 8) | b3
         cursor += 4
-        return Int32(bigEndian: be)
+        return Int32(bitPattern: raw)
     }
 
     func readFloat32BE(at cursor: inout Int) throws -> Float {
         guard cursor + 4 <= count else { throw OSCDecodingError.truncated }
-        var be: UInt32 = 0
-        _ = withUnsafeMutableBytes(of: &be) { buf in
-            self.subdata(in: cursor..<(cursor + 4)).copyBytes(to: buf, count: 4)
-        }
+        let s = startIndex
+        let b0 = UInt32(self[s + cursor])
+        let b1 = UInt32(self[s + cursor + 1])
+        let b2 = UInt32(self[s + cursor + 2])
+        let b3 = UInt32(self[s + cursor + 3])
+        let raw: UInt32 = (b0 << 24) | (b1 << 16) | (b2 << 8) | b3
         cursor += 4
-        return Float(bitPattern: UInt32(bigEndian: be))
+        return Float(bitPattern: raw)
     }
 
     func readOSCBlob(at cursor: inout Int) throws -> Data {
         let size = Int(try readInt32BE(at: &cursor))
         guard size >= 0, cursor + size <= count else { throw OSCDecodingError.truncated }
-        let blob = self.subdata(in: cursor..<(cursor + size))
+        let base = startIndex
+        let blob = self.subdata(in: (base + cursor)..<(base + cursor + size))
         let padding = (4 - (size % 4)) % 4
         cursor += size + padding
         return blob

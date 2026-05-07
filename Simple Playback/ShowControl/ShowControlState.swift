@@ -7,7 +7,7 @@ import Foundation
 /// All access through `ShowControlState` goes through its serial queue so
 /// readers and writers don't race. The state itself is a value type returned by
 /// `snapshot()`.
-public final class ShowControlState {
+final class ShowControlState {
     private let queue = DispatchQueue(label: "com.josh.simpleplayback.showcontrol.state")
 
     private var _showList: ShowList = ShowList()
@@ -28,30 +28,30 @@ public final class ShowControlState {
     private var _cueRemaining: [UUID: TimeInterval] = [:]
 
     /// Wall-clock seconds when the runtime started (for `/sp/ping` uptime).
-    public let startedAt: TimeInterval = Date().timeIntervalSinceReferenceDate
+    let startedAt: TimeInterval = Date().timeIntervalSinceReferenceDate
 
-    public init() {}
+    init() {}
 
     // MARK: - Snapshot
 
-    public struct Snapshot: Equatable {
-        public var showList: ShowList
-        public var cueStates: [UUID: CueStandbyState]
-        public var blackout: Bool
-        public var panicActive: Bool
-        public var onAir: Bool
-        public var timecodeSource: String
-        public var timecodeEngaged: Bool
-        public var timecodeLocked: Bool
-        public var timecodeNow: String
-        public var timecodeOffset: TimeInterval
-        public var showModeEnabled: Bool
-        public var cueElapsed: [UUID: TimeInterval]
-        public var cueRemaining: [UUID: TimeInterval]
-        public var uptime: TimeInterval
+    struct Snapshot: Equatable {
+        var showList: ShowList
+        var cueStates: [UUID: CueStandbyState]
+        var blackout: Bool
+        var panicActive: Bool
+        var onAir: Bool
+        var timecodeSource: String
+        var timecodeEngaged: Bool
+        var timecodeLocked: Bool
+        var timecodeNow: String
+        var timecodeOffset: TimeInterval
+        var showModeEnabled: Bool
+        var cueElapsed: [UUID: TimeInterval]
+        var cueRemaining: [UUID: TimeInterval]
+        var uptime: TimeInterval
     }
 
-    public func snapshot() -> Snapshot {
+    func snapshot() -> Snapshot {
         queue.sync {
             Snapshot(
                 showList: _showList,
@@ -74,7 +74,7 @@ public final class ShowControlState {
 
     // MARK: - Updates from CueRuntime
 
-    public func updateShowList(_ list: ShowList) {
+    func updateShowList(_ list: ShowList) {
         queue.sync {
             _showList = list
             // Reseed cue states for any new cues; drop stale.
@@ -90,7 +90,7 @@ public final class ShowControlState {
         }
     }
 
-    public func updateCueState(cueID: UUID, state: CueStandbyState) {
+    func updateCueState(cueID: UUID, state: CueStandbyState) {
         queue.sync {
             _cueStates[cueID] = state
             if state == .idle {
@@ -100,25 +100,25 @@ public final class ShowControlState {
         }
     }
 
-    public func updatePlayhead(cueID: UUID?) {
+    func updatePlayhead(cueID: UUID?) {
         queue.sync {
             _showList.playheadCueID = cueID
         }
     }
 
-    public func updatePanic(_ active: Bool) {
+    func updatePanic(_ active: Bool) {
         queue.sync { _panicActive = active }
     }
 
-    public func updateBlackout(_ active: Bool) {
+    func updateBlackout(_ active: Bool) {
         queue.sync { _blackout = active }
     }
 
-    public func updateOnAir(_ onAir: Bool) {
+    func updateOnAir(_ onAir: Bool) {
         queue.sync { _onAir = onAir }
     }
 
-    public func updateTimecode(
+    func updateTimecode(
         source: String? = nil,
         engaged: Bool? = nil,
         locked: Bool? = nil,
@@ -134,11 +134,11 @@ public final class ShowControlState {
         }
     }
 
-    public func updateShowMode(_ enabled: Bool) {
+    func updateShowMode(_ enabled: Bool) {
         queue.sync { _showModeEnabled = enabled }
     }
 
-    public func updateCueElapsed(cueID: UUID, elapsed: TimeInterval, remaining: TimeInterval) {
+    func updateCueElapsed(cueID: UUID, elapsed: TimeInterval, remaining: TimeInterval) {
         queue.sync {
             _cueElapsed[cueID] = elapsed
             _cueRemaining[cueID] = remaining
