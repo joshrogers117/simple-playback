@@ -77,6 +77,82 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(decoded.transitionSettings.crossfadeDuration, 1.2, accuracy: 0.001)
     }
 
+    func testProjectFormatVersionDefaultsToCurrentForFreshProjects() {
+        let project = PlayoutProject()
+        XCTAssertEqual(project.formatVersion, PlayoutProject.currentFormatVersion)
+    }
+
+    func testProjectFormatVersionDefaultsToOneWhenAbsentInJSON() throws {
+        let legacyJSON = """
+        {
+          "slides": [],
+          "outputWidth": 1920,
+          "outputHeight": 1080
+        }
+        """
+        let data = try XCTUnwrap(legacyJSON.data(using: .utf8))
+        let project = try JSONDecoder.simplePlayback.decode(PlayoutProject.self, from: data)
+        XCTAssertEqual(project.formatVersion, 1)
+    }
+
+    func testMarkCurrentFormatVersionUpgradesLegacyProject() {
+        var legacy = PlayoutProject(formatVersion: 1)
+        XCTAssertEqual(legacy.formatVersion, 1)
+        legacy.markCurrentFormatVersion()
+        XCTAssertEqual(legacy.formatVersion, PlayoutProject.currentFormatVersion)
+    }
+
+    func testProjectBundleRoundTripsThroughFileWrapper() throws {
+        let project = PlayoutProject(
+            slides: [],
+            selectedDeviceID: "preview:software",
+            selectedModeID: "preview-mode:1080p30",
+            outputWidth: 1920,
+            outputHeight: 1080,
+            transitionSettings: PlayoutTransitionSettings(crossfadeEnabled: true, crossfadeDuration: 0.75)
+        )
+
+        let data = try JSONEncoder.simplePlayback.encode(project)
+        let projectWrapper = FileWrapper(regularFileWithContents: data)
+        projectWrapper.preferredFilename = ProjectBundleLayout.projectFilename
+        let bundleWrapper = FileWrapper(directoryWithFileWrappers: [
+            ProjectBundleLayout.projectFilename: projectWrapper
+        ])
+
+        let extracted = try SimplePlaybackProjectDocument.projectData(from: bundleWrapper)
+        let decoded = try JSONDecoder.simplePlayback.decode(PlayoutProject.self, from: extracted)
+        XCTAssertEqual(decoded.formatVersion, PlayoutProject.currentFormatVersion)
+        XCTAssertEqual(decoded.selectedDeviceID, "preview:software")
+        XCTAssertTrue(decoded.transitionSettings.crossfadeEnabled)
+    }
+
+    func testProjectReaderAcceptsLegacyFlatFileWrapper() throws {
+        let legacyJSON = """
+        {
+          "slides": [],
+          "selectedDeviceID": "legacy:device",
+          "outputWidth": 1280,
+          "outputHeight": 720,
+          "transitionSettings": { "crossfadeEnabled": false, "crossfadeDuration": 0.5 }
+        }
+        """
+        let data = try XCTUnwrap(legacyJSON.data(using: .utf8))
+        let flatWrapper = FileWrapper(regularFileWithContents: data)
+        let extracted = try SimplePlaybackProjectDocument.projectData(from: flatWrapper)
+        let decoded = try JSONDecoder.simplePlayback.decode(PlayoutProject.self, from: extracted)
+        XCTAssertEqual(decoded.formatVersion, 1)
+        XCTAssertEqual(decoded.selectedDeviceID, "legacy:device")
+        XCTAssertEqual(decoded.outputWidth, 1280)
+        XCTAssertEqual(decoded.outputHeight, 720)
+    }
+
+    func testProjectReaderRejectsBundleWithMissingProjectFile() {
+        let stray = FileWrapper(regularFileWithContents: Data("hello".utf8))
+        stray.preferredFilename = "notes.txt"
+        let bundleWrapper = FileWrapper(directoryWithFileWrappers: ["notes.txt": stray])
+        XCTAssertThrowsError(try SimplePlaybackProjectDocument.projectData(from: bundleWrapper))
+    }
+
     func testFitScalingCentersLetterboxedMedia() {
         let rect = ScalingGeometry.mediaRect(
             sourceSize: CGSize(width: 1000, height: 1000),

@@ -8,15 +8,15 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: not started
-- **Last commit**: planning artifacts
+- **Active phase**: A
+- **Last commit**: A1 — bundle format with formatVersion + legacy flat-file read
 - **Branch**: `development`
 
 ---
 
 ## Phase A — Show runtime + UX scaffolding
 
-- [ ] A1: Convert `.splayback` to bundle format with `formatVersion` and read-flat / write-bundle migration
+- [x] A1: Convert `.splayback` to bundle format with `formatVersion` and read-flat / write-bundle migration
 - [ ] A2: Cue model — id (any non-empty string, case-insensitive uniqueness), continuation (hold/auto-continue/auto-follow), pre-wait, post-wait, notes
 - [ ] A3: Per-cue overrides — fade in/out, crossfade duration, hold-last-frame, loop, in/out points; defaults inherit from project
 - [ ] A4: Playhead + GO / PREV / PANIC / CLEAR / BLACKOUT semantics, with debounce

@@ -120,6 +120,10 @@ struct PlayoutTransitionSettings: Codable, Hashable {
 }
 
 struct PlayoutProject: Codable, Hashable {
+    /// Bumped when the on-disk schema changes. Files without this field are treated as v1 (legacy flat JSON).
+    static let currentFormatVersion = 2
+
+    var formatVersion: Int = PlayoutProject.currentFormatVersion
     var slides: [MediaSlide] = []
     var selectedDeviceID: String?
     var selectedModeID: String?
@@ -130,6 +134,7 @@ struct PlayoutProject: Codable, Hashable {
     static let empty = PlayoutProject()
 
     init(
+        formatVersion: Int = PlayoutProject.currentFormatVersion,
         slides: [MediaSlide] = [],
         selectedDeviceID: String? = nil,
         selectedModeID: String? = nil,
@@ -137,6 +142,7 @@ struct PlayoutProject: Codable, Hashable {
         outputHeight: Int = 1080,
         transitionSettings: PlayoutTransitionSettings = PlayoutTransitionSettings()
     ) {
+        self.formatVersion = formatVersion
         self.slides = slides
         self.selectedDeviceID = selectedDeviceID
         self.selectedModeID = selectedModeID
@@ -146,6 +152,7 @@ struct PlayoutProject: Codable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey {
+        case formatVersion
         case slides
         case selectedDeviceID
         case selectedModeID
@@ -156,6 +163,7 @@ struct PlayoutProject: Codable, Hashable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        formatVersion = try container.decodeIfPresent(Int.self, forKey: .formatVersion) ?? 1
         slides = try container.decodeIfPresent([MediaSlide].self, forKey: .slides) ?? []
         selectedDeviceID = try container.decodeIfPresent(String.self, forKey: .selectedDeviceID)
         selectedModeID = try container.decodeIfPresent(String.self, forKey: .selectedModeID)
@@ -163,6 +171,11 @@ struct PlayoutProject: Codable, Hashable {
         outputHeight = try container.decodeIfPresent(Int.self, forKey: .outputHeight) ?? 1080
         transitionSettings = try container.decodeIfPresent(PlayoutTransitionSettings.self, forKey: .transitionSettings)
             ?? PlayoutTransitionSettings()
+    }
+
+    /// Bumps `formatVersion` to the current value. Call before save to mark a project as upgraded.
+    mutating func markCurrentFormatVersion() {
+        formatVersion = PlayoutProject.currentFormatVersion
     }
 }
 
