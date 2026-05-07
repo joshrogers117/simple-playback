@@ -9,7 +9,7 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 ## Current state
 
 - **Active phase**: A
-- **Last commit**: A4c — Continuation timing
+- **Last commit**: A5/A6/A7 — Show List view + Show Mode toggle + base hotkey scheme
 - **Branch**: `development`
 
 ---
@@ -23,9 +23,9 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
   - [x] A4a: ShowList struct (ordered cues, lookup by id/number, validation, playhead, mutation helpers)
   - [x] A4b: CueRuntime state machine — GO / PREV / PANIC / CLEAR / BLACKOUT with debounce
   - [x] A4c: Continuation timing — autoContinue (immediate chain) and autoFollow (postWait on cue-end)
-- [ ] A5: Show List view alongside `SlideGridView`; drag-from-palette-to-list; per-cue inspector
-- [ ] A6: Edit / Show Mode toggle in title bar; lockouts in Show Mode (no destructive shortcuts, no editing affordances, confirm-on-quit while live, modal-forbidden invariant)
-- [ ] A7: Hotkey table (rebindable, local + global scope, printable export)
+- [x] A5: Show List view alongside `SlideGridView`; drag-from-palette-to-list; per-cue inspector
+- [~] A6: Edit / Show Mode toggle (toolbar toggle + Cmd-Shift-L hotkey + edit-disable wiring done; confirm-on-quit while live and modal-forbidden invariant deferred to A6b after live-state hookup)
+- [~] A7: Hotkey scheme — Space/GO, Esc/Panic, ←/Previous, Cmd-Shift-L/Show Mode, Cmd-./Clear wired via SwiftUI .keyboardShortcut. Rebinding + printable export deferred to A7b.
 - [ ] A8: Single-output default; Preview/Program opt-in; color discipline (blue/red borders, PREVIEW/PROGRAM overlays, elapsed/remaining counters)
 - [ ] A9: Status bar — outputs, dropped frames, cache, TC, log shortcut, render heartbeat dot
 - [ ] A10: Per-cue notes field (visible on standing-by cue, not tooltip-only)

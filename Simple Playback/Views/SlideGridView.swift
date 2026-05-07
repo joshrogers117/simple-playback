@@ -45,6 +45,7 @@ struct SlideGridView: View {
                                     selectedSlideID = slide.id
                                     takeAction(slide)
                                 }
+                                .draggable(slide.id.uuidString)
                             }
                         }
                         .padding(14)
