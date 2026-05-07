@@ -21,6 +21,8 @@
 		923EFA4F6874D339E9E1DFBA /* OutputStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3231D37312802C9DACC3ED8F /* OutputStatusBar.swift */; };
 		978296A45A88E016E16E3F17 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3EA161ABEB3905B9FE31C94 /* AVFoundation.framework */; };
 		9B42105D4C5F7ED092C1678C /* CoreImage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0936570928D77D246D9D4F41 /* CoreImage.framework */; };
+		A0B1C2D3E4F5061728394A5B /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 90A1B2C3D4E5F60718293A4B /* AppIcon.icon */; };
+		B2C3D4E5F60718293A4B5C6D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* Assets.xcassets */; };
 		A170C62152F04F0EB0633D6C /* SPFrameBlend.c in Sources */ = {isa = PBXBuildFile; fileRef = E414017592F14769935C1359 /* SPFrameBlend.c */; settings = {COMPILER_FLAGS = "-O3"; }; };
 		B505AC4275075D4146C716CA /* AudioPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD70E770DF4CBE42911FBF55 /* AudioPump.swift */; };
 		C06126298A47AFCDA192A03B /* DeckLinkSDKDispatch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D96D9D6A6F1BB5C773AE0FE4 /* DeckLinkSDKDispatch.cpp */; };
@@ -58,7 +60,9 @@
 		78D746C8949262918285C6CE /* DeckLinkSDK.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DeckLinkSDK.h; sourceTree = "<group>"; };
 		7F01F82490EC6B3F8642A592 /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
 		80B1BA48BF72D42C1D3CBE39 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		90A1B2C3D4E5F60718293A4B /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		9C723AE7E3FA6AE396BF08EB /* DeckLinkDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckLinkDiagnostics.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A3EA161ABEB3905B9FE31C94 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		A92C1DFC78E64818D20AA73B /* MediaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporter.swift; sourceTree = "<group>"; };
 		B14A977290CE819A4D56EF2B /* UniformTypeIdentifiers.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UniformTypeIdentifiers.framework; path = System/Library/Frameworks/UniformTypeIdentifiers.framework; sourceTree = SDKROOT; };
@@ -173,6 +177,8 @@
 		A583F726B090D51D3736AEF9 /* Support */ = {
 			isa = PBXGroup;
 			children = (
+				90A1B2C3D4E5F60718293A4B /* AppIcon.icon */,
+				A1B2C3D4E5F60718293A4B5C /* Assets.xcassets */,
 				80B1BA48BF72D42C1D3CBE39 /* Info.plist */,
 				25E603C3280E3320A9C7996B /* SimplePlayout-Bridging-Header.h */,
 			);
@@ -220,6 +226,7 @@
 			buildPhases = (
 				5B008E47E06D18B52D530CD2 /* Sources */,
 				7B78B9D81AD6AE263B149628 /* Frameworks */,
+				C3D4E5F60718293A4B5C6D7E /* Resources */,
 			);
 			buildRules = (
 			);
@@ -280,6 +287,18 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C3D4E5F60718293A4B5C6D7E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A0B1C2D3E4F5061728394A5B /* AppIcon.icon in Resources */,
+				B2C3D4E5F60718293A4B5C6D /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		5B008E47E06D18B52D530CD2 /* Sources */ = {
