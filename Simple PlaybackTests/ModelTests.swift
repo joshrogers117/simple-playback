@@ -800,6 +800,65 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(task.isCancelled)
     }
 
+    // MARK: - End-to-end project + show-list integration (A11 / A12)
+
+    func testProjectBundleRoundTripsShowListsThroughFileWrapper() throws {
+        let asset = UUID()
+        let cueA = Cue(number: "INTRO", title: "Intro", assetID: asset, continuation: .autoFollow, postWait: 0.5)
+        let cueB = Cue(number: "Q2", title: "Bumper", assetID: asset, notes: "wait for VO")
+        let list = ShowList(name: "Main", cues: [cueA, cueB])
+
+        var project = PlayoutProject(showLists: [list])
+        project.markCurrentFormatVersion()
+
+        let data = try JSONEncoder.simplePlayback.encode(project)
+        let projectWrapper = FileWrapper(regularFileWithContents: data)
+        projectWrapper.preferredFilename = ProjectBundleLayout.projectFilename
+        let bundleWrapper = FileWrapper(directoryWithFileWrappers: [
+            ProjectBundleLayout.projectFilename: projectWrapper
+        ])
+
+        let extracted = try SimplePlaybackProjectDocument.projectData(from: bundleWrapper)
+        let decoded = try JSONDecoder.simplePlayback.decode(PlayoutProject.self, from: extracted)
+        XCTAssertEqual(decoded.formatVersion, PlayoutProject.currentFormatVersion)
+        XCTAssertEqual(decoded.showLists.count, 1)
+        let restoredList = try XCTUnwrap(decoded.showLists.first)
+        XCTAssertEqual(restoredList.name, "Main")
+        XCTAssertEqual(restoredList.cues.count, 2)
+        XCTAssertEqual(restoredList.cues[0].number, "INTRO")
+        XCTAssertEqual(restoredList.cues[0].continuation, .autoFollow)
+        XCTAssertEqual(restoredList.cues[0].postWait, 0.5, accuracy: 0.001)
+        XCTAssertEqual(restoredList.cues[1].notes, "wait for VO")
+        XCTAssertEqual(decoded.activeShowListID, list.id)
+    }
+
+    func testGenerateDefaultShowListThenFireGOAdvancesPlayheadAcrossEntireList() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        FileManager.default.createFile(atPath: url.path, contents: Data(), attributes: nil)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let slideA = MediaSlide(url: url, mediaKind: .image)
+        let slideB = MediaSlide(url: url, mediaKind: .image)
+        let slideC = MediaSlide(url: url, mediaKind: .image)
+        var project = PlayoutProject(slides: [slideA, slideB, slideC])
+        project.generateDefaultShowList()
+
+        let list = project.activeShowList!
+        let clock = ManualClock()
+        let runtime = CueRuntime(showList: list, clock: { clock.now })
+        runtime.minimumGoInterval = 0
+        var fired: [String] = []
+        runtime.onCueFired = { cue, _ in fired.append(cue.number) }
+
+        for _ in 0..<3 {
+            runtime.go()
+            clock.now += 0.001
+        }
+
+        XCTAssertEqual(fired, ["1", "2", "3"])
+        XCTAssertNil(runtime.showList.playheadCue, "Playhead lands off the end after the last GO")
+    }
+
     func testShowListRoundTripsThroughJSON() throws {
         let asset = UUID()
         let cueA = Cue(number: "INTRO", title: "Intro", assetID: asset, continuation: .autoFollow)
