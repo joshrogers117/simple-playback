@@ -39,7 +39,19 @@ touch "${pages_dir}/.nojekyll"
 cp "$dmg_source" "${pages_dir}/${app_name}-${version}.dmg"
 cp "$zip_source" "${pages_dir}/${app_name}-${version}.zip"
 cp "$appcast_source" "${pages_dir}/appcast.xml"
-cp "$icon_source" "${pages_dir}/icon.png"
+
+if command -v magick >/dev/null 2>&1; then
+  magick -size 1024x1024 xc:none \
+    -fill black \
+    -draw "roundrectangle 0,0 1023,1023 224,224" \
+    "$icon_source" \
+    -compose over \
+    -composite \
+    "${pages_dir}/icon.png"
+else
+  echo "ImageMagick is required to render the GitHub Pages icon." >&2
+  exit 69
+fi
 
 shasum -a 256 \
   "${pages_dir}/${app_name}-${version}.dmg" \
@@ -232,7 +244,7 @@ cat > "${pages_dir}/index.html" <<EOF
     <section class="release" aria-label="Simple Playback release">
       <div>
         <div class="brand">
-          <img src="icon.png" alt="Simple Playback app icon">
+          <img src="icon.png?v=${version}" alt="Simple Playback app icon">
           <h1>Simple Playback</h1>
         </div>
         <p class="subtitle">A macOS playback app for still images and videos with software preview, media takes, crossfades, and DeckLink output.</p>
