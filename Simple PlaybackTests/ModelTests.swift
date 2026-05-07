@@ -146,6 +146,47 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(decoded.outputHeight, 720)
     }
 
+    func testMarkCurrentFormatVersionEnsuresAtLeastOneShowList() {
+        var project = PlayoutProject()
+        XCTAssertTrue(project.showLists.isEmpty)
+        project.markCurrentFormatVersion()
+        XCTAssertEqual(project.showLists.count, 1)
+        XCTAssertEqual(project.showLists.first?.name, "Show 1")
+        XCTAssertEqual(project.activeShowListID, project.showLists.first?.id)
+    }
+
+    func testMarkCurrentFormatVersionResetsUnknownActiveShowListID() {
+        let realList = ShowList(name: "A")
+        var project = PlayoutProject(showLists: [realList], activeShowListID: UUID())
+        project.markCurrentFormatVersion()
+        XCTAssertEqual(project.activeShowListID, realList.id)
+    }
+
+    func testActiveShowListFallsBackToFirstWhenIDIsNil() {
+        let listA = ShowList(name: "A")
+        let listB = ShowList(name: "B")
+        let project = PlayoutProject(showLists: [listA, listB], activeShowListID: nil)
+        XCTAssertEqual(project.activeShowList?.id, listA.id)
+    }
+
+    func testGenerateDefaultShowListCreatesOneCuePerSlide() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        FileManager.default.createFile(atPath: url.path, contents: Data(), attributes: nil)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let slide1 = MediaSlide(url: url, mediaKind: .image)
+        let slide2 = MediaSlide(url: url, mediaKind: .image)
+        var project = PlayoutProject(slides: [slide1, slide2])
+        project.generateDefaultShowList()
+
+        let list = try XCTUnwrap(project.showLists.first)
+        XCTAssertEqual(list.cues.count, 2)
+        XCTAssertEqual(list.cues[0].number, "1")
+        XCTAssertEqual(list.cues[1].number, "2")
+        XCTAssertEqual(list.cues[0].assetID, slide1.id)
+        XCTAssertEqual(list.cues[1].assetID, slide2.id)
+        XCTAssertEqual(project.activeShowListID, list.id)
+    }
+
     func testProjectReaderRejectsBundleWithMissingProjectFile() {
         let stray = FileWrapper(regularFileWithContents: Data("hello".utf8))
         stray.preferredFilename = "notes.txt"

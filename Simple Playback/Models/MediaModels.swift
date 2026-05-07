@@ -428,7 +428,18 @@ struct PlayoutProject: Codable, Hashable {
     static let currentFormatVersion = 2
 
     var formatVersion: Int = PlayoutProject.currentFormatVersion
+
+    /// Asset library — imported media, the palette source. Order is operator-significant.
     var slides: [MediaSlide] = []
+
+    /// Ordered show lists. Each list is an independent cue sequence. v2 projects always have at
+    /// least one list (created on demand when a project is fresh or migrated from v1).
+    var showLists: [ShowList] = []
+
+    /// ID of the show list currently displayed/edited in the UI. Resolves to the first list
+    /// when nil or unknown.
+    var activeShowListID: UUID?
+
     var selectedDeviceID: String?
     var selectedModeID: String?
     var outputWidth: Int = 1920
@@ -440,6 +451,8 @@ struct PlayoutProject: Codable, Hashable {
     init(
         formatVersion: Int = PlayoutProject.currentFormatVersion,
         slides: [MediaSlide] = [],
+        showLists: [ShowList] = [],
+        activeShowListID: UUID? = nil,
         selectedDeviceID: String? = nil,
         selectedModeID: String? = nil,
         outputWidth: Int = 1920,
@@ -448,6 +461,8 @@ struct PlayoutProject: Codable, Hashable {
     ) {
         self.formatVersion = formatVersion
         self.slides = slides
+        self.showLists = showLists
+        self.activeShowListID = activeShowListID
         self.selectedDeviceID = selectedDeviceID
         self.selectedModeID = selectedModeID
         self.outputWidth = outputWidth
@@ -458,6 +473,8 @@ struct PlayoutProject: Codable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case formatVersion
         case slides
+        case showLists
+        case activeShowListID
         case selectedDeviceID
         case selectedModeID
         case outputWidth
@@ -469,6 +486,8 @@ struct PlayoutProject: Codable, Hashable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         formatVersion = try container.decodeIfPresent(Int.self, forKey: .formatVersion) ?? 1
         slides = try container.decodeIfPresent([MediaSlide].self, forKey: .slides) ?? []
+        showLists = try container.decodeIfPresent([ShowList].self, forKey: .showLists) ?? []
+        activeShowListID = try container.decodeIfPresent(UUID.self, forKey: .activeShowListID)
         selectedDeviceID = try container.decodeIfPresent(String.self, forKey: .selectedDeviceID)
         selectedModeID = try container.decodeIfPresent(String.self, forKey: .selectedModeID)
         outputWidth = try container.decodeIfPresent(Int.self, forKey: .outputWidth) ?? 1920
@@ -477,9 +496,47 @@ struct PlayoutProject: Codable, Hashable {
             ?? PlayoutTransitionSettings()
     }
 
-    /// Bumps `formatVersion` to the current value. Call before save to mark a project as upgraded.
+    /// Bumps `formatVersion` to the current value, ensures at least one show list exists, and
+    /// resolves `activeShowListID` to a known list. Call before save.
     mutating func markCurrentFormatVersion() {
         formatVersion = PlayoutProject.currentFormatVersion
+        if showLists.isEmpty {
+            showLists.append(ShowList(name: "Show 1"))
+        }
+        if let activeID = activeShowListID, !showLists.contains(where: { $0.id == activeID }) {
+            activeShowListID = showLists.first?.id
+        }
+        if activeShowListID == nil {
+            activeShowListID = showLists.first?.id
+        }
+    }
+
+    /// The show list currently active in the UI, falling back to the first list. Returns nil
+    /// only when the project has no lists at all (only possible with a fresh empty project that
+    /// hasn't been saved yet).
+    var activeShowList: ShowList? {
+        if let id = activeShowListID, let list = showLists.first(where: { $0.id == id }) {
+            return list
+        }
+        return showLists.first
+    }
+
+    /// Generates a default show list from the asset library: one cue per slide, in order,
+    /// numbered 1, 2, 3.... Useful for migrating v1 projects whose slides are already meant
+    /// to be the show.
+    mutating func generateDefaultShowList(named name: String = "Show 1") {
+        let cues = slides.enumerated().map { index, slide in
+            Cue(
+                number: "\(index + 1)",
+                title: slide.title,
+                assetID: slide.id
+            )
+        }
+        let list = ShowList(name: name, cues: cues)
+        showLists.append(list)
+        if activeShowListID == nil {
+            activeShowListID = list.id
+        }
     }
 }
 
