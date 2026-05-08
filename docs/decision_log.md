@@ -590,3 +590,81 @@ The detector returns leftovers in their original drop order so non-sequence file
 
 **What I'd revisit if**: real SMB rehearsals show 1 s isn't enough — bump to 2 s or read the precision capability.
 
+
+## 2026-05-08 — C7d: filename-collision dedup is a stable per-position counter, not UUID
+
+**Decision**: When two slides in a Bundle for Travel plan have the same source basename (e.g. `intro.mov` from two different folders), the planner deduplicates by appending `-1`, `-2`, … to the *stem* before the extension. Order is the slide-list order; the first slide to claim `intro.mov` keeps the unsuffixed name. Re-running the planner on the same project produces the same destination filenames (deterministic).
+
+**Why**:
+- **Operators expect filenames they can read in Finder.** UUID-suffixed names work for `<bundle>/Transcoded/` (C2 / C5) because those are codec-conversion outputs the operator never browses by name; Bundle for Travel's whole point is that the bundle is venue-portable, and a person opening `<bundle>/Media/` should see `intro.mov`, `intro-1.mov` rather than two opaque UUIDs.
+- **Determinism matters for re-runs.** If the operator runs Bundle for Travel, deletes a file in Media/ accidentally, and re-runs, the second plan must produce the same filenames so the per-slide `MediaReference` originalPath the apply step rewrote is still correct. UUIDs would re-randomize and orphan the previous-run apply.
+- **The collision case is rare.** Real shows mostly have one source file per name; the suffix path only fires when the operator imported the same basename from two different folders. The rare-case ergonomic cost is low.
+
+**Alternatives considered**:
+- **UUID-prefixed filenames** — clean for collisions but ugly for the common case and breaks Finder-readability.
+- **Hash-based filenames** — `<short-hash>-intro.mov` — readable but every re-run produces new names because the hash changes if the source's bytes drift.
+- **Reject the second slide instead of renaming** — operator-hostile; the second slide is just as legitimate.
+
+**Reversibility**: easy. The dedup function is one helper; switching to UUIDs is a one-line change.
+
+**What I'd revisit if**: real rehearsals show operators get confused about which `intro-1.mov` belongs to which cue. Could surface the source path in a tooltip on the managed slide.
+
+**Public API impact**:
+- `BundleForTravelPlan.uniqueFilename(for:claimed:)` — pure helper exposed for tests.
+- `BundleForTravelOperation.destinationFilename` — String, the deduplicated name.
+
+---
+
+## 2026-05-08 — C7d: bundle-aware resolution adds a rung 0, doesn't replace rung 1
+
+**Decision**: `MediaResolver.resolve` and `MediaReference.resolvedURL(bundleMediaDirectory:)` consult `<bundleMediaDirectory>/<basename>` *only when `kind == .managed` and the bundle URL is supplied*. The bookmark + originalPath waterfall still runs for managed assets if the bundle Media/ candidate is missing.
+
+**Why**:
+- **A moved bundle should keep playing.** When a `.splayback` bundle moves to a new machine, the absolute path (which we wrote at C7d apply time as `<bundle>/Media/<filename>`) becomes wrong because the bundle's parent directory changed. The security-scoped bookmark is also stale on the new host. The bundle-relative rung is what saves the play path in this case.
+- **Same-machine bundles should not regress.** Before C7d, managed didn't exist; now that it does, managed assets on the same machine resolve via *both* the bundle path and the absolute path (which point at the same file). Rung 0 short-circuits early; rung 1 is the safety net if for some reason the bundle URL isn't known yet (e.g. mid-init).
+- **Linked references are deliberately excluded.** A linked file with the same basename as a bundled file would otherwise silently swap in the bundled copy on any project — a horrible failure mode for operator trust. Gated on `kind == .managed`.
+
+**Alternatives considered**:
+- **Replace rung 1 entirely for managed** — cleaner conceptually but loses the safety net when bundleMediaDirectory is briefly nil during view setup.
+- **Store paths as bundle-relative for managed** — would obviate rung 0 entirely. Rejected because it changes the on-disk schema (today every `MediaReference.originalPath` is an absolute path); the rung-0 approach is purely additive.
+- **Cache the resolved URL on `MediaReference`** — premature optimization; the rung 0 check is one `FileManager.fileExists` call.
+
+**Reversibility**: easy. The rung is one closure call in `MediaResolver` and a six-line branch in `MediaReference.resolvedURL(bundleMediaDirectory:)`.
+
+**What I'd revisit if**:
+- Operators want managed assets to resolve via bundle Media/ *only*, refusing to fall back to a stale absolute path. Today the fallback is permissive; a strict mode would surface a different `.fileNotInBundle` step for the missing-media UX.
+
+**Public API impact**:
+- `MediaResolutionStep.bundleMedia` — new case (existing exhaustive switches in `AssetRelinkPlan` updated to treat as "unchanged").
+- `MediaResolver.resolve(bundleMediaDirectory:)` — new optional parameter.
+- `MediaReference.resolvedURL(bundleMediaDirectory:)` — new overload; the existing `.resolvedURL()` forwards with nil for backwards compatibility.
+- `PlaybackController.bundleMediaDirectory: URL?` — new property; `RootView.onAppear` sets it.
+- `AssetLibraryProbe.makeIsOnline(bundleMediaDirectory:)` / `makeResolveURL(bundleMediaDirectory:)` — host-injectable bundle-aware probes; pre-show check uses these so a moved bundle correctly classifies its managed assets as online.
+
+---
+
+## 2026-05-08 — C7d: copies run sequentially on the main actor, no chunk-level cancel
+
+**Decision**: `BundleForTravelCoordinator` runs `FileManager.default.copyItem(at:to:)` calls one at a time inside a `Task @MainActor`. Cancel sets a flag that's checked between operations — the active copy completes before the cancel takes effect.
+
+**Why**:
+- **Copies are short relative to the import-time hashing they replace.** A 1 GB ProRes file on a local SSD copies in ~5 s; aborting mid-copy would leave a partial file and a ragged `MediaReference` to clean up. The per-operation cancel boundary keeps the state machine honest.
+- **Sequential keeps progress predictable.** Operators expect the progress bar to advance file-by-file. Concurrent copies would parallelize wall-clock but blur the "what's currently happening?" feedback.
+- **`Task @MainActor` matches the rest of the app's coordinator conventions** (TranscodeCoordinator, ImageSequenceEncodeCoordinator). The actual `copyItem` blocks the main thread per file, but only briefly, and the alternative (`Task.detached`) introduces actor-hopping that hasn't been needed elsewhere.
+
+**Alternatives considered**:
+- **Concurrent copies via `withTaskGroup`** — faster on multi-disk volumes but invites partial-file races on cancel and complicates progress UI.
+- **Background `DispatchQueue` + DispatchSource** — pre-async-await pattern; this app prefers Task/actor primitives.
+- **Mid-copy cancel via `FileManager` + `Progress.cancellationHandler`** — `FileManager.copyItem` doesn't expose mid-copy cancellation in the Foundation API; would need a chunked rewrite.
+
+**Reversibility**: medium. Switching to a TaskGroup or a chunked copy is a refactor inside the coordinator; no public-API surface changes.
+
+**What I'd revisit if**:
+- Real rehearsals show that bundling 50 GB of media takes long enough that mid-copy cancel matters. The chunked-copy path is then the next iteration.
+- Multi-disk parallelism gives a meaningful win (probably only on RAID / NAS sources).
+
+**Public API impact**:
+- `BundleForTravelCoordinator.State` (`.idle`, `.running(BundleForTravelProgress)`, `.finished`, `.failed`, `.cancelled`).
+- `BundleForTravelProgress { completedCount, totalCount, bytesCopied, totalBytes, currentFilename }`.
+- `BundleForTravelError` (`.mediaDirectoryUnwriteable`, `.copyFailed`, `.cancelled`).
+- `BundleForTravelCoordinator.copyFile / ensureDirectory / removeItem` — static test seams.
