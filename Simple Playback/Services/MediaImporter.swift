@@ -18,8 +18,25 @@ struct MediaImporter {
     static func importSlides(from urls: [URL]) -> [MediaSlide] {
         urls.compactMap { url in
             guard let kind = mediaKind(for: url) else { return nil }
-            return MediaSlide(url: url, mediaKind: kind)
+            let fps = kind == .video ? nativeFrameRate(for: url) : nil
+            return MediaSlide(url: url, mediaKind: kind, nativeFrameRate: fps)
         }
+    }
+
+    /// Reads the video track's nominal frame rate. Returns `nil` if the asset has no video
+    /// track or the rate could not be determined. Synchronous to match the existing import
+    /// flow; used at import time, not on the render hot path.
+    static func nativeFrameRate(for url: URL) -> Double? {
+        let asset = AVURLAsset(url: url)
+        guard let track = asset.tracks(withMediaType: .video).first else { return nil }
+        let nominal = Double(track.nominalFrameRate)
+        if nominal > 0 { return nominal }
+        // Fallback: derive from minFrameDuration when nominalFrameRate reports 0 (some HEVC).
+        let duration = track.minFrameDuration
+        if duration.isValid, duration.seconds > 0 {
+            return 1.0 / duration.seconds
+        }
+        return nil
     }
 
     static func mediaKind(for url: URL) -> MediaKind? {

@@ -156,7 +156,11 @@ struct RootView: View {
                 Divider()
 
                 if let selectedCueBinding {
-                    CueInspectorView(cue: selectedCueBinding, slides: document.project.slides)
+                    CueInspectorView(
+                        cue: selectedCueBinding,
+                        slides: document.project.slides,
+                        stageFPS: document.project.stages.first?.framesPerSecond
+                    )
                 } else if let selectedSlideBinding {
                     InspectorView(slide: selectedSlideBinding)
                 } else {
@@ -332,9 +336,19 @@ private struct InspectorPlaceholder: View {
 private struct CueInspectorView: View {
     @Binding var cue: Cue
     let slides: [MediaSlide]
+    let stageFPS: Double?
+
+    private var asset: MediaSlide? {
+        slides.first(where: { $0.id == cue.assetID })
+    }
 
     private var assetTitle: String {
-        slides.first(where: { $0.id == cue.assetID })?.title ?? "(missing media)"
+        asset?.title ?? "(missing media)"
+    }
+
+    private var conformance: FrameRateConformance? {
+        guard let asset, asset.mediaKind == .video, let stageFPS else { return nil }
+        return FrameRateConformance(clipFPS: asset.nativeFrameRate, stageFPS: stageFPS)
     }
 
     var body: some View {
@@ -357,6 +371,23 @@ private struct CueInspectorView: View {
                 LabeledContent("Asset") {
                     Text(assetTitle)
                         .foregroundStyle(.secondary)
+                }
+
+                if let conformance, conformance.severity == .mismatch {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text(conformance.summary)
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.orange.opacity(0.12))
+                    )
+                    .help("Right-click in the asset library → Transcode to ProRes 422 to render a Stage-rate copy.")
                 }
 
                 Divider()

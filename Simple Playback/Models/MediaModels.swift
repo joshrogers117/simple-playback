@@ -95,15 +95,35 @@ struct MediaSlide: Identifiable, Codable, Hashable {
     var media: MediaReference
     var settings: SlideSettings = SlideSettings()
 
-    init(url: URL, mediaKind: MediaKind) {
+    /// Native frame rate of the underlying media (FPS). Populated at import for video assets;
+    /// `nil` for stills, audio-only files, or video imported before the field existed (legacy
+    /// projects). Used by `FrameRateConformance` to flag clip-vs-Stage mismatches.
+    var nativeFrameRate: Double?
+
+    init(url: URL, mediaKind: MediaKind, nativeFrameRate: Double? = nil) {
         id = UUID()
         title = url.deletingPathExtension().lastPathComponent
         self.mediaKind = mediaKind
         media = MediaReference(url: url)
         settings = SlideSettings()
+        self.nativeFrameRate = nativeFrameRate
         if mediaKind == .video {
             settings.loopVideo = true
         }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, mediaKind, media, settings, nativeFrameRate
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        title = try c.decode(String.self, forKey: .title)
+        mediaKind = try c.decode(MediaKind.self, forKey: .mediaKind)
+        media = try c.decode(MediaReference.self, forKey: .media)
+        settings = try c.decodeIfPresent(SlideSettings.self, forKey: .settings) ?? SlideSettings()
+        nativeFrameRate = try c.decodeIfPresent(Double.self, forKey: .nativeFrameRate)
     }
 }
 
