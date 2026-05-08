@@ -30,6 +30,10 @@ struct SlideGridView: View {
     /// rewrites this slide's MediaReference to point at it (refreshing the
     /// fingerprint).
     var relinkSlide: (MediaSlide) -> Void = { _ in }
+    /// C7d — current project bundle's `<bundle>/Media/` URL when one exists.
+    /// Threaded into palette thumbnails and the right-click transcode gate so a
+    /// moved bundle's managed assets resolve correctly.
+    var bundleMediaDirectory: URL? = nil
 
     private let columns = [
         GridItem(.adaptive(minimum: 148, maximum: 190), spacing: 12)
@@ -62,7 +66,8 @@ struct SlideGridView: View {
                                     number: index + 1,
                                     slide: slide,
                                     isSelected: selectedSlideID == slide.id,
-                                    isLive: liveSlideID == slide.id
+                                    isLive: liveSlideID == slide.id,
+                                    bundleMediaDirectory: bundleMediaDirectory
                                 )
                                 .onTapGesture {
                                     selectedSlideID = slide.id
@@ -99,7 +104,7 @@ struct SlideGridView: View {
 
     @ViewBuilder
     private func slideContextMenu(for slide: MediaSlide) -> some View {
-        if transcodeEnabled, TranscodeService.canTranscode(slide: slide) {
+        if transcodeEnabled, TranscodeService.canTranscode(slide: slide, bundleMediaDirectory: bundleMediaDirectory) {
             ForEach(TranscodeService.preferredPresetOrder(for: slide), id: \.self) { preset in
                 Button("Transcode to \(preset.label)") {
                     requestTranscode(slide, preset)
@@ -273,11 +278,12 @@ private struct SlideTile: View {
     var slide: MediaSlide
     var isSelected: Bool
     var isLive: Bool
+    var bundleMediaDirectory: URL?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .topLeading) {
-                ThumbnailView(slide: slide)
+                ThumbnailView(slide: slide, bundleMediaDirectory: bundleMediaDirectory)
                     .aspectRatio(16 / 9, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
 
@@ -324,6 +330,7 @@ private struct SlideTile: View {
 
 private struct ThumbnailView: View {
     var slide: MediaSlide
+    var bundleMediaDirectory: URL?
     @State private var image: NSImage?
 
     var body: some View {
@@ -342,14 +349,14 @@ private struct ThumbnailView: View {
             }
         }
         .task(id: slide.id) {
-            image = await ThumbnailLoader.thumbnail(for: slide)
+            image = await ThumbnailLoader.thumbnail(for: slide, bundleMediaDirectory: bundleMediaDirectory)
         }
     }
 }
 
 private enum ThumbnailLoader {
-    static func thumbnail(for slide: MediaSlide) async -> NSImage? {
-        guard let url = slide.media.resolvedURL() else { return nil }
+    static func thumbnail(for slide: MediaSlide, bundleMediaDirectory: URL? = nil) async -> NSImage? {
+        guard let url = slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) else { return nil }
         let didAccess = url.startAccessingSecurityScopedResource()
         defer {
             if didAccess {

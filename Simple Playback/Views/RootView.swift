@@ -323,7 +323,8 @@ struct RootView: View {
                 },
                 relinkSlide: { slide in
                     relinkSlideViaOpenPanel(slide)
-                }
+                },
+                bundleMediaDirectory: bundleMediaDirectory()
             )
             .frame(minWidth: 320, idealWidth: 460)
 
@@ -419,7 +420,8 @@ struct RootView: View {
                 showMode: showController.controller?.showMode ?? false,
                 requestTranscode: { slide, preset in
                     requestTranscode(slide: slide, preset: preset)
-                }
+                },
+                bundleMediaDirectory: bundleMediaDirectory()
             )
         } else if let selectedSlideBinding {
             InspectorView(slide: selectedSlideBinding)
@@ -984,11 +986,13 @@ struct RootView: View {
     /// by design.
     private func requestTranscode(slide: MediaSlide, preset: TranscodePreset) {
         let dest = transcodedRootDirectory()
-        let sourceURL = slide.media.resolvedURL()
+        let mediaDir = bundleMediaDirectory()
+        let sourceURL = slide.media.resolvedURL(bundleMediaDirectory: mediaDir)
         transcodeCoordinator.transcode(
             slide: slide,
             preset: preset,
-            destinationDirectory: dest
+            destinationDirectory: dest,
+            bundleMediaDirectory: mediaDir
         ) { [self] result in
             switch result {
             case .success(let outcome):
@@ -1073,6 +1077,10 @@ private struct CueInspectorView: View {
     /// operators can act on inspector warnings without hunting through the asset-library
     /// context menu.
     var requestTranscode: ((MediaSlide, TranscodePreset) -> Void)? = nil
+    /// C7d — current project bundle's `<bundle>/Media/` URL when one exists.
+    /// Threaded into the inline transcode-eligibility check so a moved bundle's
+    /// managed assets don't render as un-transcodable in the cue inspector.
+    var bundleMediaDirectory: URL? = nil
 
     private var asset: MediaSlide? {
         slides.first(where: { $0.id == cue.assetID })
@@ -1132,7 +1140,7 @@ private struct CueInspectorView: View {
                             MediaFlagWarningChip(warning: warning)
                         }
                         if let requestTranscode, !showMode,
-                           TranscodeService.canTranscode(slide: asset),
+                           TranscodeService.canTranscode(slide: asset, bundleMediaDirectory: bundleMediaDirectory),
                            let preferred = TranscodeService.preferredPresetOrder(for: asset).first {
                             Button {
                                 requestTranscode(asset, preferred)

@@ -133,7 +133,15 @@ final class PlaybackController: ObservableObject {
     /// `.splayback` plays its bundled media even when the absolute path
     /// recorded at apply time is stale on the new host. RootView updates this
     /// on document open / file-URL change. `nil` for untitled documents.
-    var bundleMediaDirectory: URL?
+    /// Mirrored to the compositor so overlay (bug-image) resolution follows
+    /// the same bundle-aware path as the primary take.
+    var bundleMediaDirectory: URL? {
+        didSet {
+            if oldValue != bundleMediaDirectory {
+                compositor.bundleMediaDirectory = bundleMediaDirectory
+            }
+        }
+    }
 
     func take(slide: MediaSlide, deviceID: String?, modeID: String?, transitionSettings: PlayoutTransitionSettings) {
         cancelPendingVideoPreparation()

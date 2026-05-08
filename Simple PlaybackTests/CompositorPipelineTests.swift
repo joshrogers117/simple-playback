@@ -123,6 +123,35 @@ final class CompositorPipelineTests: XCTestCase {
         XCTAssertGreaterThan(pixel(in: composed, x: 32, y: 18).green, 0.7)
     }
 
+    func testBundleMediaDirectoryChangeInvalidatesBugImageCache() {
+        var resolveCount = 0
+        let pipeline = CompositorPipeline(imageResolver: { _ in
+            resolveCount += 1
+            return solidImage(width: 4, height: 4, red: 1, green: 0, blue: 0)
+        })
+        let base = greenFrame(width: 32, height: 32)
+        var overlays = CompositorOverlays.empty
+        overlays.bug = BugOverlay(
+            enabled: true,
+            media: MediaReference(url: URL(fileURLWithPath: "/tmp/bundle-aware-test.png")),
+            corner: .topLeft,
+            sizePercent: 0.25
+        )
+
+        _ = pipeline.compose(baseFrame: base, overlays: overlays, canvasSize: CGSize(width: 32, height: 32))
+        XCTAssertEqual(resolveCount, 1)
+
+        pipeline.bundleMediaDirectory = URL(fileURLWithPath: "/tmp/bundle-A/Media", isDirectory: true)
+        _ = pipeline.compose(baseFrame: base, overlays: overlays, canvasSize: CGSize(width: 32, height: 32))
+        XCTAssertEqual(resolveCount, 2,
+                       "Mutating bundleMediaDirectory invalidates the bug-image cache so a moved bundle re-resolves.")
+
+        pipeline.bundleMediaDirectory = URL(fileURLWithPath: "/tmp/bundle-A/Media", isDirectory: true)
+        _ = pipeline.compose(baseFrame: base, overlays: overlays, canvasSize: CGSize(width: 32, height: 32))
+        XCTAssertEqual(resolveCount, 2,
+                       "Setting the same directory is a no-op — the cache is preserved.")
+    }
+
     func testInvalidateBugImageCacheForcesResolverReinvocation() {
         var resolveCount = 0
         let pipeline = CompositorPipeline(imageResolver: { _ in

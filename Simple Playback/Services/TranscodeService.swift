@@ -76,8 +76,8 @@ enum TranscodeService {
     /// first frame, and the C4 chip's recommendation is to transcode to ProRes 4444 to
     /// recover full motion. AVFoundation reads animated GIFs through `AVURLAsset` on
     /// modern macOS, so the export-session path works the same as the video case.
-    static func canTranscode(slide: MediaSlide) -> Bool {
-        guard slide.media.resolvedURL() != nil else { return false }
+    static func canTranscode(slide: MediaSlide, bundleMediaDirectory: URL? = nil) -> Bool {
+        guard slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) != nil else { return false }
         if slide.mediaKind == .video { return true }
         if slide.mediaKind == .image && slide.flags.animatedImage { return true }
         return false
@@ -280,10 +280,11 @@ final class TranscodeCoordinator: ObservableObject {
         slide: MediaSlide,
         preset: TranscodePreset,
         destinationDirectory: URL,
+        bundleMediaDirectory: URL? = nil,
         completion: @MainActor @escaping (Result<TranscodeOutcome, TranscodeError>) -> Void
     ) -> TranscodeJob? {
-        guard let source = slide.media.resolvedURL() else {
-            completion(.failure(.sourceNotReadable(slide.media.resolvedURL() ?? URL(fileURLWithPath: ""))))
+        guard let source = slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) else {
+            completion(.failure(.sourceNotReadable(slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) ?? URL(fileURLWithPath: ""))))
             return nil
         }
         let dest = destinationDirectory

@@ -69,6 +69,37 @@ final class TranscodeServiceTests: XCTestCase {
         XCTAssertFalse(TranscodeService.canTranscode(slide: unresolvable))
     }
 
+    // C7d punch list: a managed slide whose absolute path is stale on this host
+    // should still register as transcode-eligible when the bundle's Media/ directory
+    // is supplied — the bundle-aware overload of `MediaReference.resolvedURL` lets
+    // re-transcode actions survive a moved bundle.
+    func testCanTranscodeUsesBundleMediaDirectoryForManagedSlides() throws {
+        let bundleMedia = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CanTranscode-Bundle-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("Media", isDirectory: true)
+        try FileManager.default.createDirectory(at: bundleMedia, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: bundleMedia.deletingLastPathComponent()) }
+
+        let bundledClip = bundleMedia.appendingPathComponent("clip.mov")
+        try Data().write(to: bundledClip)
+
+        // Build a managed slide whose recorded absolute path is wrong on this host —
+        // the only way to resolve it is via the bundleMediaDirectory.
+        let stalePath = "/tmp/host-A-only-\(UUID().uuidString)/clip.mov"
+        var slide = MediaSlide(url: URL(fileURLWithPath: stalePath), mediaKind: .video)
+        slide.media.kind = .managed
+        slide.media.bookmarkData = nil
+
+        XCTAssertFalse(
+            TranscodeService.canTranscode(slide: slide),
+            "Without a bundle hint, a stale-path managed slide cannot be transcoded."
+        )
+        XCTAssertTrue(
+            TranscodeService.canTranscode(slide: slide, bundleMediaDirectory: bundleMedia),
+            "With the bundle hint, the same managed slide resolves through Media/ and is transcode-eligible."
+        )
+    }
+
     // C4 widening: animated GIF / APNG slides arrive as `.image` but with
     // `flags.animatedImage = true` set by `AnimatedImageInspector`. They should now
     // light up the right-click menu so the operator can convert to ProRes 4444.

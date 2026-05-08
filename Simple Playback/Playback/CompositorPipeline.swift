@@ -18,20 +18,30 @@ import Foundation
 /// (DeckLink, preview, transition cache).
 final class CompositorPipeline {
     /// Resolves a `BugOverlay.media` reference into an `NSImage`. The default uses
-    /// `MediaReference.resolvedURL()` + `NSImage(contentsOf:)`. Tests inject their own.
+    /// `MediaReference.resolvedURL(bundleMediaDirectory:)` + `NSImage(contentsOf:)`.
+    /// Tests inject their own.
     typealias BugImageResolver = (MediaReference) -> NSImage?
 
-    private let imageResolver: BugImageResolver
+    private let injectedResolver: BugImageResolver?
     private var bugImageCache: [String: NSImage] = [:]
     private let cacheLock = NSLock()
 
-    init(imageResolver: BugImageResolver? = nil) {
-        self.imageResolver = imageResolver ?? CompositorPipeline.defaultImageResolver
+    /// C7d — current project bundle's `<bundle>/Media/` URL when one exists.
+    /// Threaded into the default bug-image resolver and the cache key so a
+    /// moved bundle's managed overlay assets resolve to their bundled copy
+    /// instead of the stale absolute path. PlaybackController syncs this from
+    /// its own `bundleMediaDirectory` so a single source of truth drives both
+    /// playback and overlay resolution.
+    var bundleMediaDirectory: URL? {
+        didSet {
+            if oldValue != bundleMediaDirectory {
+                invalidateBugImageCache()
+            }
+        }
     }
 
-    private static let defaultImageResolver: BugImageResolver = { ref in
-        guard let url = ref.resolvedURL() else { return nil }
-        return NSImage(contentsOf: url)
+    init(imageResolver: BugImageResolver? = nil) {
+        self.injectedResolver = imageResolver
     }
 
     /// Drop the cached bug image. Call when `BugOverlay.media` changes or after stop.
@@ -182,7 +192,7 @@ final class CompositorPipeline {
     }
 
     private func bugImage(for media: MediaReference) -> NSImage? {
-        let key = media.resolvedURL()?.absoluteString ?? media.originalPath
+        let key = media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory)?.absoluteString ?? media.originalPath
         cacheLock.lock()
         if let cached = bugImageCache[key] {
             cacheLock.unlock()
@@ -190,11 +200,17 @@ final class CompositorPipeline {
         }
         cacheLock.unlock()
 
-        guard let image = imageResolver(media) else { return nil }
+        guard let image = resolveImage(media) else { return nil }
         cacheLock.lock()
         bugImageCache[key] = image
         cacheLock.unlock()
         return image
+    }
+
+    private func resolveImage(_ ref: MediaReference) -> NSImage? {
+        if let injectedResolver { return injectedResolver(ref) }
+        guard let url = ref.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) else { return nil }
+        return NSImage(contentsOf: url)
     }
 
     private func drawMessage(overlay: MessageOverlay, in context: CGContext, canvas: CGSize, nowDate: Date) {
