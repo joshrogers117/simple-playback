@@ -4,6 +4,7 @@
 **Status (session 2 — 2026-05-07)**: TransportSink fan-out shipped (B5). DeckLink REF status surfaced (B6 partial). 161 tests, all green.
 **Status (session 3 — 2026-05-07)**: Compositor pipeline shipped (B12 model + pipeline + integration; UI deferred to B12d). 193 tests, all green.
 **Status (session 4 — 2026-05-07)**: B12 finished — Overlays inspector tab + ShowController bridge + composed-frame preview rendering (B12d/e/f). 197 tests, all green. 3 commits on `development`.
+**Status (session 5 — 2026-05-07)**: B6b (partial) — project-level "expects external reference" toggle + escalating red free-run banner. 202 tests, all green. 1 commit on `development`. Format-mismatch detection vs Stage frame rate still deferred to a future SDK spike.
 
 The hot path (compositor → driver → device) now goes through a `TransportSinkRouter` that fans every composed frame and audio block out to N sinks. The primary user-selected output (DeckLink or software preview) still flows through the original `VideoOutputDriver` for backward compatibility, but the driver's concrete classes are now thin shims around `DeckLinkTransportSink` / `PreviewTransportSink`. Future B-phase sub-tasks (B11 NDI, second DeckLink port, file-record sink) register additional `TransportSink`s on `PlaybackController` and pick up frames automatically.
 
@@ -156,6 +157,57 @@ These require human eyeballs — autonomous tests don't drive SwiftUI views or c
 Hardware steps remain (still untested by autonomy):
 - DeckLink output composes overlays at SDI (the bridge submits the composed BGRA frame; visual confirmation requires a card).
 - Frame timing: overlays during 23.976 / 29.97 fractional crossfades.
+
+---
+
+## What shipped in session 5 (B6b — partial)
+
+### B6b — project-level REF expectation + escalating banner
+
+- **`PlayoutProject.expectsExternalReference: Bool`** (defaults to `false`, codable, `decodeIfPresent` so legacy projects round-trip cleanly).
+- **`InspectorMode.output`** — third inspector tab alongside `Selection` and `Overlays`. Houses an `OutputInspectorView` with a read-only Stage summary (name / resolution / frame rate / color space / range) and a Reliability section containing the toggle. `RootView.inspectorContent` switches into it; the existing `OverlayInspectorView` stays focused on §3.6 compositor concerns.
+- **`OutputStatusBar.referenceExpected: Bool`** — new parameter the view uses to compute whether to show a red banner. When the toggle is on and the bridge reports `unlocked`, a full-width red bar with the system `exclamationmark.triangle.fill` glyph and the text "REF EXPECTED — Output is free-running" / "Verify the external reference signal is connected and locked." renders **above** the existing chip+status row. The orange chip stays orange; the loud signal moves to the banner.
+- **`OutputStatusBar.evaluateFreeRunBanner(referenceExpected:referenceState:)`** — pure helper extracted for unit tests; covers all 5 (state, expectation) combinations without needing a real `PlaybackController`. The banner suppresses on `idle` / `notSupported` / `locked` / `nil` — those aren't contradictions of the operator's expectation.
+
+### Tests added (session 5)
+
+| Test | What it covers |
+|---|---|
+| `ModelTests.testProjectExpectsExternalReferenceDefaultsToFalseForFreshProjects` | New field defaults to `false` for `PlayoutProject()`. |
+| `ModelTests.testProjectExpectsExternalReferenceDefaultsToFalseWhenAbsentInJSON` | Legacy projects without the field decode to `false`. |
+| `ModelTests.testProjectExpectsExternalReferenceRoundTripsThroughJSON` | Setting the field round-trips through encode/decode. |
+| `OutputStatusBarTests.testFreeRunBannerHiddenWhenReferenceNotExpected` | Banner is suppressed for every reference state when toggle is off. |
+| `OutputStatusBarTests.testFreeRunBannerVisibleOnlyForUnlockedWhenReferenceExpected` | Banner shows only on `unlocked`; suppressed on `idle` / `notSupported` / `locked` / `nil`. |
+| `OverlayInspectorTests.testInspectorModeCasesAndLabels` (updated) | Now asserts `[.selection, .overlays, .output]` with all three labels. |
+
+Total: 202 tests, all green (was 197 at start of session).
+
+### Manual verification needed (session 5 deltas)
+
+These need real DeckLink hardware (the SDI output side) plus a REF generator (the genlock side); autonomy can only verify the model + UI logic.
+
+1. Open a project, switch the inspector to **Output**. Confirm the Stage summary shows the expected resolution / frame rate / color space.
+2. Toggle "Expects external reference (genlock)" on. With no DeckLink output running yet, no banner appears (idle ≠ contradiction).
+3. Start DeckLink output on a card with no REF generator connected (or REF disconnected). Confirm:
+   - The orange "REF: Free-run" chip appears in the lower-right of the status row (existing behavior).
+   - **A new red banner appears above the status row**: "REF EXPECTED — Output is free-running" with the warning glyph.
+4. Connect / lock the REF generator. The banner disappears; the chip turns green ("REF: Locked").
+5. Disconnect REF again — banner returns; toggle the project flag off — banner disappears even while free-run.
+6. Save the project, reopen it. The toggle persists (round-trip-tested in unit tests).
+7. Run the same flow on a card without external reference input (e.g. UltraStudio Mini Recorder). The chip shows "REF: Not supported"; **no banner appears** even with the toggle on. (`notSupported` is hardware fact, not an operator-expectation contradiction.) The right surface for that mismatch is pre-show check (E1).
+
+### Still deferred (session 6+)
+
+- **B6 (remaining)** — REF format-mismatch detection vs Stage frame rate. The `IDeckLinkOutput_v15_3_1` interface used by `SPDeckLinkBridge` does **not** expose REF input timing. Needs a small SDK-API spike against newer interfaces (`IDeckLinkProfileAttributes` / `IDeckLinkProfileManager`) before scoping; if missing entirely, blocker.
+- **B7** — DeckLink format negotiation. Has product-UX questions (mid-show re-arm flow — modal? non-modal banner? dismiss-with-Esc?) that warrant a fresh session with options surfaced to the user.
+- **B8** — 10-bit YUV 4:2:2 default once any clip is >8-bit. Bridge always submits 8-bit BGRA today; needs `Stage.colorSpace` and codec inspector (C1) flags to drive a 10-bit-YUV conversion path.
+- **B11** — NDI Full sender as a `TransportSink`. Independent of DeckLink work; needs the NDI SDK.
+- **B13** — Color pipeline (sits on top of B5+B12).
+- **B9 / B15 / B10** — long tail.
+- **B16** — final Phase B summary + DeckLink mock layer for tests.
+
+Operator-facing follow-up (small):
+- Pre-show check (E1) reuse: when E1 lands, the same `expectsExternalReference` flag should drive a pre-show "REF locked?" gate, not just a render-time banner. Track in the E1 design pass.
 
 ---
 
