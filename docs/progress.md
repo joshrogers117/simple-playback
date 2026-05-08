@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B in flight (B1–B5 done)
-- **Last commit**: B5d — TransportSink router fan-out tests
+- **Active phase**: A and D complete; B in flight (B1–B5 done; B6 partial)
+- **Last commit**: B6 — DeckLink REF lock state surfaced in status bar
 - **Branch**: `development`
 
 ---
@@ -44,7 +44,7 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
   - [x] B5b: DeckLinkTransportSink + PreviewTransportSink (drivers reduced to thin shims)
   - [x] B5c: PlaybackController fans frames + audio out to auxiliary TransportSinks
   - [x] B5d: Router/sink unit tests + PlaybackController register/unregister hooks
-- [ ] B6: DeckLink REF input handling — surface lock state, refuse silent free-run when expected, warn on format mismatch
+- [~] B6: DeckLink REF input handling — surface lock state via `IDeckLinkOutput::GetReferenceStatus`, status-bar REF chip with idle/locked/free-run/not-supported palette. **Deferred to B6b**: project-level "REF expected" toggle that escalates free-run to a red banner; format-mismatch warning vs Stage frame rate (needs incoming-REF frame-rate query, which the v15.3.1 IDeckLinkOutput interface does not expose — likely needs `IDeckLinkProfileAttributes::BMDDeckLinkSupportsReferenceInputTimingOffset` or input-side enumeration).
 - [ ] B7: DeckLink format negotiation — explicit at start, mid-show change requires re-arm
 - [ ] B8: 10-bit YUV 4:2:2 default when any clip in the project is >8-bit
 - [ ] B9: "Output in use" detection + recovery path
