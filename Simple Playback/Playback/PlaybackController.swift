@@ -15,6 +15,12 @@ final class PlaybackController: ObservableObject {
     /// this as the "render path warmed" signal: spec §3.16 expects an operator to be able
     /// to verify the output pipeline isn't cold before a show. Cleared on `stop()`.
     @Published private(set) var hasRenderedAnyFrame: Bool = false
+    /// E3+ — dropped-frame counter. Owned by `PlaybackController` so the lifecycle
+    /// (reset on `stopOutput`, accumulate during a session) is naturally tied to
+    /// output state. The video timer's render path detects cadence misses and
+    /// records them; observers (status-bar chip, ShowController log) read the
+    /// rolling and cumulative published values directly.
+    let droppedFrameCounter = DroppedFrameCounter()
     @Published private(set) var liveSlideID: UUID?
     @Published private(set) var liveTitle: String = "Black"
     @Published private(set) var status: String = "Idle"
@@ -78,6 +84,10 @@ final class PlaybackController: ObservableObject {
     private var outputStartedForMode: String?
     private var scopedURL: URL?
     private var scopedURLDidAccess = false
+    /// Host time of the last timer-driven render tick. Reset on
+    /// `startVideoTimer` and `stopOutput`/`stopMediaOnly`. The drop detector
+    /// reads this to compare against the configured `activeFrameInterval`.
+    private var lastTimerTickHostTime: CFTimeInterval?
 
     init(outputDriver: VideoOutputDriver = CompositeVideoOutputDriver()) {
         self.outputDriver = outputDriver
@@ -235,6 +245,9 @@ final class PlaybackController: ObservableObject {
         activeSinkStage = nil
         deckLinkReferenceState = nil
         hasRenderedAnyFrame = false
+        let counter = droppedFrameCounter
+        Task { @MainActor in counter.reset() }
+        lastTimerTickHostTime = nil
         isRunning = false
         status = "Output stopped"
     }
@@ -909,6 +922,9 @@ final class PlaybackController: ObservableObject {
     private func startVideoTimer(mode: VideoOutputMode) {
         let interval = frameInterval(for: mode)
         timer?.cancel()
+        // Restart the tick clock so the first tick of a new take never reads
+        // as a "drop" against the previous take's last submission.
+        lastTimerTickHostTime = nil
         let timer = DispatchSource.makeTimerSource(queue: outputQueue)
         timer.schedule(deadline: .now(), repeating: .nanoseconds(Int(interval * 1_000_000_000)), leeway: .milliseconds(2))
         timer.setEventHandler { [weak self] in
@@ -921,6 +937,15 @@ final class PlaybackController: ObservableObject {
     private func renderCurrentVideoFrame(forceCurrentTime: Bool = false) {
         autoreleasepool {
             guard let videoOutput else { return }
+
+            // E3+ drop detection: compare wall-clock between consecutive timer
+            // ticks against the configured frame interval. If the queue stalled
+            // and a tick is delayed, the deficit (in whole frames) lands as
+            // dropped frames. `forceCurrentTime` tides — operator-driven seeks
+            // re-pull a frame off-cadence and shouldn't count as drops.
+            if !forceCurrentTime {
+                detectAndRecordDroppedFrames(at: CACurrentMediaTime())
+            }
 
             var decodedFrame: RenderedFrame? = nil
             let itemTime = videoOutput.itemTime(forHostTime: CACurrentMediaTime())
@@ -1275,6 +1300,30 @@ final class PlaybackController: ObservableObject {
 
     private func frameInterval(for mode: VideoOutputMode) -> Double {
         max(1.0 / max(mode.framesPerSecond, 1), 1.0 / 60.0)
+    }
+
+    /// E3+ — drop detection. Computes the gap between consecutive timer ticks
+    /// and converts a deficit larger than 1.5× the configured frame interval
+    /// into a count of dropped frames. The 1.5× threshold absorbs normal
+    /// scheduler jitter (~5–20 ms on a healthy mac) without producing false
+    /// positives. Multi-frame stalls report the full deficit so a brief 3-
+    /// frame skip lands as a single batched record on the counter.
+    private func detectAndRecordDroppedFrames(at hostTime: CFTimeInterval) {
+        defer { lastTimerTickHostTime = hostTime }
+        guard let last = lastTimerTickHostTime else { return }
+        let interval = activeFrameInterval
+        guard interval > 0 else { return }
+        let delta = hostTime - last
+        // Ignore non-positive deltas (clock adjustment, scheduling oddity) so
+        // we never record a negative drop.
+        guard delta > 0 else { return }
+        let expectedFrames = delta / interval
+        let dropped = Int(expectedFrames.rounded(.down)) - 1
+        guard dropped > 0 else { return }
+        let now = Date()
+        Task { @MainActor [droppedFrameCounter] in
+            droppedFrameCounter.record(count: dropped, at: now)
+        }
     }
 
     private struct PendingTransition {

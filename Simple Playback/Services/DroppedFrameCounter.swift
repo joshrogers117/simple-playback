@@ -38,7 +38,7 @@ final class DroppedFrameCounter: ObservableObject {
         let count: Int
     }
 
-    init(rollingWindow: TimeInterval = 10.0) {
+    nonisolated init(rollingWindow: TimeInterval = 10.0) {
         self.rollingWindow = rollingWindow
     }
 

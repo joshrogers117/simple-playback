@@ -20,6 +20,7 @@ struct OutputStatusBar: View {
                     .lineLimit(1)
                     .foregroundStyle(.secondary)
                 Spacer()
+                droppedFrameChip
                 if let refState = playback.deckLinkReferenceState {
                     referenceStatusChip(refState)
                 }
@@ -28,6 +29,39 @@ struct OutputStatusBar: View {
             .padding(14)
             .background(.bar)
         }
+    }
+
+    /// E3+ — drop count chip. Hidden until the cumulative count exceeds zero
+    /// so a clean show stays free of decorative chrome. Foreground color
+    /// escalates on rolling drops: any rolling > 0 reads orange (operator-
+    /// visible "drops are happening *now*"); rolling == 0 with cumulative > 0
+    /// reads secondary (residue from earlier in the session).
+    @ViewBuilder
+    private var droppedFrameChip: some View {
+        let counter = playback.droppedFrameCounter
+        if counter.cumulative > 0 {
+            let liveDrops = counter.rollingCount > 0
+            HStack(spacing: 4) {
+                Image(systemName: liveDrops ? "exclamationmark.triangle.fill" : "checkmark.circle")
+                    .font(.caption2)
+                Text("Drops \(counter.rollingCount)/10s · \(counter.cumulative) total")
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(liveDrops ? Color.orange : Color.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                Capsule().fill(liveDrops ? Color.orange.opacity(0.18) : Color.secondary.opacity(0.10))
+            )
+            .help(droppedFrameTooltip(rolling: counter.rollingCount, cumulative: counter.cumulative))
+        }
+    }
+
+    private func droppedFrameTooltip(rolling: Int, cumulative: Int) -> String {
+        if rolling > 0 {
+            return "\(rolling) frames dropped in the last 10 s. \(cumulative) since output started — check disk pressure, codec stress, or background load."
+        }
+        return "\(cumulative) frames dropped earlier in this session. Output has recovered."
     }
 
     /// True when the operator declared this show needs genlock and the DeckLink output is

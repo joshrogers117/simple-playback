@@ -41,6 +41,19 @@ final class ShowController: ObservableObject {
     private let transitionSettingsLookup: () -> PlayoutTransitionSettings
     private let outputBindingLookup: () -> (deviceID: String?, modeID: String?)
     private var panicCompletionTask: DispatchWorkItem?
+    private var droppedFrameCancellable: AnyCancellable?
+    /// Most recent cumulative drop count we've already logged. Drives the
+    /// debounce — only the delta since this value reaches the show log,
+    /// gated by a 1 s throttle so a long stall lands as one event, not 30.
+    private var lastReportedDropCumulative: Int = 0
+    /// Wall clock of the last `.droppedFrame` log emission. The debounce
+    /// gates emission until at least `dropFlushInterval` seconds since the
+    /// previous emission, so a long stall lands as one log entry, not one
+    /// per dropped frame.
+    private var lastDropLogTime: Date?
+    /// Window between consecutive `.droppedFrame` log entries (seconds).
+    /// Spec §3.16 calls for debounced reporting; this is the floor.
+    private let dropFlushInterval: TimeInterval = 1.0
 
     init(
         showList: ShowList,
@@ -64,6 +77,57 @@ final class ShowController: ObservableObject {
         ShowControlHub.shared.stack.dispatcher.onActionDispatched = { [weak self] action, source, _ in
             self?.recordDispatchedAction(action, source: source)
         }
+        wireDroppedFrameLog()
+    }
+
+    /// E3+ — observe the playback controller's dropped-frame counter and
+    /// emit one `.droppedFrame` log entry per 1 s window of accumulated
+    /// drops. The debounce keeps long stalls from drowning the show log
+    /// in one-per-frame entries; the detail records the burst size so
+    /// operators can still see the magnitude post-show.
+    ///
+    /// Implementation: rather than Combine `throttle` (which emits on a
+    /// trailing schedule and complicates testing), every cumulative
+    /// publish is examined synchronously. We emit immediately on the
+    /// first burst of a session, then suppress further emissions until
+    /// `dropFlushInterval` seconds have passed. The next burst after the
+    /// quiet window batches everything since the last emission into one
+    /// log entry.
+    private func wireDroppedFrameLog() {
+        droppedFrameCancellable = playback.droppedFrameCounter.$cumulative
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] cumulative in
+                self?.handleDropCumulative(cumulative, now: Date())
+            }
+    }
+
+    /// Pure-logic decision so tests can drive the debounce by injecting an
+    /// explicit `now` rather than waiting on real time.
+    func handleDropCumulative(_ cumulative: Int, now: Date) {
+        let previous = lastReportedDropCumulative
+        if cumulative < previous {
+            // Counter was reset (output stopped). Re-baseline so the next
+            // session starts from zero without emitting a phantom negative
+            // drop event.
+            lastReportedDropCumulative = cumulative
+            lastDropLogTime = nil
+            return
+        }
+        let delta = cumulative - previous
+        guard delta > 0 else { return }
+        if let last = lastDropLogTime,
+           now.timeIntervalSince(last) < dropFlushInterval {
+            // Still inside the quiet window — accumulate silently. The
+            // next emission past the window will batch the deficit.
+            return
+        }
+        lastReportedDropCumulative = cumulative
+        lastDropLogTime = now
+        showLog?.appendNow(
+            action: .droppedFrame,
+            source: .system,
+            detail: "drops=\(delta) cumulative=\(cumulative)"
+        )
     }
 
     /// Translate a dispatcher-level `ShowControlAction` + `ShowControlSource`
