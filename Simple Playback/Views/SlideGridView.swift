@@ -34,6 +34,12 @@ struct SlideGridView: View {
     /// Threaded into palette thumbnails and the right-click transcode gate so a
     /// moved bundle's managed assets resolve correctly.
     var bundleMediaDirectory: URL? = nil
+    /// C8 v1.1 — id → `FolderBookmark` lookup mirroring the project's
+    /// folder-bookmark registry. Threaded into palette thumbnails (so a
+    /// folder-renamed source still renders its live thumbnail via rung-2)
+    /// and the right-click transcode gate (so the same source still offers
+    /// the Transcode menu).
+    var folderBookmarks: [UUID: FolderBookmark] = [:]
     /// C10 — directory where the importer cached per-slide poster JPEGs.
     /// ThumbnailLoader falls back to `<dir>/<slide.id>.jpg` when the source
     /// asset is offline so the palette still renders. Default nil for
@@ -73,6 +79,7 @@ struct SlideGridView: View {
                                     isSelected: selectedSlideID == slide.id,
                                     isLive: liveSlideID == slide.id,
                                     bundleMediaDirectory: bundleMediaDirectory,
+                                    folderBookmarks: folderBookmarks,
                                     thumbnailCacheDirectory: thumbnailCacheDirectory
                                 )
                                 .onTapGesture {
@@ -110,7 +117,11 @@ struct SlideGridView: View {
 
     @ViewBuilder
     private func slideContextMenu(for slide: MediaSlide) -> some View {
-        if transcodeEnabled, TranscodeService.canTranscode(slide: slide, bundleMediaDirectory: bundleMediaDirectory) {
+        if transcodeEnabled, TranscodeService.canTranscode(
+            slide: slide,
+            bundleMediaDirectory: bundleMediaDirectory,
+            folderBookmarks: folderBookmarks
+        ) {
             ForEach(TranscodeService.preferredPresetOrder(for: slide), id: \.self) { preset in
                 Button("Transcode to \(preset.label)") {
                     requestTranscode(slide, preset)
@@ -285,6 +296,7 @@ private struct SlideTile: View {
     var isSelected: Bool
     var isLive: Bool
     var bundleMediaDirectory: URL?
+    var folderBookmarks: [UUID: FolderBookmark] = [:]
     var thumbnailCacheDirectory: URL?
 
     var body: some View {
@@ -293,6 +305,7 @@ private struct SlideTile: View {
                 ThumbnailView(
                     slide: slide,
                     bundleMediaDirectory: bundleMediaDirectory,
+                    folderBookmarks: folderBookmarks,
                     thumbnailCacheDirectory: thumbnailCacheDirectory
                 )
                     .aspectRatio(16 / 9, contentMode: .fit)
@@ -342,6 +355,7 @@ private struct SlideTile: View {
 private struct ThumbnailView: View {
     var slide: MediaSlide
     var bundleMediaDirectory: URL?
+    var folderBookmarks: [UUID: FolderBookmark] = [:]
     var thumbnailCacheDirectory: URL?
     @State private var image: NSImage?
 
@@ -364,6 +378,7 @@ private struct ThumbnailView: View {
             image = await ThumbnailLoader.thumbnail(
                 for: slide,
                 bundleMediaDirectory: bundleMediaDirectory,
+                folderBookmarks: folderBookmarks,
                 thumbnailCacheDirectory: thumbnailCacheDirectory
             )
         }
@@ -379,9 +394,14 @@ enum ThumbnailLoader {
     static func thumbnail(
         for slide: MediaSlide,
         bundleMediaDirectory: URL? = nil,
+        folderBookmarks: [UUID: FolderBookmark] = [:],
         thumbnailCacheDirectory: URL? = nil
     ) async -> NSImage? {
-        if let live = await liveThumbnail(for: slide, bundleMediaDirectory: bundleMediaDirectory) {
+        if let live = await liveThumbnail(
+            for: slide,
+            bundleMediaDirectory: bundleMediaDirectory,
+            folderBookmarks: folderBookmarks
+        ) {
             return live
         }
         return cachedThumbnail(for: slide, in: thumbnailCacheDirectory)
@@ -397,8 +417,15 @@ enum ThumbnailLoader {
         return NSImage(contentsOf: url)
     }
 
-    private static func liveThumbnail(for slide: MediaSlide, bundleMediaDirectory: URL?) async -> NSImage? {
-        guard let url = slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) else { return nil }
+    private static func liveThumbnail(
+        for slide: MediaSlide,
+        bundleMediaDirectory: URL?,
+        folderBookmarks: [UUID: FolderBookmark]
+    ) async -> NSImage? {
+        guard let url = slide.media.resolvedURL(
+            bundleMediaDirectory: bundleMediaDirectory,
+            folderBookmarks: folderBookmarks
+        ) else { return nil }
         let didAccess = url.startAccessingSecurityScopedResource()
         defer {
             if didAccess {

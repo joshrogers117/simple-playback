@@ -360,6 +360,7 @@ struct RootView: View {
                     relinkSlideViaOpenPanel(slide)
                 },
                 bundleMediaDirectory: bundleMediaDirectory(),
+                folderBookmarks: projectFolderBookmarkLookup(),
                 thumbnailCacheDirectory: thumbnailRootDirectory()
             )
             .frame(minWidth: 320, idealWidth: 460)
