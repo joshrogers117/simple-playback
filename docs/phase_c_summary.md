@@ -1,5 +1,117 @@
 # Phase C — Media pipeline — Summary
 
+**Status (session 19 — 2026-05-08) — C16 Phase C close-out**. Phase C is declared complete for v1. A code-reviewer pass against the full Phase C diff (`48a8b0a..HEAD`, 17,500+ lines across 100+ files) surfaced six P1 findings; three were addressed in this session as correctness/safety hardening commits, the other three are documented below as "still open, out of scope for v1." 3 commits, 657 → 659 tests (+2). Phase C surface remaining (C8 / C11 / C12-C15) is documented as scoped out for v1.
+
+### C16 — Code-reviewer P1 fixes folded in this session
+
+- **`CompositorPipeline.bundleMediaDirectory` race** — synchronize the property through the existing `cacheLock`. Previously a plain `var` was read off the playback `outputQueue` while being written on main; reading a heap-typed `URL?` without synchronization is undefined behavior and the resolved-URL cache key was coupled to the value. Setter now swaps and invalidates atomically. Pin: existing `testBundleMediaDirectoryChangeInvalidatesBugImageCache` still holds.
+- **`BundleForTravelCoordinator` partial-copy leak** — when `FileManager.copyItem` throws (out-of-space, source vanished mid-copy), it can leave a partial file at the destination. Add a `removeItem(destination)` call in the failure catch block before flipping to `.failed`. Mirrors `TranscodeJob.removePartialFileIfNeeded`. Pin: `testFailedCopyClearsPartialDestinationBeforeReportingFailure` asserts the contract — pre-copy clear-stale + post-failure cleanup are both `removeItem` calls.
+- **`MediaReference.resolvedURL(bundleMediaDirectory:)` bookmark branch** — gate the bookmark-resolves-to-deleted-file path on `FileManager.default.fileExists(atPath:)`. Pre-fix, `URL(resolvingBookmarkData:...)` would return a stale URL pointing at a deleted file, and `TranscodeService.canTranscode` (which only checked `resolvedURL(...) != nil`) treated that as "online." Pin: `testResolvedURLReturnsNilWhenBookmarkResolvesToDeletedFile` builds a bookmark over a real file, deletes the file, and asserts `resolvedURL()` returns nil.
+
+### C16 — Reviewer findings deferred (out of scope for v1)
+
+- **`MediaResolver` walks every search root for nothing on unfingerprinted slides.** `for root in searchRoots` keeps enumerating after `nameAndSizeHit` is set on a `fingerprint == nil` slide. O(roots × files) wasted walk per legacy slide. Add an early break after the inner candidate loop. Not a correctness bug, just measurable on 500-slide decks. Filed for a future sweep.
+- **`recomputeAssetLibraryStatus` per-slide-mutation cost.** `RootView.swift` runs `AssetLibraryProbe.evaluate` on every `project.slides` change; `liveIsOnline` does one stat per slide. A 500-slide drag-reorder triggers 500 stats per tick. Documented since session 17. Right fix is a 250 ms debounce or a memoization on `(slides.count, slides.map(\.media.originalPath).hashValue, bundleMediaDirectory)`.
+- **`AssetRelinkPlan.apply` preserves managed kind even when relink target is outside the bundle.** A `.managed` slide relinked via NSOpenPanel to a file outside `<bundle>/Media/` keeps `.managed` but the path no longer points inside. The bundle-Media rung 0 of `MediaResolver` fails to find the file and falls through to bookmark/originalPath — works, but the kind is lying. Right fix is to infer kind from "is `update.newURL` under `bundleMediaDirectory`."
+
+### C16 — Phase C feature inventory (what shipped over Sessions 6–19)
+
+**Codec inspector and pipeline flags**
+
+- C1 long-GOP / VFR / 10-bit 4:2:0 / untagged-color flags via `MediaFlagsEvaluator` and `MediaFlagsInspector`; populated at import; rendered as `MediaFlagWarningChip` rows below the FPS conformance warning in the cue inspector.
+- B8 `PlayoutProject.recommendsTenBitOutput` (Phase B reuse — keys off `flags.tenBitYUV420`).
+
+**Importers**
+
+- C3 PDF rasterize-on-import via PDFKit at output × 2 → `<bundle>/Cache/Renders/`.
+- C6 Keynote `.key` → AppleScript export to PDF → bitmap rasterize. `NSAppleEventsUsageDescription` + `com.apple.security.automation.apple-events` entitlement.
+- C4 animated GIF / APNG detection → ProRes 4444 leads in right-click menu.
+- C5 image-sequence detection (`name.NNN[N].ext`, 3- or 4-digit counters, multi-dot basenames, gaps) + ProRes 4444 encode via `AVAssetWriter`.
+- C5c folder-drop UX with per-sequence frame-rate confirm sheet (24 / 25 / 30 / 48 / 50 / 60 + custom integer); standalone files routed through `MediaImporter`, sequences through `ImageSequenceEncodeCoordinator`.
+
+**Transcode pipeline**
+
+- C2 right-click ProRes 422 / 4444 transcode action; `TranscodeService` + `TranscodeCoordinator` + `Transcoded/` bundle layout; non-modal progress strip.
+- Inline transcode chip on the cue inspector flag warnings (Show-Mode-gated).
+- Animated-image presets order ProRes 4444 first; widened `canTranscode` to animated images.
+- Partial-file cleanup on cancel (C2/C5c gap close).
+
+**Asset library — C7**
+
+- C7a `AssetFingerprinter` (CryptoKit SHA-256 streaming, 1 MiB chunked) + `MediaAssetFingerprint { contentHash, size, mtime }`.
+- `MediaReference.kind: .linked | .managed` and `MediaReference.fingerprint`; legacy projects decode-if-present.
+- C7b importer-time fingerprint population (failure non-blocking).
+- C7c `MediaResolver` waterfall — bookmark/originalPath → contentHash search → name+size search → offline.
+- C7d Bundle for Travel — `BundleForTravelPlan` (filename-collision dedup, already-managed skip, offline skip), `BundleForTravelCoordinator` (state machine + injectable I/O seams), `BundleForTravelSheet` (idle plan summary → progress → result), toolbar action gated on saved bundle.
+- Bundle-aware `MediaReference.resolvedURL(bundleMediaDirectory:)` overload + `MediaResolver.bundleMedia` rung 0 + `AssetLibraryProbe.makeIsOnline(bundleMediaDirectory:)` so a moved bundle's managed assets play.
+- Session-18 punch list close-out — `CompositorPipeline.bundleMediaDirectory`, `TranscodeService.canTranscode(slide:bundleMediaDirectory:)`, `BundleURLObserver` Save-As symmetry, threading the bundle dir through palette + cue inspector.
+- Session-19 hardening (this session) — atomic property synchronization, partial-copy cleanup, bookmark fileExists check.
+
+**Missing-media UX — C9**
+
+- C9 first slice — `AssetRelinkPlan` pure-logic plan + apply over `MediaResolver`. Pre-Show `media.files` row Fix handler opens NSOpenPanel and applies the plan project-wide; empty match surfaces via the import-status banner.
+- C9 second slice — per-slide right-click → Locate… in `SlideGridView` for one-shot file picks.
+- C9 third slice — persistent missing-media banner above `OutputStatusBar` (`MissingMediaBannerView`), recomputed on slide mutation. Shows offline-count without requiring Pre-Show.
+
+**Thumbnails — C10**
+
+- `ThumbnailGenerator` 320×180 JPEG (~10 KB at quality 0.75); image branch via NSImage/NSBitmapImageRep, video branch via `AVAssetImageGenerator` at `.zero` with `requestedTimeToleranceBefore/After = .positiveInfinity`.
+- `MediaImporter.thumbnailEncoder` static-var seam writes `<bundle>/Cache/Thumbnails/<slide.id>.jpg` for every direct image/video import + every PDF/Keynote rasterized page. Failures silent.
+- `SlideGridView` offline fallback — live source URL first, then `<dir>/<slide.id>.jpg` synchronously. Palette grid renders even after the source is gone.
+
+**Import status banner**
+
+- `ImportStatusBanner` ObservableObject + view rendered above `OutputStatusBar`. Routes PDF / Keynote / unsupported / transcode (non-cancel) failures and is the single uniform non-modal failure surface.
+- Apple-events deep-link button on Keynote-import failures (Option E session 12).
+- Modal `Keynote not installed` `NSAlert` removed (C-banner-c, session 11).
+
+### C16 — Consolidated manual rehearsal steps for Phase C
+
+Run these on real operator media before promoting Phase C to "production-ready." Each step exercises a code path that was unit-tested but never run against the variety of real-world inputs that production media brings.
+
+1. **Codec inspector flags** — import a long-GOP H.264 clip, a 10-bit HEVC Main-10 clip, a VFR phone clip, and a clip with NCLC tags missing. Verify the cue inspector renders one yellow chip per applicable flag below the FPS warning. The 10-bit chip should also turn on the Output inspector's "10-bit recommended" hint via B8.
+2. **PDF import** — import a multi-page PDF whose pages mix portrait and landscape and contain at least one heavy-vector page. Verify rasters land in `<bundle>/Cache/Renders/<slide.id>.png` at output × 2, the palette tiles render the rasters, and a re-save of the project doesn't re-rasterize.
+3. **Keynote import** — import a `.key` file on a machine with Keynote installed. Verify the AppleScript prompt fires the first time and the import completes. Then import on a machine where Keynote is uninstalled — verify the import-status banner shows the "Keynote not installed" failure (no modal alert).
+4. **Animated GIF** — import a multi-frame GIF and an animated PNG. Right-click → Transcode menu should lead with ProRes 4444 (not 422). Run the transcode and verify the resulting `.mov` plays smoothly with frames preserved.
+5. **Image sequence** — drop a folder containing `frame.0001.png` … `frame.0240.png`. Verify the Add Folder sheet groups them into one sequence; pick 30 fps; confirm; verify the resulting ProRes 4444 `.mov` plays at the right rate.
+6. **ProRes transcode** — right-click an H.264 clip → Transcode to ProRes 422. Verify the non-modal progress strip ticks, a sibling slide is appended on success, and the source slide's flag chip disappears (it now has a `.movsibling).
+7. **Asset fingerprinting + relink** — import a clip, save the project, move the file to a new directory, reopen. Pre-Show `media.files` row should show "1 offline." Use Locate Folder → pick the new parent directory → relink applies and the file is found by content hash + name+size.
+8. **Per-slide Locate** — for a single offline slide, right-click → Locate… → pick the new file. Verify the slide rebinds with a refreshed fingerprint (not stale).
+9. **Bundle for Travel cross-host** — bundle a project on machine A (toolbar → Bundle for Travel → confirm), copy the entire `.splayback` bundle to machine B, open it. Verify managed assets play, compositor overlays render, palette thumbnails light up (live + offline-fallback paths), and the right-click "Transcode to ProRes" stays enabled for managed sources. Verify the missing-media banner doesn't false-positive.
+10. **Save-As of untitled** — open a new doc, drop a clip, Save-As to a new bundle URL. Verify the asset-library banner doesn't flicker between offline / online; managed playback (after Bundle for Travel) resolves via the new bundle's `Media/` on the next take.
+11. **C10 thumbnails offline path** — import a clip, save the project, delete the source from disk, close-and-reopen the project. Palette tile should still render the cached poster instead of the placeholder icon.
+12. **Bundle for Travel partial-copy cleanup (session-19 fix)** — fill the destination disk to within a few MB, kick a Bundle for Travel pass, observe the failure banner. Verify the destination directory does NOT contain a truncated copy of the file that failed to copy.
+13. **Stale-bookmark recovery (session-19 fix)** — open a project whose bookmarked source files have been moved/deleted on the host machine without project-side relink. Verify the offline-count banner is correct (every stale bookmark is reported), `TranscodeService.canTranscode` is False (right-click menu hides Transcode), and `Locate…` finds the new path.
+
+### C16 — What's scoped out of v1 Phase C
+
+- **C8 — folder-level bookmarks for batch imports.** Today every imported file gets its own security-scoped bookmark; for folder imports (C5c), a 50-clip folder produces 50 bookmark blobs in the project file. The spec implies a folder-level bookmark + per-file relative path. Architectural change — adds a `FolderBookmark` model, modifies `MediaImporter` to opt into folder-mode when the source is a single parent directory, and the resolver gains a fallback rung that joins folder-bookmark + relative path. Bigger than C7d (3-5 commits over 1-2 sessions). Filed.
+- **C11 — filmstrip thumbnail sprite-sheets (background queue).** Pairs naturally with C10. Pre-render N thumbnails sampled across each video's duration for a future scrub UI. The decision (already in `decision_log.md` for C10) is single sprite-sheet PNG per video at `<bundle>/Cache/Filmstrips/<slide.id>.png`. Architecture: `FilmstripGenerator` pure-logic + `FilmstripCoordinator` (mirror `BundleForTravelCoordinator` shape — `@MainActor ObservableObject` state machine, jobs list, cancel, sibling-strip splice). UI deferred until a scrub surface lands. 2-4 commits.
+- **C12 — audio engine refactor.** 48 kHz / 32-bit float, 8 internal channels, routing matrix. Substantial; deserves its own sub-phase.
+- **C13 — audio cue types.** Embedded, audio-only cue, background bed.
+- **C14 — per-cue audio.** Volume, mute, fade-in/out, crossfade override, varispeed with pitch correction.
+- **C15 — SRT/WebVTT subtitle sidecar render.** Subtitle layer in compositor.
+
+The audio block (C12-C15) is large enough to be its own pickup. C8 and C11 are autonomy-friendly Phase C tail tasks.
+
+### C16 — Test inventory at Phase C close
+
+659 tests total at HEAD on `development`. Phase C-direct test files (file count and approximate test counts):
+
+- `MediaFlagsEvaluatorTests.swift` (~10), `MediaFlagsInspectorTests.swift` (~6), `MediaImporterTests.swift` (~12), `MediaImporterKeynoteTests.swift` (~5), `MediaImporterPDFTests.swift` (~4), `MediaImporterAnimatedImageTests.swift` (~4), `MediaImporterThumbnailTests.swift` (4)
+- `PDFImporterTests.swift` (~8), `KeynoteImporterTests.swift` (~9), `AnimatedImageInspectorTests.swift` (~5)
+- `ImageSequenceDetectorTests.swift` (~9), `ImageSequenceEncoderTests.swift` + `ImageSequenceEncodeCoordinatorTests.swift` (~10), `AddFolderImporterTests.swift` (7), `PendingFolderImportTests.swift` (7)
+- `TranscodeServiceTests.swift` (~14), `TranscodeCoordinatorTests.swift` (~10)
+- `AssetFingerprinterTests.swift` (~5), `MediaResolverTests.swift` (~17 incl. session-19 stale-bookmark pin), `AssetRelinkPlanTests.swift` (~6), `AssetLibraryProbeTests.swift` (~6)
+- `BundleForTravelPlanTests.swift` (~6), `BundleForTravelCoordinatorTests.swift` (~6 incl. session-19 partial-copy pin)
+- `ThumbnailGeneratorTests.swift` (4), `SlideGridViewThumbnailFallbackTests.swift` (4)
+- `CompositorPipelineTests.swift` (~6 incl. C7d bundle-dir invalidation pin)
+- `ImportStatusBannerTests.swift` (~4)
+
+Phase D / Phase E interaction tests (`PreShowCheckTests`, `PreShowCheckFixHandlersTests`, `ShowControllerLogTests`, `ShowControllerLateTakeLogTests`, etc.) reuse Phase C primitives but are out of scope here.
+
+---
+
 **Status (session 18 — 2026-05-08)**: Closed the session-17 C7d punch list (P1 read-side bundle-aware resolution + Save-As bundle-dir refresh) and shipped **C10 embedded poster-frame thumbnails** end-to-end. 4 commits in C7-finalization + 3 commits in C10. 645 → 657 tests (+12); 637 → 657 across the full session counting the late-take live integration in Phase E (+20). Shape mirrors session-17 — pure-logic service + thin host wiring + a small UI surface per commit.
 
 - **Z1 (C7 punch list)** — Bundle-aware resolution threaded through every read path that the C7d landing missed:
