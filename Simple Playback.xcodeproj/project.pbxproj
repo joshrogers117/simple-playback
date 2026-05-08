@@ -23,6 +23,7 @@
 		3E21186036951CC387B69F2E /* SlideGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B620D6408556D32380C918 /* SlideGridView.swift */; };
 		44E0E08A26F3691D8E7A2C44 /* AuthTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA2A137EBDAA8855CAA24A2 /* AuthTokenStore.swift */; };
 		4536CC9B693175B1A31F6425 /* OverlayInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B85E5A857820D320657302C /* OverlayInspectorView.swift */; };
+		4986A9905EB62FFA630409BD /* MediaFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93004BE1F2BECBBF122DB00C /* MediaFlags.swift */; };
 		4A94C48FF22B0552314D441E /* DeckLinkDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF97362F36D6ED17D41359D2 /* DeckLinkDiagnostics.swift */; };
 		4C060BE294B7C9A97DBA4FBE /* FrameRateConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C8342BEF86901A52B41C81 /* FrameRateConformanceTests.swift */; };
 		4D7E6C165E984434FD9A4BB0 /* SPFrameBlend.c in Sources */ = {isa = PBXBuildFile; fileRef = 4FFDD7785740559EEB94F4CA /* SPFrameBlend.c */; };
@@ -64,6 +65,7 @@
 		C9842DF5C4DF8FAA50B74011 /* DeckLinkBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = B637A693F1741DD785724AAE /* DeckLinkBridge.mm */; };
 		CC37F2E5CFC466A33AA98F58 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773B6424E99EBEA84CB2027B /* ModelTests.swift */; };
 		CF0020C246A6F8DF7BC4B6D6 /* VideoOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF2597FFE1CB9927C6CB6395 /* VideoOutput.swift */; };
+		D93CCBEA7AE13AB4FC44F4F3 /* MediaFlagsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF79938EE267D36AF458C582 /* MediaFlagsTests.swift */; };
 		DCABF0FFCC0E6E0596173F64 /* CompositorPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21271656A4CCF6A5AD4E2940 /* CompositorPipelineTests.swift */; };
 		DF9D9D2A7D5D102CC20FCD95 /* DeckLinkSDKDispatch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9E8B4217656574F74350F1FF /* DeckLinkSDKDispatch.cpp */; };
 		DFB8E02D46414DBF7C34D646 /* OverlayInspectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD1EB0DEF2FFFA7B96C902D /* OverlayInspectorTests.swift */; };
@@ -131,6 +133,7 @@
 		8A5E1B676CDA189E4C8C26CB /* PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackController.swift; sourceTree = "<group>"; };
 		8FD2B422FED7E9102FAEA3D2 /* ShowControlState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlState.swift; sourceTree = "<group>"; };
 		92D6FAD99797FC3C21DA725E /* AVKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVKit.framework; path = System/Library/Frameworks/AVKit.framework; sourceTree = SDKROOT; };
+		93004BE1F2BECBBF122DB00C /* MediaFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlags.swift; sourceTree = "<group>"; };
 		934A545F270968E04F027F8B /* LTCReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LTCReader.swift; sourceTree = "<group>"; };
 		93727D6450DEE3ED3934DA97 /* WebSocketFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketFrame.swift; sourceTree = "<group>"; };
 		96F3960B5C5F817DFB3377D4 /* OSCQueryServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCQueryServer.swift; sourceTree = "<group>"; };
@@ -161,6 +164,7 @@
 		ECEAD362FE5313C14713663D /* SimplePlaybackApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackApp.swift; sourceTree = "<group>"; };
 		F1E1F27FCEA1C60E3C601307 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		FD749649E2DEED56E2B8C243 /* CueRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueRuntime.swift; sourceTree = "<group>"; };
+		FF79938EE267D36AF458C582 /* MediaFlagsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlagsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -239,6 +243,7 @@
 			children = (
 				6214E79B299E7C7AB111C790 /* CompositorLayers.swift */,
 				1C201B22E860FB94D92CA433 /* FrameRateConformance.swift */,
+				93004BE1F2BECBBF122DB00C /* MediaFlags.swift */,
 				569A548ECCAC07CC9E9B92D2 /* MediaModels.swift */,
 				29F9DCDACFB1E27A47F7D0DE /* SimplePlaybackDocument.swift */,
 				BAB740EFC960FD945A655941 /* SimplePlaybackProjectDocument.swift */,
@@ -252,6 +257,7 @@
 			children = (
 				21271656A4CCF6A5AD4E2940 /* CompositorPipelineTests.swift */,
 				22C8342BEF86901A52B41C81 /* FrameRateConformanceTests.swift */,
+				FF79938EE267D36AF458C582 /* MediaFlagsTests.swift */,
 				773B6424E99EBEA84CB2027B /* ModelTests.swift */,
 				0A0971F0E4FF56FD74F21EC0 /* OutputStatusBarTests.swift */,
 				CAD1EB0DEF2FFFA7B96C902D /* OverlayInspectorTests.swift */,
@@ -469,6 +475,7 @@
 				1FA47C61D92B5CF6AFD91783 /* LTCDecoder.swift in Sources */,
 				A34CA8E22BA04CC530DD0597 /* LTCReader.swift in Sources */,
 				73DBCDAA4262F2AFB8237FC4 /* MTCReader.swift in Sources */,
+				4986A9905EB62FFA630409BD /* MediaFlags.swift in Sources */,
 				A81F8D8813F0437F211EF445 /* MediaImporter.swift in Sources */,
 				154CB32BBDF7469F91B49587 /* MediaModels.swift in Sources */,
 				6B7B4C3468690A6CA15DBD56 /* OSCAddressMap.swift in Sources */,
@@ -511,6 +518,7 @@
 			files = (
 				DCABF0FFCC0E6E0596173F64 /* CompositorPipelineTests.swift in Sources */,
 				4C060BE294B7C9A97DBA4FBE /* FrameRateConformanceTests.swift in Sources */,
+				D93CCBEA7AE13AB4FC44F4F3 /* MediaFlagsTests.swift in Sources */,
 				CC37F2E5CFC466A33AA98F58 /* ModelTests.swift in Sources */,
 				05B0542CB3BD8AC9F77CEDFA /* OutputStatusBarTests.swift in Sources */,
 				DFB8E02D46414DBF7C34D646 /* OverlayInspectorTests.swift in Sources */,
