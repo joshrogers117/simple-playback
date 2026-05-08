@@ -26,17 +26,39 @@ final class CompositorPipeline {
     private var bugImageCache: [String: NSImage] = [:]
     private let cacheLock = NSLock()
 
+    /// Backing storage for `bundleMediaDirectory`. Always accessed under
+    /// `cacheLock` so the writer (PlaybackController on main) and the reader
+    /// (compose path on the playback `outputQueue`) see a consistent value.
+    /// Reading a heap-typed `URL?` without synchronization is a Swift
+    /// memory-model hazard even when the writer is monotonic.
+    private var _bundleMediaDirectory: URL?
+
     /// C7d — current project bundle's `<bundle>/Media/` URL when one exists.
     /// Threaded into the default bug-image resolver and the cache key so a
     /// moved bundle's managed overlay assets resolve to their bundled copy
     /// instead of the stale absolute path. PlaybackController syncs this from
     /// its own `bundleMediaDirectory` so a single source of truth drives both
     /// playback and overlay resolution.
+    ///
+    /// Setter and getter both go through `cacheLock`. A change to the value
+    /// invalidates the bug-image cache atomically with the swap, so a reader
+    /// that takes the lock immediately after a write either observes the new
+    /// directory + cleared cache, or the old directory + populated cache —
+    /// never the new directory keyed against the old cache.
     var bundleMediaDirectory: URL? {
-        didSet {
-            if oldValue != bundleMediaDirectory {
-                invalidateBugImageCache()
+        get {
+            cacheLock.lock()
+            defer { cacheLock.unlock() }
+            return _bundleMediaDirectory
+        }
+        set {
+            cacheLock.lock()
+            let didChange = _bundleMediaDirectory != newValue
+            _bundleMediaDirectory = newValue
+            if didChange {
+                bugImageCache.removeAll()
             }
+            cacheLock.unlock()
         }
     }
 
@@ -192,22 +214,26 @@ final class CompositorPipeline {
     }
 
     private func bugImage(for media: MediaReference) -> NSImage? {
-        let key = media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory)?.absoluteString ?? media.originalPath
+        // Snapshot the bundle dir under the same lock that guards the cache —
+        // bundleMediaDirectory and bugImageCache are coupled (the cache key
+        // depends on the resolved URL), so reading them apart races the setter.
         cacheLock.lock()
+        let bundleDir = _bundleMediaDirectory
+        let key = media.resolvedURL(bundleMediaDirectory: bundleDir)?.absoluteString ?? media.originalPath
         if let cached = bugImageCache[key] {
             cacheLock.unlock()
             return cached
         }
         cacheLock.unlock()
 
-        guard let image = resolveImage(media) else { return nil }
+        guard let image = resolveImage(media, bundleMediaDirectory: bundleDir) else { return nil }
         cacheLock.lock()
         bugImageCache[key] = image
         cacheLock.unlock()
         return image
     }
 
-    private func resolveImage(_ ref: MediaReference) -> NSImage? {
+    private func resolveImage(_ ref: MediaReference, bundleMediaDirectory: URL?) -> NSImage? {
         if let injectedResolver { return injectedResolver(ref) }
         guard let url = ref.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) else { return nil }
         return NSImage(contentsOf: url)
