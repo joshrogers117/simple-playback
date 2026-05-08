@@ -893,7 +893,12 @@ struct RootView: View {
     /// existing media-importer path.
     private func confirmFolderImport(_ confirmed: PendingFolderImport) {
         if !confirmed.standaloneMediaURLs.isEmpty {
-            addMedia(confirmed.standaloneMediaURLs)
+            // C8 — folder-mode addMedia. Captures one FolderBookmark for the
+            // folder, registers it on the project, and stamps every imported
+            // MediaReference with the bookmark id + a relative path. Resolver
+            // rung 2 will recover these slides if a clip is later moved within
+            // the imported folder.
+            addMedia(confirmed.standaloneMediaURLs, folderURL: confirmed.folderURL)
         }
 
         let dest = transcodedRootDirectory()
@@ -942,14 +947,39 @@ struct RootView: View {
         return true
     }
 
-    private func addMedia(_ urls: [URL]) {
+    private func addMedia(_ urls: [URL], folderURL: URL? = nil) {
         guard !(showController.controller?.showMode ?? false) else { return }
-        let context = currentMediaImportContext()
+        // C8 — folder-mode opt-in. When the operator imports through Add
+        // Folder…  / a folder-drop with a single common parent, capture one
+        // FolderBookmark for that parent, register it in the project, and
+        // hand it to the importer so every slide gets the folder-bookmark
+        // fields stamped.
+        let registered = folderURL.map(registerFolderBookmark)
+        let context = currentMediaImportContext(
+            folderBookmark: registered,
+            folderRoot: folderURL
+        )
         let report = MediaImporter.importSlidesAndReport(from: urls, context: context)
         importStatus.record(report.failures)
         guard !report.slides.isEmpty else { return }
         document.project.slides.append(contentsOf: report.slides)
         selectedSlideID = report.slides.last?.id
+    }
+
+    /// C8 — append a `FolderBookmark` to `project.folderBookmarks` for the
+    /// given folder URL and return it. If a bookmark with the same originalPath
+    /// already exists, reuse its id instead of registering a duplicate so the
+    /// project file doesn't accumulate redundant blobs across re-imports of
+    /// the same folder.
+    private func registerFolderBookmark(_ folderURL: URL) -> FolderBookmark {
+        let normalized = folderURL.standardizedFileURL.path
+        if let existing = document.project.folderBookmarks
+            .first(where: { $0.originalPath == normalized }) {
+            return existing
+        }
+        let bookmark = FolderBookmark(folderURL: folderURL)
+        document.project.folderBookmarks.append(bookmark)
+        return bookmark
     }
 
     /// Builds the per-import context the importer needs for source formats that require
@@ -958,7 +988,10 @@ struct RootView: View {
     /// when the document has been saved, app-support otherwise. App-support fallbacks
     /// stay portable across launches but require a future "Bundle for Travel" pass to
     /// migrate them into the bundle for venue handoff.
-    private func currentMediaImportContext() -> MediaImportContext {
+    private func currentMediaImportContext(
+        folderBookmark: FolderBookmark? = nil,
+        folderRoot: URL? = nil
+    ) -> MediaImportContext {
         let stage = document.project.stages.first
         let baseWidth = stage?.width ?? document.project.outputWidth
         let baseHeight = stage?.height ?? document.project.outputHeight
@@ -977,7 +1010,9 @@ struct RootView: View {
                     sourceURL: sourceURL,
                     destinationURL: destination
                 )
-            }
+            },
+            folderBookmark: folderBookmark,
+            folderRoot: folderRoot
         )
     }
 
