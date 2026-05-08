@@ -23,6 +23,10 @@ struct RootView: View {
     /// toggles Show Mode. The closure is implemented by the NSDocument so
     /// the project encoder + bundle layout can stay there.
     private let autosaveCheckpoint: (AutosaveCheckpoint.Reason) -> Void
+    /// E1+ energy — no-idle-sleep IOPM assertion. Held while Show Mode is on
+    /// so macOS cannot put the machine to sleep mid-show. Released on Show
+    /// Mode off and on document close (RootView .onDisappear).
+    @StateObject private var energyAssertion = EnergyAssertion()
     /// Tracks the previous Show Mode value so the `.onChange` hook only
     /// fires the checkpoint on real transitions (not the initial nil →
     /// false ShowController-load).
@@ -435,6 +439,15 @@ struct RootView: View {
     private func handleShowModeChange(_ newValue: Bool?) {
         guard let newValue else { return }
         defer { lastShowMode = newValue }
+        // Energy assertion follows showMode regardless of whether this is the
+        // first observation (nil → false on load also reaches here): we want
+        // the assertion to land the moment the operator flips into Show Mode,
+        // not one toggle later.
+        if newValue {
+            energyAssertion.acquire()
+        } else {
+            energyAssertion.release()
+        }
         guard let last = lastShowMode, last != newValue else { return }
         autosaveCheckpoint(newValue ? .showModeOn : .showModeOff)
     }
@@ -512,6 +525,7 @@ struct RootView: View {
         }
         ctx.audioDeviceAvailable = AudioDeviceProbe.isDefaultOutputDeviceAvailable()
         ctx.renderPathWarmed = playback.hasRenderedAnyFrame
+        ctx.systemPreventsIdleSleep = energyAssertion.isHeld
         return ctx
     }
 

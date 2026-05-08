@@ -42,6 +42,13 @@ enum PreShowCheck {
         /// warmed" as a pre-show requirement — operators want to verify the pipeline
         /// isn't cold before a show. `nil` when the host has not yet sampled.
         var renderPathWarmed: Bool?
+
+        /// Whether the host has registered a no-idle-sleep IOPM assertion, so macOS
+        /// cannot idle-sleep the machine mid-show. Set to true when Show Mode is on
+        /// and `EnergyAssertion.acquire()` succeeded. `nil` skips the row (host has
+        /// not yet sampled). Spec §3.16 calls out energy / never-sleep among the
+        /// macOS conditions a pre-show panel should verify.
+        var systemPreventsIdleSleep: Bool?
     }
 
     enum DeckLinkReferenceStatus: Equatable {
@@ -100,6 +107,9 @@ enum PreShowCheck {
         }
         if let render = evaluateRenderPath(context: context) {
             rows.append(render)
+        }
+        if let energy = evaluateEnergy(context: context) {
+            rows.append(energy)
         }
         // Stable order: severity-major (errors first), title-tiebreak.
         return rows.sorted { lhs, rhs in
@@ -311,6 +321,28 @@ enum PreShowCheck {
             severity: .warning,
             title: "Render Path",
             summary: "Render path is cold — fire a cue to warm the pipeline before doors open."
+        )
+    }
+
+    /// Energy row. `systemPreventsIdleSleep == true` is OK ("we're holding a
+    /// no-idle-sleep assertion — macOS will not put the machine to sleep");
+    /// `false` is a warning ("system could idle-sleep mid-show — toggle Show Mode
+    /// to engage the assertion"); nil is suppressed (host has not yet sampled).
+    static func evaluateEnergy(context: Context) -> Row? {
+        guard let asserted = context.systemPreventsIdleSleep else { return nil }
+        if asserted {
+            return Row(
+                id: "system.energy",
+                severity: .ok,
+                title: "Energy",
+                summary: "Idle sleep blocked — show machine will stay awake."
+            )
+        }
+        return Row(
+            id: "system.energy",
+            severity: .warning,
+            title: "Energy",
+            summary: "macOS could idle-sleep mid-show — Show Mode engages a no-idle-sleep assertion."
         )
     }
 

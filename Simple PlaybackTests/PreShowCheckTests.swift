@@ -236,6 +236,31 @@ final class PreShowCheckTests: XCTestCase {
         XCTAssertTrue(row?.summary.lowercased().contains("cold") ?? false)
     }
 
+    // MARK: - Energy
+
+    func testEnergyRowSuppressedWhenNoMeasurement() {
+        XCTAssertNil(PreShowCheck.evaluateEnergy(context: PreShowCheck.Context()))
+    }
+
+    func testEnergyRowOKWhenAssertionHeld() {
+        var ctx = PreShowCheck.Context()
+        ctx.systemPreventsIdleSleep = true
+        let row = PreShowCheck.evaluateEnergy(context: ctx)
+        XCTAssertEqual(row?.id, "system.energy")
+        XCTAssertEqual(row?.severity, .ok)
+    }
+
+    func testEnergyRowWarningWhenAssertionNotHeld() {
+        var ctx = PreShowCheck.Context()
+        ctx.systemPreventsIdleSleep = false
+        let row = PreShowCheck.evaluateEnergy(context: ctx)
+        XCTAssertEqual(row?.severity, .warning)
+        XCTAssertTrue(
+            row?.summary.lowercased().contains("idle-sleep") ?? false,
+            "Warning copy should mention idle-sleep so the operator knows what's at stake."
+        )
+    }
+
     // MARK: - DeckLink adapter
 
     /// The bridge state → PreShowCheck enum mapping is the single seam between the

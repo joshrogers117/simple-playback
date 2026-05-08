@@ -12,8 +12,10 @@
 		02967ABCE0AAFA316D52DA49 /* AutosaveCheckpointer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18F5B52C774E8E6CC0899D9C /* AutosaveCheckpointer.swift */; };
 		02E7848C2C617A208282F42A /* OSCMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 473B7534956D23833D7E61BD /* OSCMessage.swift */; };
 		05124FD2A6536D48F63AD2C9 /* AddFolderImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C41349B62BEDC6D03ED0DA6 /* AddFolderImporter.swift */; };
+		0591BDE7845DD83E323D1CC1 /* EnergyAssertion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32E04427E697B0F4238C1C4C /* EnergyAssertion.swift */; };
 		05B0542CB3BD8AC9F77CEDFA /* OutputStatusBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0971F0E4FF56FD74F21EC0 /* OutputStatusBarTests.swift */; };
 		0DC6F58F420AAD20BD0336A5 /* MediaImportFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2762065E2D1FE5D3F052F8FF /* MediaImportFailure.swift */; };
+		0F2D0CF9F6B7620C44F4BFDA /* EnergyAssertionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09A6E0D2794272C8FBB0987 /* EnergyAssertionTests.swift */; };
 		11107495CED0238B67C8D7AC /* ShowControlStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6023F5FCD12A96AE5EAD4313 /* ShowControlStack.swift */; };
 		11F48F224E2E07F3A2CD4894 /* BonjourPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACFD5B151F32CFDFFECCB68 /* BonjourPublisher.swift */; };
 		154CB32BBDF7469F91B49587 /* MediaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569A548ECCAC07CC9E9B92D2 /* MediaModels.swift */; };
@@ -159,6 +161,7 @@
 		29F9DCDACFB1E27A47F7D0DE /* SimplePlaybackDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackDocument.swift; sourceTree = "<group>"; };
 		2B85E5A857820D320657302C /* OverlayInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayInspectorView.swift; sourceTree = "<group>"; };
 		2D06F636A6229A0C418EE285 /* ImageSequenceEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSequenceEncoder.swift; sourceTree = "<group>"; };
+		32E04427E697B0F4238C1C4C /* EnergyAssertion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyAssertion.swift; sourceTree = "<group>"; };
 		332208860C29B553E0BE52D0 /* ShowLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowLogView.swift; sourceTree = "<group>"; };
 		364D651E1585BC12FAC85DC1 /* SimplePlayback.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SimplePlayback.entitlements; sourceTree = "<group>"; };
 		38F7D1388C31CB5FF57645DA /* KeynoteImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeynoteImporterTests.swift; sourceTree = "<group>"; };
@@ -219,6 +222,7 @@
 		AB44C4BE122979080B759770 /* AnimatedImageInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedImageInspector.swift; sourceTree = "<group>"; };
 		AE5337B42A540319366F02D3 /* ShowLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowLog.swift; sourceTree = "<group>"; };
 		AFB3106A106C37E4EE56BC7E /* MTCReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MTCReader.swift; sourceTree = "<group>"; };
+		B09A6E0D2794272C8FBB0987 /* EnergyAssertionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyAssertionTests.swift; sourceTree = "<group>"; };
 		B133348CF010D337CDA988A0 /* ImportStatusBannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportStatusBannerTests.swift; sourceTree = "<group>"; };
 		B29CDDBD1A7CD4394C852378 /* ShowLogFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowLogFilterTests.swift; sourceTree = "<group>"; };
 		B328F432BC7CCB991A9A8373 /* MediaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporter.swift; sourceTree = "<group>"; };
@@ -356,6 +360,7 @@
 				6BF01B25D49F0D899EA2AE22 /* AudioDeviceProbeTests.swift */,
 				F0336D644737BA64EE43F017 /* AutosaveCheckpointerTests.swift */,
 				21271656A4CCF6A5AD4E2940 /* CompositorPipelineTests.swift */,
+				B09A6E0D2794272C8FBB0987 /* EnergyAssertionTests.swift */,
 				22C8342BEF86901A52B41C81 /* FrameRateConformanceTests.swift */,
 				48D597C7D54010FC1E62D378 /* ImageSequenceDetectorTests.swift */,
 				5DE55003A493F69B338D09BA /* ImageSequenceEncodeCoordinatorTests.swift */,
@@ -480,6 +485,7 @@
 				AB44C4BE122979080B759770 /* AnimatedImageInspector.swift */,
 				9FC38AB74DB5321128E72E79 /* AudioDeviceProbe.swift */,
 				18F5B52C774E8E6CC0899D9C /* AutosaveCheckpointer.swift */,
+				32E04427E697B0F4238C1C4C /* EnergyAssertion.swift */,
 				6FD2EFC1C287DD9480AF2D2F /* ImageSequenceDetector.swift */,
 				2D06F636A6229A0C418EE285 /* ImageSequenceEncoder.swift */,
 				D2A8691862AC8AE01B87203D /* KeynoteImporter.swift */,
@@ -606,6 +612,7 @@
 				C9842DF5C4DF8FAA50B74011 /* DeckLinkBridge.mm in Sources */,
 				4A94C48FF22B0552314D441E /* DeckLinkDiagnostics.swift in Sources */,
 				DF9D9D2A7D5D102CC20FCD95 /* DeckLinkSDKDispatch.cpp in Sources */,
+				0591BDE7845DD83E323D1CC1 /* EnergyAssertion.swift in Sources */,
 				61B1311538DACF01A1A47603 /* FrameRateConformance.swift in Sources */,
 				5602C3EC7F566873E1629051 /* FrameRenderer.swift in Sources */,
 				AD31546ACCAED84FF1D140D4 /* HTTPRequest.swift in Sources */,
@@ -678,6 +685,7 @@
 				458E7CD285F738A458DE28C1 /* AudioDeviceProbeTests.swift in Sources */,
 				1D2DA3CD426E79C87480A852 /* AutosaveCheckpointerTests.swift in Sources */,
 				DCABF0FFCC0E6E0596173F64 /* CompositorPipelineTests.swift in Sources */,
+				0F2D0CF9F6B7620C44F4BFDA /* EnergyAssertionTests.swift in Sources */,
 				4C060BE294B7C9A97DBA4FBE /* FrameRateConformanceTests.swift in Sources */,
 				EE3870434C944DFB877D89F7 /* ImageSequenceDetectorTests.swift in Sources */,
 				D2D87259CFD1B81F53DBC0C8 /* ImageSequenceEncodeCoordinatorTests.swift in Sources */,
