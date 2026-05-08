@@ -34,9 +34,11 @@ final class FilmstripCoordinator: ObservableObject {
 
     /// Test seam — the pure-logic generator. Default delegates to
     /// `FilmstripGenerator.generateSpriteSheet`. Tests substitute a stub
-    /// that records calls without going through AVFoundation.
-    nonisolated(unsafe) static var generator: (URL, Int, Int, CGSize) throws -> Data = { url, count, cols, size in
-        try FilmstripGenerator.generateSpriteSheet(
+    /// that records calls without going through AVFoundation. Async to
+    /// match the migrated `image(at:)` extraction loop and to honor
+    /// Task cancellation between frames natively.
+    nonisolated(unsafe) static var generator: @Sendable (URL, Int, Int, CGSize) async throws -> Data = { url, count, cols, size in
+        try await FilmstripGenerator.generateSpriteSheet(
             for: url,
             frameCount: count,
             columns: cols,
@@ -108,7 +110,7 @@ final class FilmstripCoordinator: ObservableObject {
         Task.detached { [weak self] in
             let outcome: Outcome
             do {
-                let data = try Self.generator(
+                let data = try await Self.generator(
                     captureSource,
                     captureFrameCount,
                     captureColumns,
@@ -116,6 +118,13 @@ final class FilmstripCoordinator: ObservableObject {
                 )
                 try Self.writer(data, captureDestination)
                 outcome = .completed(captureDestination)
+            } catch is CancellationError {
+                // A cancelled job is silently dropped — the host (typically
+                // the document closing) doesn't need a failure entry.
+                await MainActor.run { [weak self] in
+                    self?.removeJob(forSlide: captureSlideID)
+                }
+                return
             } catch let failure as FilmstripGenerator.Failure {
                 outcome = .failed(failure)
             } catch {

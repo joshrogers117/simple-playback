@@ -15,7 +15,7 @@ final class FilmstripCoordinatorTests: XCTestCase {
 
     override func tearDown() async throws {
         FilmstripCoordinator.generator = { url, count, cols, size in
-            try FilmstripGenerator.generateSpriteSheet(
+            try await FilmstripGenerator.generateSpriteSheet(
                 for: url,
                 frameCount: count,
                 columns: cols,

@@ -77,27 +77,44 @@ enum FilmstripGenerator {
     /// (`FilmstripCoordinator` does this on a background actor so the main
     /// thread isn't blocked by a several-second extraction pass).
     ///
-    /// Threading: `AVAssetImageGenerator.copyCGImage(at:actualTime:)` is
-    /// synchronous; this method blocks the calling thread for `frameCount`
-    /// extractions. Production callsites must run this off the main thread.
+    /// Threading: each per-frame extraction uses
+    /// `AVAssetImageGenerator.image(at:)` which is awaited. The whole
+    /// method must be called from an async context. Honors `Task`
+    /// cancellation between frames — a cancelled task aborts the loop
+    /// rather than running every extraction to completion. Production
+    /// callsites still run this on a detached Task so a several-second
+    /// extraction pass doesn't block whatever started it.
     static func generateSpriteSheet(
         for url: URL,
         frameCount: Int = defaultFrameCount,
         columns: Int = defaultColumns,
         frameSize: CGSize = defaultFrameSize
-    ) throws -> Data {
+    ) async throws -> Data {
         guard frameCount > 0 else { throw Failure.frameCountInvalid }
         guard columns > 0 else { throw Failure.columnsInvalid }
 
         let asset = AVURLAsset(url: url)
-        // `tracks(withMediaType:)` is enough to detect "this isn't really a
-        // video" without paying the full async-load cost. `duration` on a
-        // post-iOS-13 asset can return invalid for unreadable URLs; we
-        // surface those as `sourceNotReadable` rather than `durationUnknown`.
-        guard !asset.tracks(withMediaType: .video).isEmpty else {
+        // `loadTracks(withMediaType:)` is the macOS 13+ async equivalent
+        // of `tracks(withMediaType:)`. We surface a load failure or empty
+        // result as `sourceNotReadable` (the asset is either non-video or
+        // unreadable from this process).
+        let videoTracks: [AVAssetTrack]
+        do {
+            videoTracks = try await asset.loadTracks(withMediaType: .video)
+        } catch {
             throw Failure.sourceNotReadable
         }
-        let durationSeconds = CMTimeGetSeconds(asset.duration)
+        guard !videoTracks.isEmpty else {
+            throw Failure.sourceNotReadable
+        }
+
+        let duration: CMTime
+        do {
+            duration = try await asset.load(.duration)
+        } catch {
+            throw Failure.durationUnknown
+        }
+        let durationSeconds = CMTimeGetSeconds(duration)
         guard durationSeconds.isFinite, durationSeconds > 0 else {
             throw Failure.durationUnknown
         }
@@ -111,10 +128,13 @@ enum FilmstripGenerator {
         let timestamps = sampleTimestamps(durationSeconds: durationSeconds, frameCount: frameCount)
         var cgFrames: [CGImage?] = []
         for ts in timestamps {
+            try Task.checkCancellation()
             let cmTime = CMTime(seconds: ts, preferredTimescale: 600)
             do {
-                let cg = try generator.copyCGImage(at: cmTime, actualTime: nil)
+                let (cg, _) = try await generator.image(at: cmTime)
                 cgFrames.append(cg)
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 throw Failure.frameExtractionFailed(timestamp: ts)
             }

@@ -64,11 +64,14 @@ final class FilmstripGeneratorTests: XCTestCase {
 
     // MARK: - generateSpriteSheet
 
-    func testGenerateSpriteSheetThrowsForUnreadableSource() {
+    func testGenerateSpriteSheetThrowsForUnreadableSource() async {
         let bogusURL = URL(fileURLWithPath: "/tmp/nonexistent-\(UUID().uuidString).mov")
-        XCTAssertThrowsError(try FilmstripGenerator.generateSpriteSheet(for: bogusURL)) { error in
-            // Either sourceNotReadable (no video tracks) or durationUnknown is acceptable —
-            // they're observationally equivalent for a file that doesn't exist.
+        do {
+            _ = try await FilmstripGenerator.generateSpriteSheet(for: bogusURL)
+            XCTFail("Expected throw")
+        } catch {
+            // Either sourceNotReadable (no video tracks) or durationUnknown
+            // is acceptable — observationally equivalent for a missing file.
             switch error as? FilmstripGenerator.Failure {
             case .sourceNotReadable, .durationUnknown:
                 break
@@ -78,25 +81,60 @@ final class FilmstripGeneratorTests: XCTestCase {
         }
     }
 
-    func testGenerateSpriteSheetThrowsFrameCountInvalid() {
+    func testGenerateSpriteSheetThrowsFrameCountInvalid() async {
         let bogusURL = URL(fileURLWithPath: "/tmp/x.mov")
-        XCTAssertThrowsError(try FilmstripGenerator.generateSpriteSheet(for: bogusURL, frameCount: 0)) { error in
+        do {
+            _ = try await FilmstripGenerator.generateSpriteSheet(for: bogusURL, frameCount: 0)
+            XCTFail("Expected throw")
+        } catch {
             XCTAssertEqual(error as? FilmstripGenerator.Failure, .frameCountInvalid)
         }
     }
 
-    func testGenerateSpriteSheetThrowsColumnsInvalid() {
+    func testGenerateSpriteSheetThrowsColumnsInvalid() async {
         let bogusURL = URL(fileURLWithPath: "/tmp/x.mov")
-        XCTAssertThrowsError(try FilmstripGenerator.generateSpriteSheet(for: bogusURL, columns: 0)) { error in
+        do {
+            _ = try await FilmstripGenerator.generateSpriteSheet(for: bogusURL, columns: 0)
+            XCTFail("Expected throw")
+        } catch {
             XCTAssertEqual(error as? FilmstripGenerator.Failure, .columnsInvalid)
         }
     }
 
-    func testGenerateSpriteSheetProducesPNGForRealMovie() throws {
+    func testGenerateSpriteSheetHonorsTaskCancellation() async throws {
+        // After the migration to async APIs, a cancelled Task aborts the
+        // per-frame extraction loop instead of running every extraction
+        // to completion. Spawn a task, cancel it before it hits await,
+        // and confirm the throw is CancellationError rather than a
+        // FilmstripGenerator.Failure.
         let url = try makeH264Movie(frameCount: 30)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let pngData = try FilmstripGenerator.generateSpriteSheet(
+        let task = Task<Void, Error> {
+            try Task.checkCancellation()
+            _ = try await FilmstripGenerator.generateSpriteSheet(
+                for: url,
+                frameCount: 24,
+                columns: 6,
+                frameSize: CGSize(width: 32, height: 32)
+            )
+        }
+        task.cancel()
+        do {
+            try await task.value
+            XCTFail("Cancelled task should not complete normally.")
+        } catch is CancellationError {
+            // expected
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+    }
+
+    func testGenerateSpriteSheetProducesPNGForRealMovie() async throws {
+        let url = try makeH264Movie(frameCount: 30)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let pngData = try await FilmstripGenerator.generateSpriteSheet(
             for: url,
             frameCount: 4,
             columns: 2,
