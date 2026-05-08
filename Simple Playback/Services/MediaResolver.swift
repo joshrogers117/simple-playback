@@ -163,6 +163,15 @@ enum MediaResolver {
         let storedHash = reference.fingerprint?.contentHash
         let storedSize = reference.fingerprint?.size
 
+        // Pre-C7 (legacy) references have no fingerprint, so both `storedHash` and
+        // `storedSize` are nil. Rung 2 needs a stored hash; rung 3 needs a stored
+        // size — neither can match. Short-circuit before walking every file in
+        // every search root for nothing. On a 500-slide deck this is the
+        // difference between O(slides × roots × files) syscalls and zero.
+        if storedHash == nil && storedSize == nil {
+            return .offline
+        }
+
         var nameAndSizeHit: URL? = nil
 
         for root in searchRoots {

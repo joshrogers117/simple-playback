@@ -213,6 +213,31 @@ final class MediaResolverTests: XCTestCase {
         XCTAssertEqual(result.step, .offline)
     }
 
+    func testSkipsSearchRootWalkWhenReferenceHasNoFingerprint() {
+        // Legacy (pre-C7) slides have no fingerprint, so both rung 2 (content hash)
+        // and rung 3 (name + size) can never match — both require stored values.
+        // Walking every file in every search root would be O(roots × files) wasted
+        // syscalls per legacy slide; short-circuit straight to offline. Pin via
+        // an XCTFail in the listFiles closure so a regression that re-introduces
+        // the walk fails loudly.
+        let reference = MediaReference(url: URL(fileURLWithPath: "/Movies/legacy.mov"))
+        XCTAssertNil(reference.fingerprint)
+
+        let result = MediaResolver.resolve(
+            reference: reference,
+            searchRoots: [URL(fileURLWithPath: "/A"), URL(fileURLWithPath: "/B")],
+            fileExists: { _ in false },
+            listFiles: { _ in
+                XCTFail("Search roots must not be enumerated when reference has no fingerprint.")
+                return []
+            },
+            fileSize: { _ in nil },
+            fingerprintAt: { _ in nil }
+        )
+
+        XCTAssertEqual(result, .offline)
+    }
+
     // MARK: - Search-root iteration
 
     func testFirstSearchRootWithHashHitWins() {
