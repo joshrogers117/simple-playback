@@ -69,18 +69,39 @@ enum ThumbnailGenerator {
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
         generator.maximumSize = size
-        // Synchronous frame extraction is acceptable for v1 — import is already
-        // a foreground operation and a failed `.zero` extract will throw, at
-        // which point we fall back to the asset's first-frame attempt via
-        // `requestedTimeToleranceBefore/After`.
+        // `requestedTimeToleranceBefore/After = .positiveInfinity` so codecs
+        // that reject `.zero` (some HEVC, some long-GOP H.264) still yield
+        // their nearest deliverable first frame instead of erroring.
         generator.requestedTimeToleranceBefore = .positiveInfinity
         generator.requestedTimeToleranceAfter = .positiveInfinity
-        do {
-            let cg = try generator.copyCGImage(at: .zero, actualTime: nil)
-            return try encodeJPEG(cgImage: cg, size: size, quality: quality)
-        } catch {
-            throw Failure.generatorFailed
+
+        // The deprecated sync `copyCGImage(at:actualTime:)` was replaced in
+        // macOS 13+ by `image(at:)` (async-only). Our importer is sync, so
+        // bridge the non-deprecated completion-handler variant
+        // (`generateCGImageAsynchronously(for:completionHandler:)`) to a
+        // synchronous result via DispatchSemaphore. Acceptable here because
+        // import already runs as a foreground operation off the render hot
+        // path; first-frame extracts typically return well under 100 ms.
+        let box = ThumbnailExtractionBox()
+        let semaphore = DispatchSemaphore(value: 0)
+        generator.generateCGImageAsynchronously(for: .zero) { cg, _, error in
+            box.image = cg
+            box.error = error
+            semaphore.signal()
         }
+        semaphore.wait()
+
+        guard let cg = box.image else { throw Failure.generatorFailed }
+        return try encodeJPEG(cgImage: cg, size: size, quality: quality)
+    }
+
+    /// Mutable carrier for the AVFoundation completion-handler result, written
+    /// on AVF's internal queue and read on the calling thread after the
+    /// semaphore signal. `@unchecked Sendable` because the semaphore enforces
+    /// the happens-before that the type itself doesn't express.
+    private final class ThumbnailExtractionBox: @unchecked Sendable {
+        var image: CGImage?
+        var error: Error?
     }
 
     private static func encodeJPEG(cgImage: CGImage, size: CGSize, quality: CGFloat) throws -> Data {
