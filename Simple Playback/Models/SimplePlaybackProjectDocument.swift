@@ -33,6 +33,24 @@ final class SimplePlaybackProjectDocument: NSDocument {
         true
     }
 
+    /// E6 — write an autosave checkpoint to `<bundle>/Autosave/`. Best-effort:
+    /// untitled documents (no fileURL yet) and serialization failures are
+    /// silent. Pruning happens inside the checkpointer.
+    func writeAutosaveCheckpoint(reason: AutosaveCheckpoint.Reason) {
+        guard let bundleURL = fileURL else { return }
+        do {
+            let data = try JSONEncoder.simplePlayback.encode(playbackDocument.project)
+            try AutosaveCheckpointer.writeCheckpoint(
+                projectData: data,
+                bundleURL: bundleURL,
+                reason: reason
+            )
+        } catch {
+            // Best-effort. A failed checkpoint should never abort the
+            // operator action that triggered it (Show Mode toggle).
+        }
+    }
+
     override init() {
         super.init()
         hasUndoManager = true
@@ -49,7 +67,10 @@ final class SimplePlaybackProjectDocument: NSDocument {
             document: documentBinding,
             outputSettings: OutputSettingsStore.shared,
             projectBundleURLProvider: { [weak self] in self?.fileURL },
-            lockController: lockController
+            lockController: lockController,
+            autosaveCheckpoint: { [weak self] reason in
+                self?.writeAutosaveCheckpoint(reason: reason)
+            }
         )
         let hostingController = NSHostingController(rootView: rootView)
         let window = NSWindow(contentViewController: hostingController)

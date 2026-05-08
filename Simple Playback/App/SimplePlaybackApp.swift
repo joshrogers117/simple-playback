@@ -216,6 +216,14 @@ private struct StartupWindowHider: NSViewRepresentable {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Spec §3.16 — autosave every 30 s of edit activity. The setting
+        // lives on NSDocumentController; combined with our document's
+        // `autosavesInPlace = true`, the OS coalesces edits and writes back
+        // to the same bundle URL after this delay. The Show-Mode-toggle
+        // *checkpoint* (a separate snapshot to <bundle>/Autosave/) is wired
+        // through SimplePlaybackProjectDocument.writeAutosaveCheckpoint.
+        NSDocumentController.shared.autosavingDelay = 30
+
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(150))
             StartupProjectOpener.shared.openStartupProjectIfNeeded()

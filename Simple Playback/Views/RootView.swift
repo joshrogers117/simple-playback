@@ -19,6 +19,14 @@ struct RootView: View {
     /// released even if SwiftUI teardown beats us to it); RootView observes
     /// the published banner state to surface the warning.
     @ObservedObject private var lockController: ProjectLockController
+    /// E6 — autosave checkpoint hook. Called by RootView when the operator
+    /// toggles Show Mode. The closure is implemented by the NSDocument so
+    /// the project encoder + bundle layout can stay there.
+    private let autosaveCheckpoint: (AutosaveCheckpoint.Reason) -> Void
+    /// Tracks the previous Show Mode value so the `.onChange` hook only
+    /// fires the checkpoint on real transitions (not the initial nil →
+    /// false ShowController-load).
+    @State private var lastShowMode: Bool?
     @State private var selectedSlideID: UUID?
     @State private var selectedCueID: UUID?
     @State private var dropTargeted = false
@@ -46,12 +54,14 @@ struct RootView: View {
         document: Binding<SimplePlaybackDocument>,
         outputSettings: OutputSettingsStore,
         projectBundleURLProvider: @escaping () -> URL? = { nil },
-        lockController: ProjectLockController
+        lockController: ProjectLockController,
+        autosaveCheckpoint: @escaping (AutosaveCheckpoint.Reason) -> Void = { _ in }
     ) {
         self._document = document
         self.outputSettings = outputSettings
         self.projectBundleURLProvider = projectBundleURLProvider
         self.lockController = lockController
+        self.autosaveCheckpoint = autosaveCheckpoint
         _showController = StateObject(wrappedValue: ShowControllerHolder())
     }
 
@@ -165,6 +175,9 @@ struct RootView: View {
         }
         .onChange(of: document.project.stages.first?.compositorOverlays) {
             syncCompositorOverlays()
+        }
+        .onChange(of: showController.controller?.showMode) { _, newValue in
+            handleShowModeChange(newValue)
         }
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $dropTargeted) { providers in
             handleDrop(providers: providers)
@@ -413,6 +426,17 @@ struct RootView: View {
         guard let controller = showController.controller,
               let activeList = document.project.activeShowList else { return }
         controller.syncShowListFromProject(activeList)
+    }
+
+    /// E6 checkpoint hook. Fires whenever Show Mode flips between true/false
+    /// after the initial load. The first non-nil value seeds `lastShowMode`
+    /// without writing a checkpoint — that prevents a spurious "show mode
+    /// off" snapshot at app launch on every project open.
+    private func handleShowModeChange(_ newValue: Bool?) {
+        guard let newValue else { return }
+        defer { lastShowMode = newValue }
+        guard let last = lastShowMode, last != newValue else { return }
+        autosaveCheckpoint(newValue ? .showModeOn : .showModeOff)
     }
 
     private func syncCompositorOverlays() {
