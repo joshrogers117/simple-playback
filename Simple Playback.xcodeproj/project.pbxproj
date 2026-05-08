@@ -17,6 +17,7 @@
 		1FA47C61D92B5CF6AFD91783 /* LTCDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AAABB8C041A4E6DF8BE8685 /* LTCDecoder.swift */; };
 		27C597830A79418BECCDFEC6 /* ShowControlHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474A0C6ABB641B1CA5416495 /* ShowControlHub.swift */; };
 		28C1335FD15B6AE87DD31AB3 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A5E1B676CDA189E4C8C26CB /* PlaybackController.swift */; };
+		2AE84FFB58E06C9A60B6C982 /* TransportSinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63903ACF2604D9E2128B0F6C /* TransportSinks.swift */; };
 		2E94C7044EE3CF2C00F39C69 /* ShowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87395AF6ACFB3496B47EFFB3 /* ShowController.swift */; };
 		3E21186036951CC387B69F2E /* SlideGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B620D6408556D32380C918 /* SlideGridView.swift */; };
 		44E0E08A26F3691D8E7A2C44 /* AuthTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA2A137EBDAA8855CAA24A2 /* AuthTokenStore.swift */; };
@@ -98,6 +99,7 @@
 		569A548ECCAC07CC9E9B92D2 /* MediaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaModels.swift; sourceTree = "<group>"; };
 		5D0C8298731E2AD4C22B2306 /* OutputPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputPreviewView.swift; sourceTree = "<group>"; };
 		6023F5FCD12A96AE5EAD4313 /* ShowControlStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlStack.swift; sourceTree = "<group>"; };
+		63903ACF2604D9E2128B0F6C /* TransportSinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportSinks.swift; sourceTree = "<group>"; };
 		6A4A7CF3D1DF29B837A0BF44 /* SubscriptionPump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionPump.swift; sourceTree = "<group>"; };
 		6CD51FEB5E50862496E8A6BA /* ShowControlActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlActions.swift; sourceTree = "<group>"; };
 		70B339087E0F91F6B7504F6D /* ShowControlDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlDispatcher.swift; sourceTree = "<group>"; };
@@ -180,6 +182,7 @@
 				E1B3AC760F776AC4DDC6B0F9 /* DeckLinkSDK.h */,
 				9E8B4217656574F74350F1FF /* DeckLinkSDKDispatch.cpp */,
 				B9392E6B9D0468959B74A1F9 /* TransportSink.swift */,
+				63903ACF2604D9E2128B0F6C /* TransportSinks.swift */,
 				CF2597FFE1CB9927C6CB6395 /* VideoOutput.swift */,
 			);
 			path = Output;
@@ -461,6 +464,7 @@
 				67058819C3FE046151E4BCAD /* SubscriptionRegistry.swift in Sources */,
 				9693BB1ACC35C9F34674A4A2 /* Timecode.swift in Sources */,
 				ABA983A9D89AD460EE548AF4 /* TransportSink.swift in Sources */,
+				2AE84FFB58E06C9A60B6C982 /* TransportSinks.swift in Sources */,
 				CF0020C246A6F8DF7BC4B6D6 /* VideoOutput.swift in Sources */,
 				54A9764CA77C6FE799CDDC71 /* WebSocketFrame.swift in Sources */,
 			);

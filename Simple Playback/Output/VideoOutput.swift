@@ -142,8 +142,21 @@ final class CompositeVideoOutputDriver: VideoOutputDriver {
     }
 }
 
+/// Adapts a `VideoOutputMode` into the Stage shape a sink needs at start time. Used by the
+/// driver shims while the project still drives output via (deviceID, modeID); once cues
+/// resolve to Stage IDs (B5c+) this helper goes away.
+private func transportStage(forMode mode: VideoOutputMode) -> TransportSinkStage {
+    TransportSinkStage(
+        width: mode.width,
+        height: mode.height,
+        frameRateNumerator: Int(mode.timeScale),
+        frameRateDenominator: Int(mode.frameDuration)
+    )
+}
+
 final class PreviewVideoOutputDriver: VideoOutputDriver {
-    private(set) var status = "Software preview output"
+    private let sink = PreviewTransportSink()
+    var status: String { sink.status }
 
     func availableDevices() -> [VideoOutputDevice] {
         [
@@ -159,25 +172,35 @@ final class PreviewVideoOutputDriver: VideoOutputDriver {
     func start(deviceID: String, modeID: String) throws {
         guard deviceID == "preview:software" else { throw VideoOutputError.deviceNotFound }
         guard modeID == VideoOutputMode.preview1080p30.id else { throw VideoOutputError.modeNotFound }
-        status = "Software preview running"
+        try sink.start(stage: transportStage(forMode: .preview1080p30))
     }
 
     func stop() {
-        status = "Software preview output"
+        sink.stop()
     }
 
-    func submitVideoFrame(_ data: Data, width: Int, height: Int, rowBytes: Int) throws {}
-    func submitAudioPCM16(_ data: Data, sampleFrameCount: Int) throws {}
+    func submitVideoFrame(_ data: Data, width: Int, height: Int, rowBytes: Int) throws {
+        try sink.submit(frame: RenderedFrame(data: data, width: width, height: height, rowBytes: rowBytes))
+    }
+
+    func submitAudioPCM16(_ data: Data, sampleFrameCount: Int) throws {
+        try sink.submit(audio: data, sampleFrameCount: sampleFrameCount)
+    }
 }
 
 final class DeckLinkVideoOutputDriver: VideoOutputDriver {
-    private let bridge = SPDeckLinkBridge()
-    private(set) var status = "DeckLink idle"
+    private let discoveryBridge = SPDeckLinkBridge()
+    private var activeSink: DeckLinkTransportSink?
+    private var lastSinkStatus: String?
+
+    var status: String {
+        if let activeSink, activeSink.isRunning { return activeSink.status }
+        if let lastSinkStatus { return lastSinkStatus }
+        return discoveryBridge.runtimeStatus
+    }
 
     func availableDevices() -> [VideoOutputDevice] {
-        let devices = bridge.availableDevices()
-        status = bridge.runtimeStatus
-
+        let devices = discoveryBridge.availableDevices()
         return devices.map { device in
             VideoOutputDevice(
                 id: device.identifier,
@@ -198,35 +221,50 @@ final class DeckLinkVideoOutputDriver: VideoOutputDriver {
     }
 
     func start(deviceID: String, modeID: String) throws {
+        if let activeSink, activeSink.deviceID == deviceID, activeSink.modeID == modeID {
+            // Existing sink can re-arm; new stage is derived from the same mode.
+        } else {
+            activeSink?.stop()
+            activeSink = DeckLinkTransportSink(deviceID: deviceID, modeID: modeID)
+        }
+
+        guard let activeSink else { return }
+        let mode = availableDevices()
+            .first(where: { $0.id == deviceID })?.modes
+            .first(where: { $0.id == modeID })
+        let stage = mode.map(transportStage(forMode:))
+            ?? TransportSinkStage(width: 1920, height: 1080, frameRateNumerator: 30, frameRateDenominator: 1)
         do {
-            try bridge.start(withDeviceIdentifier: deviceID, modeIdentifier: modeID)
-            status = bridge.runtimeStatus
+            try activeSink.start(stage: stage)
+            lastSinkStatus = activeSink.status
         } catch {
-            status = bridge.runtimeStatus
-            throw VideoOutputError.deckLink(error.localizedDescription)
+            lastSinkStatus = activeSink.status
+            throw error
         }
     }
 
     func stop() {
-        bridge.stop()
-        status = "DeckLink stopped"
+        activeSink?.stop()
+        lastSinkStatus = "DeckLink stopped"
     }
 
     func submitVideoFrame(_ data: Data, width: Int, height: Int, rowBytes: Int) throws {
+        guard let activeSink else { return }
         do {
-            try bridge.displayFrame(withBGRAData: data, width: width, height: height, rowBytes: rowBytes)
+            try activeSink.submit(frame: RenderedFrame(data: data, width: width, height: height, rowBytes: rowBytes))
         } catch {
-            status = bridge.runtimeStatus
-            throw VideoOutputError.deckLink(error.localizedDescription)
+            lastSinkStatus = activeSink.status
+            throw error
         }
     }
 
     func submitAudioPCM16(_ data: Data, sampleFrameCount: Int) throws {
+        guard let activeSink else { return }
         do {
-            try bridge.writeAudioPCM16Data(data, sampleFrameCount: sampleFrameCount)
+            try activeSink.submit(audio: data, sampleFrameCount: sampleFrameCount)
         } catch {
-            status = bridge.runtimeStatus
-            throw VideoOutputError.deckLink(error.localizedDescription)
+            lastSinkStatus = activeSink.status
+            throw error
         }
     }
 }
