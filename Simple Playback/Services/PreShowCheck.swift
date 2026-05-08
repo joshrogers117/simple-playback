@@ -357,11 +357,11 @@ enum PreShowCheck {
     }
 
     /// Asset-library row — every MediaSlide whose underlying file isn't on disk shows
-    /// up here as an error. The cue-level "media.resolution" row above checks logical
-    /// cue→slide pointer integrity; this row checks the on-disk file existence one
-    /// rung deeper. They're independent: a project can pass one and fail the other.
-    /// nil context skips the row entirely. The summary leads with the count and
-    /// names the first three offline slides for operator-facing context.
+    /// up here as an error; slides whose file is on disk but has changed since import
+    /// (size/mtime delta vs the C7 fingerprint) show up as a warning. The cue-level
+    /// "media.resolution" row above checks logical cue→slide pointer integrity; this
+    /// row checks on-disk file health one rung deeper. They're independent: a project
+    /// can pass one and fail the other. nil context skips the row entirely.
     static func evaluateAssetLibrary(context: Context) -> Row? {
         guard let status = context.assetLibraryStatus else { return nil }
         if status.totalSlideCount == 0 {
@@ -372,23 +372,35 @@ enum PreShowCheck {
                 summary: "No media in the asset library."
             )
         }
-        if status.offlineSlideCount == 0 {
+        if status.offlineSlideCount > 0 {
+            let preview = status.offlineSlideTitles.joined(separator: ", ")
+            let extra = status.offlineSlideCount > status.offlineSlideTitles.count
+                ? " (+\(status.offlineSlideCount - status.offlineSlideTitles.count) more)"
+                : ""
             return Row(
                 id: "media.files",
-                severity: .ok,
+                severity: .error,
                 title: "Files",
-                summary: "All \(status.totalSlideCount) media file(s) resolve."
+                summary: "\(status.offlineSlideCount) of \(status.totalSlideCount) media file(s) offline: \(preview)\(extra)."
             )
         }
-        let preview = status.offlineSlideTitles.joined(separator: ", ")
-        let extra = status.offlineSlideCount > status.offlineSlideTitles.count
-            ? " (+\(status.offlineSlideCount - status.offlineSlideTitles.count) more)"
-            : ""
+        if status.staleSlideCount > 0 {
+            let preview = status.staleSlideTitles.joined(separator: ", ")
+            let extra = status.staleSlideCount > status.staleSlideTitles.count
+                ? " (+\(status.staleSlideCount - status.staleSlideTitles.count) more)"
+                : ""
+            return Row(
+                id: "media.files",
+                severity: .warning,
+                title: "Files",
+                summary: "\(status.staleSlideCount) of \(status.totalSlideCount) media file(s) modified since import: \(preview)\(extra)."
+            )
+        }
         return Row(
             id: "media.files",
-            severity: .error,
+            severity: .ok,
             title: "Files",
-            summary: "\(status.offlineSlideCount) of \(status.totalSlideCount) media file(s) offline: \(preview)\(extra)."
+            summary: "All \(status.totalSlideCount) media file(s) resolve."
         )
     }
 

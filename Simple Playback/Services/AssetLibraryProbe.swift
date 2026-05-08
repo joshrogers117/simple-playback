@@ -14,15 +14,41 @@ struct AssetLibraryStatus: Equatable {
     /// projects with hundreds of missing slides don't render an unbounded summary
     /// string.
     var offlineSlideTitles: [String]
+    /// Slides whose linked file is on disk but whose size or mtime differs from
+    /// what was captured at import (fingerprint mismatch). Separate from offline:
+    /// a stale slide is still playable, just possibly not the file the operator
+    /// rehearsed with. Operator-facing as a warning, not an error.
+    var staleSlideCount: Int
+    var staleSlideTitles: [String]
 
-    static let empty = AssetLibraryStatus(
-        totalSlideCount: 0,
-        offlineSlideCount: 0,
-        offlineSlideTitles: []
-    )
+    init(
+        totalSlideCount: Int = 0,
+        offlineSlideCount: Int = 0,
+        offlineSlideTitles: [String] = [],
+        staleSlideCount: Int = 0,
+        staleSlideTitles: [String] = []
+    ) {
+        self.totalSlideCount = totalSlideCount
+        self.offlineSlideCount = offlineSlideCount
+        self.offlineSlideTitles = offlineSlideTitles
+        self.staleSlideCount = staleSlideCount
+        self.staleSlideTitles = staleSlideTitles
+    }
+
+    static let empty = AssetLibraryStatus()
 }
 
 enum AssetLibraryProbe {
+    /// Cheap pre-flight metadata pair used to decide if a linked file's bytes
+    /// have changed since import. Reading these via `FileManager.attributesOfItem`
+    /// is fast (one stat); we only fall back to a real SHA-256 re-fingerprint
+    /// when an operator explicitly requests it (deferred — out of scope for this
+    /// pre-show row).
+    struct CurrentFileMetadata: Equatable {
+        var size: Int64
+        var mtime: Date
+    }
+
     /// Default online-check used by the live probe. Honors the bookmark resolution
     /// path inside `MediaReference.resolvedURL()` and verifies the resolved URL
     /// actually points at a real file (the bookmark branch returns a URL even for
@@ -32,28 +58,87 @@ enum AssetLibraryProbe {
         return FileManager.default.fileExists(atPath: url.path)
     }
 
-    /// Walk the slide list, count offline slides, and capture the first three
-    /// offline titles for the operator-facing pre-show summary.
+    /// Default URL resolver used by the live probe — just `media.resolvedURL()`.
+    /// Tests override this so the stale-check branch can be exercised without
+    /// standing up real files at the slide's path.
+    static let liveResolveURL: (MediaSlide) -> URL? = { slide in
+        slide.media.resolvedURL()
+    }
+
+    /// Default current-metadata reader. Returns nil on stat failure; callers
+    /// treat that as "can't tell — skip the staleness check for this slide."
+    static let liveCurrentMetadata: (URL) -> CurrentFileMetadata? = { url in
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = (attrs[.size] as? NSNumber)?.int64Value else {
+            return nil
+        }
+        let mtime = (attrs[.modificationDate] as? Date) ?? Date()
+        return CurrentFileMetadata(size: size, mtime: mtime)
+    }
+
+    /// Tolerance window for mtime comparison. Filesystem precision varies (HFS+
+    /// is 1 s; APFS is nanosecond; SMB drops to 2 s on some volumes); 1 s is the
+    /// conservative floor that doesn't trigger stale on a venue-portable bundle
+    /// reopened on a different volume.
+    static let defaultMtimeToleranceSeconds: TimeInterval = 1.0
+
+    /// True iff the on-disk file has changed in size, or mtime moved by more than
+    /// the tolerance window, since the fingerprint was captured. Pure helper —
+    /// callers compose with `liveCurrentMetadata` (or a stub) to drive the check.
+    static func isStale(
+        stored: MediaAssetFingerprint,
+        current: CurrentFileMetadata,
+        mtimeToleranceSeconds: TimeInterval = defaultMtimeToleranceSeconds
+    ) -> Bool {
+        if stored.size != current.size { return true }
+        let delta = abs(stored.mtime.timeIntervalSince(current.mtime))
+        return delta > mtimeToleranceSeconds
+    }
+
+    /// Walk the slide list, count offline + stale slides, and capture the first
+    /// few titles in each bucket for the operator-facing pre-show summary.
     ///
-    /// Pure-logic over the injected `isOnline` predicate. Tests substitute a stub
-    /// instead of standing up a temp filesystem of fixtures.
+    /// Pure-logic over the injected predicates. Tests substitute stubs instead
+    /// of standing up a temp filesystem of fixtures.
     static func evaluate(
         slides: [MediaSlide],
         previewLimit: Int = 3,
-        isOnline: (MediaSlide) -> Bool = liveIsOnline
+        isOnline: (MediaSlide) -> Bool = liveIsOnline,
+        resolveURL: (MediaSlide) -> URL? = liveResolveURL,
+        currentMetadata: (URL) -> CurrentFileMetadata? = liveCurrentMetadata
     ) -> AssetLibraryStatus {
         var offlineTitles: [String] = []
         var offlineCount = 0
-        for slide in slides where !isOnline(slide) {
-            offlineCount += 1
-            if offlineTitles.count < previewLimit {
-                offlineTitles.append(slide.title)
+        var staleTitles: [String] = []
+        var staleCount = 0
+        for slide in slides {
+            if !isOnline(slide) {
+                offlineCount += 1
+                if offlineTitles.count < previewLimit {
+                    offlineTitles.append(slide.title)
+                }
+                continue
+            }
+            // Stale check — only fires when the slide was fingerprinted at import
+            // (pre-C7 slides skip silently) and the live file metadata is readable.
+            guard let stored = slide.media.fingerprint,
+                  let url = resolveURL(slide),
+                  let current = currentMetadata(url) else {
+                continue
+            }
+            if isStale(stored: stored, current: current) {
+                staleCount += 1
+                if staleTitles.count < previewLimit {
+                    staleTitles.append(slide.title)
+                }
             }
         }
         return AssetLibraryStatus(
             totalSlideCount: slides.count,
             offlineSlideCount: offlineCount,
-            offlineSlideTitles: offlineTitles
+            offlineSlideTitles: offlineTitles,
+            staleSlideCount: staleCount,
+            staleSlideTitles: staleTitles
         )
     }
 }
