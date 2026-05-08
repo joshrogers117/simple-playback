@@ -10,6 +10,9 @@ struct RootView: View {
     @StateObject private var transcodeCoordinator = TranscodeCoordinator()
     @StateObject private var encodeCoordinator = ImageSequenceEncodeCoordinator()
     @StateObject private var importStatus = ImportStatusBanner()
+    /// C7d — Bundle for Travel coordinator. Owns the active copy pass; the
+    /// confirm sheet binds to it. Lifetime is the document window.
+    @StateObject private var bundleForTravelCoordinator = BundleForTravelCoordinator()
     /// E3 — append-only show log for this document. Wired into ShowController
     /// after configuration so every verb (GO/PANIC/CLEAR/BLACKOUT/Show-Mode)
     /// records to the journal. Persistence destination is set in
@@ -56,6 +59,10 @@ struct RootView: View {
     @State private var showLogPresented: Bool = false
     /// Toggle for the Phase E5 take-history sheet.
     @State private var takeHistoryPresented: Bool = false
+    /// C7d — non-nil while the Bundle for Travel sheet is on-screen. Holds the
+    /// pre-computed plan so summary + progress + result all read off the same
+    /// snapshot.
+    @State private var pendingBundleForTravel: BundleForTravelPlanReport?
     /// Stable per-window UUID. Untitled documents — which have no fileURL yet —
     /// rasterize PDFs (and transcode to ProRes) into an app-support subdirectory keyed
     /// by this ID so concurrent untitled windows don't collide.
@@ -167,6 +174,14 @@ struct RootView: View {
                 }
                 .help("Open the take history — the last 200 cue fires in this session.")
 
+                Button {
+                    presentBundleForTravelSheet()
+                } label: {
+                    Label("Bundle for Travel", systemImage: "shippingbox")
+                }
+                .help("Copy linked media into the project bundle so the show is venue-portable.")
+                .disabled(!canBundleForTravel)
+
                 Spacer()
 
                 Toggle(isOn: showModeBinding) {
@@ -232,6 +247,23 @@ struct RootView: View {
         }
         .sheet(isPresented: $takeHistoryPresented) {
             TakeHistoryView(history: takeHistory, onClose: { takeHistoryPresented = false })
+        }
+        .sheet(isPresented: bundleForTravelSheetBinding) {
+            if let plan = pendingBundleForTravel,
+               let bundleURL = projectBundleURLProvider() {
+                let mediaDir = bundleURL.appendingPathComponent(
+                    ProjectBundleLayout.mediaDirectory,
+                    isDirectory: true
+                )
+                BundleForTravelSheet(
+                    coordinator: bundleForTravelCoordinator,
+                    plan: plan,
+                    mediaDirectoryURL: mediaDir,
+                    onConfirm: { runBundleForTravel(plan: plan, mediaDirectoryURL: mediaDir) },
+                    onCancel: { dismissBundleForTravelSheet() },
+                    onClose: { dismissBundleForTravelSheet() }
+                )
+            }
         }
         .sheet(item: $pendingFolderImport) { _ in
             // The closure parameter is read-only; we drive the sheet from the @State so
@@ -611,6 +643,74 @@ struct RootView: View {
         }
 
         return handlers
+    }
+
+    private var bundleForTravelSheetBinding: Binding<Bool> {
+        Binding(
+            get: { pendingBundleForTravel != nil },
+            set: { newValue in
+                if !newValue { dismissBundleForTravelSheet() }
+            }
+        )
+    }
+
+    private var canBundleForTravel: Bool {
+        guard projectBundleURLProvider() != nil else { return false }
+        return !document.project.slides.isEmpty
+    }
+
+    /// Toolbar entry-point for the C7d Bundle for Travel command. Computes
+    /// the plan synchronously against the current slide list (cheap — pure
+    /// logic over the asset library) and presents the confirm sheet. The
+    /// actual copying happens inside the coordinator on confirm.
+    private func presentBundleForTravelSheet() {
+        guard let bundleURL = projectBundleURLProvider() else { return }
+        let mediaDir = bundleURL.appendingPathComponent(
+            ProjectBundleLayout.mediaDirectory,
+            isDirectory: true
+        )
+        let report = BundleForTravelPlan.plan(
+            slides: document.project.slides,
+            resolve: { ref in
+                MediaResolver.resolve(
+                    reference: ref,
+                    searchRoots: [],
+                    bundleMediaDirectory: mediaDir
+                )
+            }
+        )
+        bundleForTravelCoordinator.reset()
+        pendingBundleForTravel = report
+    }
+
+    /// Operator confirmed the plan — kick off the copy pass. On success we
+    /// apply the plan to `project.slides` (kind flips to `.managed`,
+    /// originalPath rewrites to the bundle Media/ destination, fingerprint
+    /// refreshes against the freshly copied file). The sheet stays on-screen
+    /// in its terminal state so the operator can read the summary before
+    /// dismissing.
+    private func runBundleForTravel(
+        plan: BundleForTravelPlanReport,
+        mediaDirectoryURL: URL
+    ) {
+        bundleForTravelCoordinator.start(
+            plan: plan,
+            mediaDirectoryURL: mediaDirectoryURL
+        ) { result in
+            if case .success(let completedPlan) = result {
+                let updated = BundleForTravelPlan.apply(
+                    plan: completedPlan,
+                    to: document.project.slides,
+                    mediaDirectoryURL: mediaDirectoryURL
+                )
+                document.project.slides = updated
+            }
+        }
+    }
+
+    private func dismissBundleForTravelSheet() {
+        pendingBundleForTravel = nil
+        bundleForTravelCoordinator.reset()
     }
 
     /// C9 — single-slide relink action wired to the SlideGridView Locate…

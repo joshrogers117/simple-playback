@@ -81,6 +81,7 @@
 		730DC9B890EBCCA703C2E2CF /* TakeHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E99FC3B24835175EF3BD62E /* TakeHistoryTests.swift */; };
 		73DBCDAA4262F2AFB8237FC4 /* MTCReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB3106A106C37E4EE56BC7E /* MTCReader.swift */; };
 		7903F319F280ADCB53522EA0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9E5D5CE935540C98B6BAAAEF /* Assets.xcassets */; };
+		7C4BF6FFFDA26DABFDAB1DD9 /* BundleForTravelSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D38F9625D50B1A0F19983F41 /* BundleForTravelSheet.swift */; };
 		7D6E9D5D91681AA09335F8F9 /* HTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4EF3D125520DB5F0C1F703 /* HTTPServer.swift */; };
 		851AE7644559671FB09FD2BD /* ShowControlIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E47E51BD45087956CCF2905 /* ShowControlIntegrationTests.swift */; };
 		873129B7192207BD8E22D111 /* ImportStatusBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41F6421D7CBD102AC8875CC6 /* ImportStatusBanner.swift */; };
@@ -287,6 +288,7 @@
 		CF2597FFE1CB9927C6CB6395 /* VideoOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutput.swift; sourceTree = "<group>"; };
 		CF97362F36D6ED17D41359D2 /* DeckLinkDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckLinkDiagnostics.swift; sourceTree = "<group>"; };
 		D2A8691862AC8AE01B87203D /* KeynoteImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeynoteImporter.swift; sourceTree = "<group>"; };
+		D38F9625D50B1A0F19983F41 /* BundleForTravelSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleForTravelSheet.swift; sourceTree = "<group>"; };
 		D6A8BE27C4F2CAA54E827EC3 /* AssetLibraryProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetLibraryProbe.swift; sourceTree = "<group>"; };
 		D8CA5B1A327E84EEA75F0B9F /* UniformTypeIdentifiers.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UniformTypeIdentifiers.framework; path = System/Library/Frameworks/UniformTypeIdentifiers.framework; sourceTree = SDKROOT; };
 		D930FD6914035D4FEAC331A2 /* PreShowCheckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreShowCheckTests.swift; sourceTree = "<group>"; };
@@ -370,6 +372,7 @@
 			isa = PBXGroup;
 			children = (
 				BAB7AC40249EC7B2A4951E24 /* AddFolderImportSheet.swift */,
+				D38F9625D50B1A0F19983F41 /* BundleForTravelSheet.swift */,
 				95B1D23335E9E0BF80F8D959 /* CrashRecoveryBannerView.swift */,
 				41F6421D7CBD102AC8875CC6 /* ImportStatusBanner.swift */,
 				0BC0B853C12B46AB64798C9D /* InspectorView.swift */,
@@ -683,6 +686,7 @@
 				11F48F224E2E07F3A2CD4894 /* BonjourPublisher.swift in Sources */,
 				3D1CF70C2CF630DC443A79BF /* BundleForTravelCoordinator.swift in Sources */,
 				1347EF040A9255D95C7A5C1A /* BundleForTravelPlan.swift in Sources */,
+				7C4BF6FFFDA26DABFDAB1DD9 /* BundleForTravelSheet.swift in Sources */,
 				EDB3E5ED1721A22A5B31024C /* CompositorLayers.swift in Sources */,
 				60D24C84B7A425B9412B95C9 /* CompositorPipeline.swift in Sources */,
 				C304C03B3716404CB35470F4 /* CrashRecoveryBannerView.swift in Sources */,
