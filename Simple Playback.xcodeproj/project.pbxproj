@@ -29,6 +29,7 @@
 		1D2DA3CD426E79C87480A852 /* AutosaveCheckpointerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0336D644737BA64EE43F017 /* AutosaveCheckpointerTests.swift */; };
 		1EC3502B7A2008F401A9D081 /* BundleForTravelPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBA2DABFD5EE282A4CC471FC /* BundleForTravelPlanTests.swift */; };
 		1FA47C61D92B5CF6AFD91783 /* LTCDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AAABB8C041A4E6DF8BE8685 /* LTCDecoder.swift */; };
+		265DF5E6C31354A2496F13C9 /* FilmstripCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C464E7C3A355CB93D5C25FC /* FilmstripCoordinator.swift */; };
 		27C597830A79418BECCDFEC6 /* ShowControlHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474A0C6ABB641B1CA5416495 /* ShowControlHub.swift */; };
 		2802ED3F9310BC405ED40764 /* AnimatedImageInspectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F13F77220235167A2E3CF142 /* AnimatedImageInspectorTests.swift */; };
 		28C1335FD15B6AE87DD31AB3 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A5E1B676CDA189E4C8C26CB /* PlaybackController.swift */; };
@@ -107,6 +108,7 @@
 		9877245F6768C2BD0B636B31 /* ShowLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5337B42A540319366F02D3 /* ShowLog.swift */; };
 		99869A4B8562CD2A2D1A69B5 /* ProjectLockControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7207C062BAE86A22C6BC8983 /* ProjectLockControllerTests.swift */; };
 		9AE825B362AF4C86B1F012C2 /* AssetFingerprinterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84A7FA109AFD06BDF513E0D8 /* AssetFingerprinterTests.swift */; };
+		9E2452F0AAD43DAC0C2D0955 /* FilmstripCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0054C1DB191C23C6138BCACC /* FilmstripCoordinatorTests.swift */; };
 		9F685F50F961D73764497CED /* TransportSinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24668879F6BB6C3E4ED2C3F5 /* TransportSinkTests.swift */; };
 		A0C4E2AC793B8B206E6F7128 /* PreShowCheckFixHandlersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F69D8058E585303C53CD3E3F /* PreShowCheckFixHandlersTests.swift */; };
 		A34CA8E22BA04CC530DD0597 /* LTCReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 934A545F270968E04F027F8B /* LTCReader.swift */; };
@@ -173,6 +175,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0054C1DB191C23C6138BCACC /* FilmstripCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmstripCoordinatorTests.swift; sourceTree = "<group>"; };
 		00712F270D3EB78020694E87 /* OSCAddressMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCAddressMap.swift; sourceTree = "<group>"; };
 		01C17ADD674250609276D8A4 /* HTTPRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRoutes.swift; sourceTree = "<group>"; };
 		06A94FE5F5AA25EE58FF77A3 /* ImageSequenceEncoderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSequenceEncoderTests.swift; sourceTree = "<group>"; };
@@ -225,6 +228,7 @@
 		48D597C7D54010FC1E62D378 /* ImageSequenceDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSequenceDetectorTests.swift; sourceTree = "<group>"; };
 		4938DA35785910BBFF3391DD /* MediaImporterKeynoteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporterKeynoteTests.swift; sourceTree = "<group>"; };
 		494E2E6E35E9CF59293D1176 /* FilmstripGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmstripGenerator.swift; sourceTree = "<group>"; };
+		4C464E7C3A355CB93D5C25FC /* FilmstripCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmstripCoordinator.swift; sourceTree = "<group>"; };
 		4FFDD7785740559EEB94F4CA /* SPFrameBlend.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SPFrameBlend.c; sourceTree = "<group>"; };
 		50C07D5C65BD28D34CB0463D /* PlaybackControllerCueFireTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackControllerCueFireTests.swift; sourceTree = "<group>"; };
 		50CF28D157920076A3C82649 /* OutputInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputInspectorView.swift; sourceTree = "<group>"; };
@@ -447,6 +451,7 @@
 				28F1823003EC72E1D46610F5 /* CrashRecoveryDetectorTests.swift */,
 				532651899A2D97DB1134F636 /* DroppedFrameCounterTests.swift */,
 				B09A6E0D2794272C8FBB0987 /* EnergyAssertionTests.swift */,
+				0054C1DB191C23C6138BCACC /* FilmstripCoordinatorTests.swift */,
 				55CBCF96BB663B7A4A87D0D5 /* FilmstripGeneratorTests.swift */,
 				22C8342BEF86901A52B41C81 /* FrameRateConformanceTests.swift */,
 				48D597C7D54010FC1E62D378 /* ImageSequenceDetectorTests.swift */,
@@ -592,6 +597,7 @@
 				0D46390F473701690C95CF1E /* CrashRecoveryDetector.swift */,
 				A4758CF8E9891007D793354E /* DroppedFrameCounter.swift */,
 				32E04427E697B0F4238C1C4C /* EnergyAssertion.swift */,
+				4C464E7C3A355CB93D5C25FC /* FilmstripCoordinator.swift */,
 				494E2E6E35E9CF59293D1176 /* FilmstripGenerator.swift */,
 				6FD2EFC1C287DD9480AF2D2F /* ImageSequenceDetector.swift */,
 				2D06F636A6229A0C418EE285 /* ImageSequenceEncoder.swift */,
@@ -733,6 +739,7 @@
 				DF9D9D2A7D5D102CC20FCD95 /* DeckLinkSDKDispatch.cpp in Sources */,
 				388AA05ED53476DBD72A4554 /* DroppedFrameCounter.swift in Sources */,
 				0591BDE7845DD83E323D1CC1 /* EnergyAssertion.swift in Sources */,
+				265DF5E6C31354A2496F13C9 /* FilmstripCoordinator.swift in Sources */,
 				D1EE64AA6E2B3B97F7A8CD8D /* FilmstripGenerator.swift in Sources */,
 				61B1311538DACF01A1A47603 /* FrameRateConformance.swift in Sources */,
 				5602C3EC7F566873E1629051 /* FrameRenderer.swift in Sources */,
@@ -821,6 +828,7 @@
 				A495088FE7143EE70B129749 /* CrashRecoveryDetectorTests.swift in Sources */,
 				71A74B61F50A3AAF221FC2C2 /* DroppedFrameCounterTests.swift in Sources */,
 				0F2D0CF9F6B7620C44F4BFDA /* EnergyAssertionTests.swift in Sources */,
+				9E2452F0AAD43DAC0C2D0955 /* FilmstripCoordinatorTests.swift in Sources */,
 				524250895D1631045605F062 /* FilmstripGeneratorTests.swift in Sources */,
 				4C060BE294B7C9A97DBA4FBE /* FrameRateConformanceTests.swift in Sources */,
 				EE3870434C944DFB877D89F7 /* ImageSequenceDetectorTests.swift in Sources */,
