@@ -48,6 +48,7 @@
 		CC37F2E5CFC466A33AA98F58 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773B6424E99EBEA84CB2027B /* ModelTests.swift */; };
 		CF0020C246A6F8DF7BC4B6D6 /* VideoOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF2597FFE1CB9927C6CB6395 /* VideoOutput.swift */; };
 		DF9D9D2A7D5D102CC20FCD95 /* DeckLinkSDKDispatch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9E8B4217656574F74350F1FF /* DeckLinkSDKDispatch.cpp */; };
+		E5DFE39B8CB8514358205B8E /* SubscriptionPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4A7CF3D1DF29B837A0BF44 /* SubscriptionPump.swift */; };
 		EAA4BC2642696555F131F8BE /* OutputPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0C8298731E2AD4C22B2306 /* OutputPreviewView.swift */; };
 		F52CA35701C089E08D0BFDCB /* ShowControlState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FD2B422FED7E9102FAEA3D2 /* ShowControlState.swift */; };
 		F6777B6986F9083E1C779BD2 /* CoreImage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E66F934F6D6C5561905E6550 /* CoreImage.framework */; };
@@ -83,6 +84,7 @@
 		4FFDD7785740559EEB94F4CA /* SPFrameBlend.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SPFrameBlend.c; sourceTree = "<group>"; };
 		569A548ECCAC07CC9E9B92D2 /* MediaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaModels.swift; sourceTree = "<group>"; };
 		5D0C8298731E2AD4C22B2306 /* OutputPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputPreviewView.swift; sourceTree = "<group>"; };
+		6A4A7CF3D1DF29B837A0BF44 /* SubscriptionPump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionPump.swift; sourceTree = "<group>"; };
 		6CD51FEB5E50862496E8A6BA /* ShowControlActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlActions.swift; sourceTree = "<group>"; };
 		70B339087E0F91F6B7504F6D /* ShowControlDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlDispatcher.swift; sourceTree = "<group>"; };
 		74F6B96FEA30A03C2D3B1FBB /* DeckLinkBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DeckLinkBridge.h; sourceTree = "<group>"; };
@@ -275,6 +277,7 @@
 				70B339087E0F91F6B7504F6D /* ShowControlDispatcher.swift */,
 				8FD2B422FED7E9102FAEA3D2 /* ShowControlState.swift */,
 				A13557C5F98007D62499B140 /* StateSnapshotEncoder.swift */,
+				6A4A7CF3D1DF29B837A0BF44 /* SubscriptionPump.swift */,
 				206A8DDCD4F82FF85D3587EC /* SubscriptionRegistry.swift */,
 				93727D6450DEE3ED3934DA97 /* WebSocketFrame.swift */,
 			);
@@ -417,6 +420,7 @@
 				51CA5DA530C6B560FA1A7989 /* SimplePlaybackProjectDocument.swift in Sources */,
 				3E21186036951CC387B69F2E /* SlideGridView.swift in Sources */,
 				54E5A1988F51C1AE8DE5B42A /* StateSnapshotEncoder.swift in Sources */,
+				E5DFE39B8CB8514358205B8E /* SubscriptionPump.swift in Sources */,
 				67058819C3FE046151E4BCAD /* SubscriptionRegistry.swift in Sources */,
 				CF0020C246A6F8DF7BC4B6D6 /* VideoOutput.swift in Sources */,
 				54A9764CA77C6FE799CDDC71 /* WebSocketFrame.swift in Sources */,

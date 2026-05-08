@@ -423,4 +423,98 @@ final class ShowControlTests: XCTestCase {
         try? list.append(cue)
         return CueRuntime(showList: list)
     }
+
+    // MARK: - Subscription pump (D7/D8/D9)
+
+    func testSubscriptionPumpSkipsTickWithoutSubscribers() {
+        let state = ShowControlState()
+        var list = ShowList()
+        try? list.append(Cue(number: "INTRO", title: "Intro", assetID: UUID()))
+        state.updateShowList(list)
+
+        let registry = SubscriptionRegistry()
+        let pump = SubscriptionPump(state: state, subscriptions: registry)
+
+        // No subscribers → no broadcasts. Mostly proves we don't crash.
+        pump.tick()
+        // (Visible side effect: zero broadcasts, registry still empty.)
+        XCTAssertFalse(registry.hasSubscribers)
+    }
+
+    func testSubscriptionPumpEmitsGlobalsAndCues() {
+        let state = ShowControlState()
+        var list = ShowList()
+        let cue = Cue(number: "INTRO", title: "Intro", assetID: UUID())
+        try? list.append(cue)
+        state.updateShowList(list)
+        state.updatePlayhead(cueID: cue.id)
+        state.updateTimecode(locked: true, now: "01:00:00:00")
+
+        let registry = SubscriptionRegistry()
+        var captured: [Data] = []
+        let sink = SubscriptionRegistry.WebSocketSink(send: { captured.append($0) })
+        registry.addWebSocket(sink)
+
+        let pump = SubscriptionPump(state: state, subscriptions: registry)
+        pump.tick()
+
+        XCTAssertFalse(captured.isEmpty)
+        let combined = captured.compactMap { String(data: $0, encoding: .utf8) }.joined(separator: "\n")
+        XCTAssertTrue(combined.contains("playhead_id"))
+        XCTAssertTrue(combined.contains("INTRO"))
+        XCTAssertTrue(combined.contains("tc_now"))
+        XCTAssertTrue(combined.contains("01:00:00:00"))
+    }
+
+    func testSubscriptionPumpFormatsDurations() {
+        XCTAssertEqual(SubscriptionPump.formatDuration(0), "00:00:00.000")
+        XCTAssertEqual(SubscriptionPump.formatDuration(1.5), "00:00:01.500")
+        XCTAssertEqual(SubscriptionPump.formatDuration(3661.123), "01:01:01.123")
+    }
+
+    func testSubscriptionPumpEmitsPerCueFeedbacks() {
+        let state = ShowControlState()
+        var list = ShowList()
+        let cue = Cue(number: "INTRO", title: "Intro", assetID: UUID())
+        try? list.append(cue)
+        state.updateShowList(list)
+        state.updateCueState(cueID: cue.id, state: .running)
+        state.updateCueElapsed(cueID: cue.id, elapsed: 5, remaining: 25)
+
+        let registry = SubscriptionRegistry()
+        var captured: [Data] = []
+        let sink = SubscriptionRegistry.WebSocketSink(send: { captured.append($0) })
+        registry.addWebSocket(sink)
+
+        let pump = SubscriptionPump(state: state, subscriptions: registry)
+        pump.tick()
+
+        let combined = captured.compactMap { String(data: $0, encoding: .utf8) }.joined()
+        XCTAssertTrue(combined.contains("/sp/state/cue/INTRO/running"))
+        XCTAssertTrue(combined.contains("/sp/state/cue/INTRO/elapsed"))
+        XCTAssertTrue(combined.contains("/sp/state/cue/INTRO/remaining"))
+        XCTAssertTrue(combined.contains("\"running\":true"))
+    }
+
+    // MARK: - Ping (D10) and apiVersion (D11)
+
+    func testDispatcherPingReturnsUptime() {
+        let runtime = makeShowControlRuntime()
+        let state = ShowControlState()
+        var clockNow: TimeInterval = 0
+        let d = ShowControlDispatcher(runtime: runtime, state: state, clock: { clockNow })
+        clockNow = 42
+        let result = d.dispatch(.ping, source: .test, capabilities: [.read, .fire])
+        guard case let .ok(data) = result else { XCTFail(); return }
+        guard case let .double(uptime) = data["uptime"] else { XCTFail(); return }
+        XCTAssertGreaterThanOrEqual(uptime, 0)
+    }
+
+    func testApiVersionAppearsInEveryReply() {
+        let json = ShowControlReplyEnvelope.jsonString(
+            address: "/sp/ping",
+            result: .ok(data: ["uptime": .double(1)])
+        )
+        XCTAssertTrue(json.contains("\"apiVersion\":1"))
+    }
 }
