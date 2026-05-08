@@ -278,6 +278,9 @@ struct RootView: View {
                 },
                 cancelEncode: { job in
                     job.cancel()
+                },
+                relinkSlide: { slide in
+                    relinkSlideViaOpenPanel(slide)
                 }
             )
             .frame(minWidth: 320, idealWidth: 460)
@@ -608,6 +611,29 @@ struct RootView: View {
         }
 
         return handlers
+    }
+
+    /// C9 — single-slide relink action wired to the SlideGridView Locate…
+    /// context menu. Operator picks one file via NSOpenPanel; we splice the new
+    /// reference (with a fresh fingerprint) into `project.slides` for that
+    /// specific slide. Independent of the bulk folder-relink Fix handler;
+    /// useful when the operator already knows the new file's exact location.
+    private func relinkSlideViaOpenPanel(_ slide: MediaSlide) {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.prompt = "Locate"
+        panel.message = "Pick the file that should replace \(slide.title)."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let index = document.project.slides.firstIndex(where: { $0.id == slide.id }) else { return }
+        var updated = document.project.slides[index]
+        updated.media = MediaReference(
+            url: url,
+            fingerprint: try? AssetFingerprinter.fingerprint(url: url),
+            kind: updated.media.kind
+        )
+        document.project.slides[index] = updated
     }
 
     /// Operator-triggered relink action wired into the `media.files` Pre-Show

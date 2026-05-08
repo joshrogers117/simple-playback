@@ -25,6 +25,11 @@ struct SlideGridView: View {
     var cancelTranscode: (TranscodeJob) -> Void = { _ in }
     /// Asks the host to cancel a running image-sequence encode.
     var cancelEncode: (ImageSequenceEncoder) -> Void = { _ in }
+    /// C9 — operator-triggered single-slide relink. Default no-op so existing call
+    /// sites stay green; RootView wires an NSOpenPanel that picks one file and
+    /// rewrites this slide's MediaReference to point at it (refreshing the
+    /// fingerprint).
+    var relinkSlide: (MediaSlide) -> Void = { _ in }
 
     private let columns = [
         GridItem(.adaptive(minimum: 148, maximum: 190), spacing: 12)
@@ -100,6 +105,10 @@ struct SlideGridView: View {
                     requestTranscode(slide, preset)
                 }
             }
+            Divider()
+        }
+        Button("Locate…") {
+            relinkSlide(slide)
         }
     }
 }
