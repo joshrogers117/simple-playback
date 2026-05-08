@@ -6,7 +6,7 @@ import Foundation
 /// transport surface and the local UI never diverge.
 ///
 /// Mirrors the `/sp/...` OSC namespace defined in `feature_spec.md` §3.12.
-public enum ShowControlAction: Equatable {
+enum ShowControlAction: Equatable {
     // Show-runtime verbs.
     case go(target: String?)
     case previous
@@ -52,7 +52,7 @@ public enum ShowControlAction: Equatable {
 
 /// Capabilities required to perform an action. Tokens carry a set of caps;
 /// dispatcher rejects an action whose required cap isn't in the token's set.
-public enum ShowControlCapability: String, Codable, CaseIterable, Hashable {
+enum ShowControlCapability: String, Codable, CaseIterable, Hashable {
     case read
     case fire
     case edit
@@ -60,7 +60,7 @@ public enum ShowControlCapability: String, Codable, CaseIterable, Hashable {
 
 extension ShowControlAction {
     /// The capability a caller must hold to perform this action.
-    public var requiredCapability: ShowControlCapability {
+    var requiredCapability: ShowControlCapability {
         switch self {
         case .ping, .subscribe, .unsubscribe:
             return .read
@@ -81,7 +81,7 @@ extension ShowControlAction {
 /// arriving within `retriggerLockoutSeconds` collapse to one. Per-cue verbs key
 /// by cue number; global verbs key by their action name.
 extension ShowControlAction {
-    public var idempotencyKey: String {
+    var idempotencyKey: String {
         switch self {
         case let .go(target):
             return "go:\(target ?? "<playhead>")"
@@ -148,14 +148,14 @@ extension ShowControlAction {
 }
 
 /// One outcome of dispatching an action — what to put in the reply envelope.
-public enum ShowControlActionResult: Equatable {
+enum ShowControlActionResult: Equatable {
     case ok(data: [String: ShowControlValue])
     case rejected(reason: String)
 }
 
 /// JSON-friendly value type for action result data.
 /// Avoids `Any` so encoding stays type-safe.
-public enum ShowControlValue: Equatable {
+enum ShowControlValue: Equatable {
     case string(String)
     case int(Int)
     case double(Double)

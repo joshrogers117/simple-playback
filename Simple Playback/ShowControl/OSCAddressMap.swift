@@ -2,8 +2,8 @@ import Foundation
 
 /// Decodes an `OSCMessage` into a `ShowControlAction`. Returns `nil` for
 /// addresses we don't recognize (the caller should reply with an error).
-public enum OSCAddressMap {
-    public static func action(for message: OSCMessage) -> ShowControlAction? {
+enum OSCAddressMap {
+    static func action(for message: OSCMessage) -> ShowControlAction? {
         let segs = message.address.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
         guard segs.first?.lowercased() == "sp" else { return nil }
         let tail = Array(segs.dropFirst())
@@ -160,9 +160,9 @@ public enum OSCAddressMap {
 
 /// Encodes a `ShowControlActionResult` into an OSC `/reply` envelope, plus
 /// reusable JSON encoding for HTTP twin replies.
-public enum ShowControlReplyEnvelope {
+enum ShowControlReplyEnvelope {
     /// Builds the JSON body. Includes `apiVersion`, `address`, `status`, `data`.
-    public static func json(
+    static func json(
         address: String,
         result: ShowControlActionResult,
         encoder: JSONEncoder = .standard()
@@ -171,7 +171,7 @@ public enum ShowControlReplyEnvelope {
         return (try? encoder.encode(payload)) ?? Data("{}".utf8)
     }
 
-    public static func jsonString(
+    static func jsonString(
         address: String,
         result: ShowControlActionResult
     ) -> String {
@@ -179,7 +179,7 @@ public enum ShowControlReplyEnvelope {
         return String(data: data, encoding: .utf8) ?? "{}"
     }
 
-    public static func build(
+    static func build(
         address: String,
         result: ShowControlActionResult
     ) -> JSONReply {
@@ -205,18 +205,18 @@ public enum ShowControlReplyEnvelope {
 }
 
 /// JSON-encodable reply envelope.
-public struct JSONReply: Encodable {
-    public let apiVersion: Int
-    public let address: String
-    public let status: String
-    public let data: [String: ShowControlValue]?
-    public let error: String?
+struct JSONReply: Encodable {
+    let apiVersion: Int
+    let address: String
+    let status: String
+    let data: [String: ShowControlValue]?
+    let error: String?
 
     enum CodingKeys: String, CodingKey {
         case apiVersion, address, status, data, error
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(apiVersion, forKey: .apiVersion)
         try c.encode(address, forKey: .address)
@@ -231,11 +231,11 @@ public struct JSONReply: Encodable {
 }
 
 /// Wrapper that knows how to encode a `[String: ShowControlValue]` into JSON.
-public struct JSONValueDict: Encodable {
-    public let underlying: [String: ShowControlValue]
-    public init(_ d: [String: ShowControlValue]) { underlying = d }
+struct JSONValueDict: Encodable {
+    let underlying: [String: ShowControlValue]
+    init(_ d: [String: ShowControlValue]) { underlying = d }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: AnyCodingKey.self)
         for (k, v) in underlying {
             try v.encode(to: c.superEncoder(forKey: AnyCodingKey(stringValue: k)!))
@@ -244,7 +244,7 @@ public struct JSONValueDict: Encodable {
 }
 
 extension ShowControlValue: Encodable {
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var single = encoder.singleValueContainer()
         switch self {
         case let .string(s): try single.encode(s)
@@ -259,18 +259,19 @@ extension ShowControlValue: Encodable {
 }
 
 /// AnyCodingKey shim so we can encode arbitrary string-keyed maps.
-public struct AnyCodingKey: CodingKey {
-    public var stringValue: String
-    public var intValue: Int?
-    public init?(stringValue: String) { self.stringValue = stringValue }
-    public init?(intValue: Int) { self.intValue = intValue; self.stringValue = String(intValue) }
+struct AnyCodingKey: CodingKey {
+    var stringValue: String
+    var intValue: Int?
+    init?(stringValue: String) { self.stringValue = stringValue }
+    init?(intValue: Int) { self.intValue = intValue; self.stringValue = String(intValue) }
 }
 
 extension JSONEncoder {
     /// Standard encoder for show-control replies. Sorted keys for stable output.
-    public static func standard() -> JSONEncoder {
+    /// Slashes are kept unescaped for OSCQuery / address compatibility.
+    static func standard() -> JSONEncoder {
         let e = JSONEncoder()
-        e.outputFormatting = [.sortedKeys]
+        e.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         return e
     }
 }
