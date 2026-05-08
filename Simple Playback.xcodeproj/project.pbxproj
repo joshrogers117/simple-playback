@@ -31,6 +31,7 @@
 		67058819C3FE046151E4BCAD /* SubscriptionRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 206A8DDCD4F82FF85D3587EC /* SubscriptionRegistry.swift */; };
 		67765CD777AA4E30553D4126 /* SimplePlaybackApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECEAD362FE5313C14713663D /* SimplePlaybackApp.swift */; };
 		6B7B4C3468690A6CA15DBD56 /* OSCAddressMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00712F270D3EB78020694E87 /* OSCAddressMap.swift */; };
+		73DBCDAA4262F2AFB8237FC4 /* MTCReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB3106A106C37E4EE56BC7E /* MTCReader.swift */; };
 		7903F319F280ADCB53522EA0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9E5D5CE935540C98B6BAAAEF /* Assets.xcassets */; };
 		7D6E9D5D91681AA09335F8F9 /* HTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4EF3D125520DB5F0C1F703 /* HTTPServer.swift */; };
 		8E0250619812CB053444052C /* OSCServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBA363D1C04A7119011031E /* OSCServer.swift */; };
@@ -46,6 +47,7 @@
 		B69CE1461F740680651EFC39 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F1E1F27FCEA1C60E3C601307 /* AppIcon.icon */; };
 		BFE5FEA90AEA11BD597BEC0C /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EB3CFD9074943CC8F73C637C /* AVFoundation.framework */; };
 		C02D1DDF70B419255097C42E /* InspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC0B853C12B46AB64798C9D /* InspectorView.swift */; };
+		C120F1AED083BE5B83E60533 /* InternalTimecodeGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2109CBF6D66866EB07681F /* InternalTimecodeGenerator.swift */; };
 		C7A4EDB0BDB83897190B4A25 /* OSCQueryServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96F3960B5C5F817DFB3377D4 /* OSCQueryServer.swift */; };
 		C9842DF5C4DF8FAA50B74011 /* DeckLinkBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = B637A693F1741DD785724AAE /* DeckLinkBridge.mm */; };
 		CC37F2E5CFC466A33AA98F58 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773B6424E99EBEA84CB2027B /* ModelTests.swift */; };
@@ -108,6 +110,8 @@
 		A13557C5F98007D62499B140 /* StateSnapshotEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateSnapshotEncoder.swift; sourceTree = "<group>"; };
 		A45B0A7CB7DDDC72B747F7C8 /* FrameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameRenderer.swift; sourceTree = "<group>"; };
 		A66F04C7C7C26DBC9EA69F81 /* Simple PlaybackTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Simple PlaybackTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA2109CBF6D66866EB07681F /* InternalTimecodeGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InternalTimecodeGenerator.swift; sourceTree = "<group>"; };
+		AFB3106A106C37E4EE56BC7E /* MTCReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MTCReader.swift; sourceTree = "<group>"; };
 		B328F432BC7CCB991A9A8373 /* MediaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporter.swift; sourceTree = "<group>"; };
 		B55CC65960D79FA6ECC0214F /* Simple Playback.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Simple Playback.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B637A693F1741DD785724AAE /* DeckLinkBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DeckLinkBridge.mm; sourceTree = "<group>"; };
@@ -275,8 +279,10 @@
 				189C4C83922BF987A389D797 /* HTTPRequest.swift */,
 				01C17ADD674250609276D8A4 /* HTTPRoutes.swift */,
 				7B4EF3D125520DB5F0C1F703 /* HTTPServer.swift */,
+				AA2109CBF6D66866EB07681F /* InternalTimecodeGenerator.swift */,
 				0AAABB8C041A4E6DF8BE8685 /* LTCDecoder.swift */,
 				934A545F270968E04F027F8B /* LTCReader.swift */,
+				AFB3106A106C37E4EE56BC7E /* MTCReader.swift */,
 				00712F270D3EB78020694E87 /* OSCAddressMap.swift */,
 				473B7534956D23833D7E61BD /* OSCMessage.swift */,
 				96F3960B5C5F817DFB3377D4 /* OSCQueryServer.swift */,
@@ -408,8 +414,10 @@
 				91592F7DACBD58D4C6BBE0F2 /* HTTPRoutes.swift in Sources */,
 				7D6E9D5D91681AA09335F8F9 /* HTTPServer.swift in Sources */,
 				C02D1DDF70B419255097C42E /* InspectorView.swift in Sources */,
+				C120F1AED083BE5B83E60533 /* InternalTimecodeGenerator.swift in Sources */,
 				1FA47C61D92B5CF6AFD91783 /* LTCDecoder.swift in Sources */,
 				A34CA8E22BA04CC530DD0597 /* LTCReader.swift in Sources */,
+				73DBCDAA4262F2AFB8237FC4 /* MTCReader.swift in Sources */,
 				A81F8D8813F0437F211EF445 /* MediaImporter.swift in Sources */,
 				154CB32BBDF7469F91B49587 /* MediaModels.swift in Sources */,
 				6B7B4C3468690A6CA15DBD56 /* OSCAddressMap.swift in Sources */,

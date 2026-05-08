@@ -626,4 +626,34 @@ final class ShowControlTests: XCTestCase {
         // every "1" bit. We expect at least 160 crossings.
         XCTAssertGreaterThanOrEqual(crossings, 80, "Expected at least one crossing per bit boundary")
     }
+
+    // MARK: - Internal generator (D14)
+
+    func testInternalGeneratorProducesIncrementingTC() {
+        var clockNow: TimeInterval = 0
+        let gen = InternalTimecodeGenerator(
+            frameRate: .fps30,
+            startTC: TimecodeValue(hours: 1, minutes: 0, seconds: 0, frames: 0, frameRate: .fps30),
+            clock: { clockNow }
+        )
+        // Without start(), advancing time still produces a current value
+        // because we need to test the TC math.
+        gen.start()
+        clockNow = 1.0 // 30 frames later.
+        let v = gen.currentValue()
+        XCTAssertEqual(v.hours, 1)
+        XCTAssertEqual(v.minutes, 0)
+        XCTAssertEqual(v.seconds, 1)
+        gen.stop()
+    }
+
+    func testInternalGeneratorRespectsStartOffset() {
+        var clockNow: TimeInterval = 0
+        let start = TimecodeValue(hours: 9, minutes: 30, seconds: 15, frames: 7, frameRate: .fps25)
+        let gen = InternalTimecodeGenerator(frameRate: .fps25, startTC: start, clock: { clockNow })
+        gen.start()
+        let v = gen.currentValue()
+        XCTAssertEqual(v.frameCount, start.frameCount)
+        gen.stop()
+    }
 }
