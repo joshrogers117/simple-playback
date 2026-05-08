@@ -48,16 +48,17 @@ final class ShowController: ObservableObject {
     private var panicCompletionTask: DispatchWorkItem?
     private var droppedFrameCancellable: AnyCancellable?
     /// E3+ tail — pure-logic late-take detector. ShowController bridges
-    /// `handleCueFired` → `recordGoFired` and `playback.$liveSlideID` →
-    /// `recordFrameSubmitted`. The signal is **load-latency proxy**: for video
-    /// cues `liveSlideID` flips after `AVPlayerItemVideoOutput` preparation
-    /// completes (real per-take load latency); for image cues it flips
-    /// synchronously inside `take(...)` (always reads as on-time). A future
-    /// "first composed frame for cue X reached SDI" callback would tighten the
-    /// measurement; today the proxy at least catches operator-visible video-
-    /// load delays — exposed to allow tests to inject the detector directly.
+    /// `handleCueFired` → `recordGoFired` and `playback.onFirstComposedFrameForCue`
+    /// → `recordFrameSubmitted` (Path 1, upgraded from the prior Path 2
+    /// `$liveSlideID` proxy). The Path 1 callback fires once per take when
+    /// the first composed frame for that take reaches `submitFrame` — covers
+    /// both image and video cues uniformly. The previous Path 2 proxy
+    /// flipped `liveSlideID` synchronously inside `take(...)` for image
+    /// cues (always reading as on-time) and only caught load latency for
+    /// video cues; Path 1 closes both gaps. Detector exposed so tests can
+    /// drive `handleLiveSlideTransition(slideID:now:)` directly without
+    /// synthesizing a real callback emission.
     let lateTakeDetector = LateTakeDetector()
-    private var liveSlideIDCancellable: AnyCancellable?
     /// Operator-readable descriptor (cue number or title) cached at
     /// `recordGoFired` time so the late-take log entry can name the cue. The
     /// detector itself only carries cueID; we cache the human form here.
@@ -101,17 +102,17 @@ final class ShowController: ObservableObject {
         wireLateTakeDetector()
     }
 
-    /// E3+ tail — pipe `playback.$liveSlideID` into the late-take detector. The
-    /// first non-nil publish whose slideID matches the pending take closes the
-    /// measurement; verdict.late lands as a `.lateTake` show-log entry with
-    /// `latency=Nms cue=<descriptor>` detail.
+    /// E3+ tail — pipe `playback.onFirstComposedFrameForCue` into the
+    /// late-take detector (Path 1). The callback fires once per take with
+    /// (slideID, Date) when the first composed frame for that take reaches
+    /// `submitFrame`. PlaybackController dispatches the callback on main, so
+    /// the bridge can call `handleLiveSlideTransition` directly. Verdict.late
+    /// lands as a `.lateTake` show-log entry with `latency=Nms cue=<descriptor>`
+    /// detail.
     private func wireLateTakeDetector() {
-        liveSlideIDCancellable = playback.$liveSlideID
-            .compactMap { $0 }
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] slideID in
-                self?.handleLiveSlideTransition(slideID: slideID, now: Date())
-            }
+        playback.onFirstComposedFrameForCue = { [weak self] slideID, firedAt in
+            self?.handleLiveSlideTransition(slideID: slideID, now: firedAt)
+        }
     }
 
     /// Test seam — set the human cue descriptor that will name the next
