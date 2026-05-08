@@ -1,5 +1,17 @@
 # Phase E — Reliability — Summary
 
+**Status (session 18 — 2026-05-08)**: **Late-take live integration (E3+ tail) shipped**. The session-17 pure-logic `LateTakeDetector` is now wired through ShowController:
+
+- `handleCueFired` calls `lateTakeDetector.recordGoFired(cueID:, slideID:, at: Date())` just before `playback.take(...)`. The cue's number-or-title is cached in `pendingLateTakeCueDescriptor` so the eventual log entry can name the cue.
+- `playback.$liveSlideID` Combine sink hops to the main queue and calls `handleLiveSlideTransition(slideID:now:)` on the first non-nil publish. The bridge calls `recordFrameSubmitted(slideID:, at:)`; late verdicts append a `.lateTake` show-log event with detail `latency=Nms cue=<descriptor>` (source `.system`).
+- `onPanicChanged(active: true)` calls `lateTakeDetector.clearPending()` + clears the descriptor cache so an interrupted take doesn't leak into the next GO's measurement.
+
+**Path-2 limitation** (matches the session-17 deferred note): `liveSlideID` flips synchronously inside `take(...)` for image cues — they always read as on-time. For videos the flip happens after `AVPlayerItemVideoOutput` preparation, so per-take video load latency IS measured. A future "first composed frame for cue X reached SDI" callback would tighten the measurement; today the proxy at least catches operator-visible video-load delays.
+
+Tests: `ShowControllerLateTakeLogTests` (6 cases — late vs on-time emission, no-pending gate, slide-mismatch keeps pending alive, PANIC clears pending, second GO supersedes first). The bridge exposes `setPendingLateTakeCueDescriptor(_:)` and `clearPendingLateTakeCueDescriptorForTesting()` test seams + a public `handleLiveSlideTransition(slideID:now:)` so tests can drive the bridge by injecting an explicit `now` rather than synthesizing a real publish.
+
+---
+
 **Status (session 16 — 2026-05-08)**: Phase E gets a small but high-value addition tied to C7's new asset-library primitives — Pre-Show now has a `media.files` row that flags slides whose linked file is offline (error) or whose size/mtime drifted since import (warning). The same row carries a Fix button (E2) that opens NSOpenPanel and runs the C7c MediaResolver waterfall against the chosen folder, splicing resolved URLs back into `project.slides` with refreshed fingerprints. This closes the long-deferred E2 `media.resolution` Fix gap. Late-take detection (E3+ tail) remains deferred — needs a "first frame submitted for cue X" callback that PlaybackController doesn't expose yet.
 
 **Status (session 15 — 2026-05-08)**: **Phase E mostly landed**. Session 15 picked off the four most contained leftovers: E3+ dropped-frame counter, E5 take history (in-memory v1), E7 crash recovery on next launch. 4 commits, 498 → 543 tests (+45).

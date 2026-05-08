@@ -668,3 +668,110 @@ The detector returns leftovers in their original drop order so non-sequence file
 - `BundleForTravelProgress { completedCount, totalCount, bytesCopied, totalBytes, currentFilename }`.
 - `BundleForTravelError` (`.mediaDirectoryUnwriteable`, `.copyFailed`, `.cancelled`).
 - `BundleForTravelCoordinator.copyFile / ensureDirectory / removeItem` — static test seams.
+
+---
+
+## 2026-05-08 — Compositor / palette / transcode bundle-aware resolution: thread the dir, do not introduce a resolver helper
+
+**Decision**: The C7d punch list called for either threading `bundleMediaDirectory` to every `resolvedURL()` read site, *or* introducing a single `MediaSlideResolver` helper that all read paths go through. Session 18 chose the threading option for v1.
+
+**Why**:
+- **Each callsite already has the bundle dir at hand.** PlaybackController, RootView, and SlideGridView all know the URL; passing it down was a 1-line change per site, no new abstraction.
+- **A `MediaSlideResolver` helper would need to capture the bundle dir** (closure over a `let`, or a singleton observed by the document). Either form introduces a lifecycle question (when does the helper invalidate? who owns it?) that the explicit-parameter approach sidesteps.
+- **The bundle dir gets stale on Save-As** — a ref-typed helper would need to refresh on `fileURLDidChange`. Today's Combine-driven `BundleURLObserver` (Z2) does that for the canonical sites; a helper would duplicate that work.
+
+**Alternatives considered**:
+- **Single `MediaSlideResolver` helper** — cleaner abstraction but needs a lifecycle story; defer until a third bundle-aware decision (e.g., scope-specific bookmark refresh, multi-bundle inheritance) creates real coupling.
+- **Promote `bundleMediaDirectory` to a global `EnvironmentKey`** — works for view-tree code but doesn't reach pure services like `TranscodeService.canTranscode`. Hybrid would split the read paths.
+
+**Reversibility**: easy. The existing parameter sites are forwarders; refactoring to a helper is a search-and-replace once the second use case appears.
+
+**What I'd revisit if**:
+- A second "directory at the head of a resolution waterfall" appears (e.g., per-screen managed-assets root). At that point a helper amortizes the scaffolding.
+
+**Public API impact**:
+- `CompositorPipeline.bundleMediaDirectory: URL?` (didSet invalidates the bug-image cache).
+- `TranscodeService.canTranscode(slide:bundleMediaDirectory:)` — defaulted nil for backward compat.
+- `TranscodeCoordinator.transcode(...bundleMediaDirectory:)` — same.
+- `SlideGridView.bundleMediaDirectory: URL? = nil` + `CueInspectorView.bundleMediaDirectory`.
+
+---
+
+## 2026-05-08 — Save-As bundle-dir refresh: BundleURLObserver, not a NotificationCenter post
+
+**Decision**: SimplePlaybackProjectDocument owns a small `BundleURLObserver: ObservableObject` that mirrors `NSDocument.fileURL` into a SwiftUI-observable signal. The fileURL KVO observer republishes; RootView observes the value and refreshes both `playback.bundleMediaDirectory` and the C9 missing-media banner via `.onChange`.
+
+**Why**:
+- **Symmetry with `lockController.evaluate(bundleURL:)`** — the lock controller already reacts to fileURL changes via the same observer; mirroring its pattern keeps the cross-document re-evaluate logic in one mental model.
+- **No window-identity filtering needed.** A `NotificationCenter.publisher(for:)` would fire across every open document; consumers would have to filter by `object` and resolve their own NSDocument reference. The observer is per-document and naturally scoped.
+- **`.onChange(of: observer.bundleURL)` is the idiomatic SwiftUI re-act primitive** — the alternative (`@State` polling, `NSWindowDidBecomeMain` listening) reads as cargo-culted.
+
+**Alternatives considered**:
+- **NotificationCenter post + `.onReceive`** — tempting because it doesn't add a new type; rejected because RootView would need to filter by document identity it doesn't currently hold.
+- **Closure callback registered via `makeWindowControllers`** — mutable closure on the document, set when RootView wires up. Works but trades observable-object idioms for an imperative hook.
+- **Promote `bundleURLObserver.bundleURL` to a `@Published` on PlaybackController itself** — couples playback to the document's bundle, conflating concerns.
+
+**Reversibility**: easy. The observer is a 4-line class; deleting it after promoting bundle URL to another store is a small refactor.
+
+**Public API impact**:
+- `BundleURLObserver: ObservableObject { @Published var bundleURL: URL? }`.
+- `RootView.init(...bundleURLObserver:)` — defaulted to `BundleURLObserver()` for previews/tests that don't construct an NSDocument.
+
+---
+
+## 2026-05-08 — Late-take live integration: liveSlideID proxy, not a new "first frame" callback
+
+**Decision**: Wire `LateTakeDetector` through `ShowController` using `playback.$liveSlideID` as the "frame submitted" signal — Path 2 from the session-17 deferred note. Do not add a "first composed frame for cue X reached SDI" callback to PlaybackController in this iteration.
+
+**Why**:
+- **Path 2 ships in 1 commit; Path 1 is an architecture change** to PlaybackController. The deferred note explicitly identified the tradeoff.
+- **The proxy catches the operator-visible video-load case.** For video cues, `liveSlideID = prepared.slide.id` fires *after* `AVPlayerItemVideoOutput` preparation completes — that's the per-take video load latency, the most common late-take cause in live shows.
+- **Image cues read as on-time** because `liveSlideID` flips synchronously inside `take(...)` for them. We document this limitation in the LateTakeDetector + ShowController doc-comments rather than block the ship.
+- **A future Path 1 callback can replace the sink** without touching the detector or the log-emission code path. The bridge isolates the signal change to one Combine subscription.
+
+**Alternatives considered**:
+- **Path 1: Add `submitFrame` callback** — emits exactly once per cue fire when the first composed frame reaches an output. Tighter measurement; bigger change. Filed for the future.
+- **Skip live integration entirely** — leaves the `.lateTake` ShowLog action unused. Worse than partial.
+- **Use wall-clock timer as a proxy** — fixed delay between GO and "frame should have landed." Decoupled from real load behavior; misleading.
+
+**Reversibility**: easy. The Combine subscription is a 4-line `wireLateTakeDetector()` method on ShowController; replacing it with a callback hook is a localized change.
+
+**What I'd revisit if**:
+- Operators report image-cue late-takes (perceived delay before a cue lights up the screen) that the detector misses. Forces Path 1.
+- Per-take latency variance turns out to be the dominant signal vs the binary late/on-time threshold — would call for a histogram in the show log, not just an event.
+
+**Public API impact**:
+- `ShowController.lateTakeDetector: LateTakeDetector` — internal so tests can inject.
+- `ShowController.handleLiveSlideTransition(slideID:now:)` — pure-logic test seam.
+- `ShowController.setPendingLateTakeCueDescriptor(_:)` / `clearPendingLateTakeCueDescriptorForTesting()` — test seams to drive the bridge without a real cue-runtime fire.
+- `ShowLog.Action.lateTake` (already shipped session 17).
+
+---
+
+## 2026-05-08 — C10 thumbnail storage: per-slide JPEG sidecars under Cache/Thumbnails, not inline base64
+
+**Decision**: `MediaImporter` writes one `<bundle>/Cache/Thumbnails/<slide.id>.jpg` per imported slide. The slide model is unchanged — no inline `posterThumbnailData: Data?` field in `MediaReference` / `MediaSlide`. Untitled documents fall back to App-Support `Simple Playback/Thumbnails/<sessionID>/`.
+
+**Why**:
+- **Project files stay JSON-small.** A 200-slide deck would carry ~2 MB of base64 data inline; the sidecar approach keeps Show.json under 100 KB even for that size.
+- **Spec §3.17's `Cache/` parent already houses derived assets** (`Cache/Renders/` for PDF rasters). Sibling `Cache/Thumbnails/` is the obvious location and reads as "safe to delete" the same way.
+- **Bundle for Travel needs no special handling** — copying the bundle copies the cache. The C7d resolver doesn't need to know about thumbnails.
+- **Slide ID as the filename is canonical and stable.** UUIDs are unique across the project; a deleted-then-re-imported source produces a new slide ID and a fresh thumbnail.
+
+**Alternatives considered**:
+- **Inline base64 on `MediaSlide`** — works for untitled documents (no bundle) but bloats project files; nudged toward sidecar after seeing 200-slide projection.
+- **Single sprite-sheet per project** (one PNG with N tiles) — saves inode overhead but complicates incremental imports; deferred to C11 (filmstrip), where sprite-sheet semantics are a better fit.
+- **Per-slide PNG instead of JPEG** — lossless but ~5× larger; thumbnails don't need lossless and palette legibility doesn't suffer at quality 0.75.
+
+**Reversibility**: easy. `ThumbnailGenerator` is producer-agnostic — switching to inline storage is a model change + an importer rewrite, not a generator rewrite.
+
+**What I'd revisit if**:
+- Operators report stale thumbnails after re-import (slide ID changed, old sidecar orphaned). Would call for a "Compact project" action that walks `Cache/Thumbnails/` and removes JPEGs no MediaSlide resolves to.
+- Sidecar misses turn out to be common (e.g., bundle-without-cache shipped between machines). Would call for an inline fallback on top of the sidecar.
+
+**Public API impact**:
+- `Services/ThumbnailGenerator.swift` — pure-logic JPEG encoder.
+- `MediaImportContext.thumbnailRootDirectory: URL?`.
+- `MediaImporter.thumbnailEncoder: (URL, MediaKind) -> Data?` — static-var test seam.
+- `ProjectBundleLayout.thumbnailsDirectory = "Cache/Thumbnails"`.
+- `ThumbnailLoader.cachedThumbnail(for:in:)` — pure-logic offline fallback for tests.

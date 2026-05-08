@@ -1,5 +1,33 @@
 # Phase C — Media pipeline — Summary
 
+**Status (session 18 — 2026-05-08)**: Closed the session-17 C7d punch list (P1 read-side bundle-aware resolution + Save-As bundle-dir refresh) and shipped **C10 embedded poster-frame thumbnails** end-to-end. 4 commits in C7-finalization + 3 commits in C10. 645 → 657 tests (+12); 637 → 657 across the full session counting the late-take live integration in Phase E (+20). Shape mirrors session-17 — pure-logic service + thin host wiring + a small UI surface per commit.
+
+- **Z1 (C7 punch list)** — Bundle-aware resolution threaded through every read path that the C7d landing missed:
+  - `CompositorPipeline.bundleMediaDirectory: URL?` with `didSet` invalidating the bug-image cache. Default resolver + cache key both go through `resolvedURL(bundleMediaDirectory:)`.
+  - `PlaybackController.bundleMediaDirectory.didSet` mirrors to the compositor — one source of truth drives both primary take and overlay resolution.
+  - `TranscodeService.canTranscode(slide:bundleMediaDirectory:)` + `TranscodeCoordinator.transcode(...bundleMediaDirectory:)` so re-transcode finds managed sources on a moved bundle.
+  - `SlideGridView` (palette thumbnails + right-click menu) and `CueInspectorView` (inline transcode-eligibility chip) both thread the bundle dir.
+  - Tests: `CompositorPipelineTests.testBundleMediaDirectoryChangeInvalidatesBugImageCache`; `TranscodeServiceTests.testCanTranscodeUsesBundleMediaDirectoryForManagedSlides`.
+
+- **Z2 (C7 punch list)** — `BundleURLObserver` (small ObservableObject) owned by `SimplePlaybackProjectDocument`, republished from the existing fileURL KVO observer alongside `lockController.evaluate`. RootView's `.onChange(of: bundleURLObserver.bundleURL)` refreshes both `playback.bundleMediaDirectory` and the C9 missing-media banner. Symmetry with how the lock controller already reacts to fileURL changes; an untitled document saved-as no longer keeps the cached `nil` until reopen.
+
+- **C10-1** — `Services/ThumbnailGenerator.swift` pure-logic. `generateJPEG(for:mediaKind:size:quality:)` produces a 320×180 JPEG (~10 KB at quality 0.75). Image branch: `NSImage(contentsOf:)` + `NSBitmapImageRep`. Video branch: `AVAssetImageGenerator` at `.zero` with `requestedTimeToleranceBefore/After = .positiveInfinity` so `.zero`-rejecting clips still yield their first frame. Tests cover JPEG magic-byte prefix, source-not-readable error, and quality-propagation sanity check (4 cases).
+
+- **C10-2** — `MediaImportContext` gains optional `thumbnailRootDirectory`; `MediaImporter.thumbnailEncoder` static-var seam writes `<dir>/<slide.id>.jpg` for every direct image/video import + every PDF/Keynote rasterized page (new `imageSlidesWithThumbnailCache` helper). Thumbnail failures silent — encoder returning nil or a write error never blocks an import. `ProjectBundleLayout.thumbnailsDirectory = "Cache/Thumbnails"`. Tests: `MediaImporterThumbnailTests` (4 cases — happy-path JPEG write, nil-directory skip, nil-encoder safe, kind passthrough).
+
+- **C10-3** — `RootView.thumbnailRootDirectory()` (bundle-relative when saved, App Support per-session for untitled — mirrors `renderRootDirectory()` shape). `SlideGridView.thumbnailCacheDirectory` parameter; `ThumbnailLoader.thumbnail(for:bundleMediaDirectory:thumbnailCacheDirectory:)` tries the live source URL first and falls back to `<dir>/<slide.id>.jpg` synchronously. Tests: `SlideGridViewThumbnailFallbackTests` (4 cases — sidecar present, missing dir, nil dir argument, async loader fallback).
+
+What's still deferred for Phase C: **C8 folder bookmarks**; **C11 filmstrip sprite-sheets** (background queue — pairs with C10 once a video-scrub UI exists); **C12–C15 audio**. **C16 Phase C summary + manual rehearsal steps** is the wrap-up; Phase C is at a natural boundary now and the next session can declare it closed before tackling C8 / C11 / audio in their own pickups.
+
+### Manual verification needed (session 18 deltas)
+
+- **Bundle for Travel cross-host** — bundle a project on machine A, copy to machine B, open. The session-17 sub-bullets still apply; session 18 additionally proves that compositor overlays render against managed assets, the palette grid lights up (live thumbnails AND offline-fallback path), and the right-click "Transcode to ProRes" stays enabled for managed video sources.
+- **Save-As of untitled** — open new document, drop a clip, Save-As to a new bundle URL. The asset-library banner should not flicker between offline / online; managed playback (after Bundle for Travel) should resolve via the new bundle's Media/ on the next take.
+- **Late-take detection** — record a show with intentionally slow video loads (large H.264 from a slow disk). The show log should accumulate `.lateTake` entries with `latency=Nms cue=…` for cues where the load exceeded 150 ms. Image cues will not log late takes (proxy limitation).
+- **C10 thumbnails offline path** — import a clip, save the project, delete the source from disk, close-and-reopen the project. Palette tile should still render the cached poster instead of the placeholder icon.
+
+---
+
 **Status (session 17 — 2026-05-08)**: **C7d Bundle for Travel landed end-to-end**. Phase C is now C1–C7 + C-banner + C9 first/second slice complete; remaining is C8 (folder bookmarks), C9 persistent banner, C10/C11 (thumbnails), C12-C15 (audio). 4 commits, 599 → 625 tests (+26). The shipped pieces:
 
 - **C7d-1** — `Services/BundleForTravelPlan.swift` pure-logic plan + apply. `plan(slides:resolve:fileSize:)` walks linked slides through the C7c resolver, classifies each as `operations` (copyable), `alreadyManagedSlideIDs` (skipped — already in `<bundle>/Media/`), or `offlineSlideIDs` (unresolvable). Filename-collision dedup via `BundleForTravelPlan.uniqueFilename(for:claimed:)` — first claimant keeps the unsuffixed name, subsequent collisions get `-1`, `-2`, … inserted before the extension. `apply(plan:to:mediaDirectoryURL:fingerprint:)` rebuilds each operation's `MediaReference` at `<mediaDirectoryURL>/<destinationFilename>`, flips `kind` to `.managed`, and refreshes the fingerprint. `ProjectBundleLayout.mediaDirectory = "Media"` per spec §3.17.
