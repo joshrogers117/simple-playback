@@ -108,6 +108,12 @@ final class ImageSequenceEncoder: ObservableObject, Identifiable {
                     completion(.success(dest))
                 }
             } catch is CancellationError {
+                // AVAssetWriter.cancelWriting() is documented to remove the destination
+                // file, but we make it defensive here too so a future writer tweak that
+                // skips the cleanup (or a partial file from a path other than the
+                // canonical cancelWriting flow) cannot accumulate orphans in
+                // `<bundle>/Transcoded/`.
+                try? FileManager.default.removeItem(at: dest)
                 await MainActor.run { [weak self] in
                     guard let self else { return }
                     self.state = .cancelled

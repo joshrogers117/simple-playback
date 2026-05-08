@@ -204,6 +204,7 @@ final class TranscodeJob: ObservableObject, Identifiable {
                 guard let self else { return }
                 self.stateObserverTask?.cancel()
                 self.stateObserverTask = nil
+                TranscodeJob.removePartialFileIfNeeded(at: dest)
                 self.state = .cancelled
                 completion(.failure(.cancelled))
             } catch {
@@ -211,6 +212,7 @@ final class TranscodeJob: ObservableObject, Identifiable {
                 self.stateObserverTask?.cancel()
                 self.stateObserverTask = nil
                 if (error as NSError).code == NSUserCancelledError {
+                    TranscodeJob.removePartialFileIfNeeded(at: dest)
                     self.state = .cancelled
                     completion(.failure(.cancelled))
                 } else {
@@ -229,6 +231,15 @@ final class TranscodeJob: ObservableObject, Identifiable {
         guard !state.isTerminal else { return }
         exportTask?.cancel()
         stateObserverTask?.cancel()
+    }
+
+    /// AVAssetExportSession does not delete its destination file on cancellation —
+    /// callers are left with a partial `.mov` that lingers in `<bundle>/Transcoded/`
+    /// until the next start re-clears the same path. Defensive removal here closes
+    /// the loop on cancel; nonisolated because we want to call it from the
+    /// off-main-actor catch path without bouncing through MainActor.
+    nonisolated static func removePartialFileIfNeeded(at url: URL) {
+        try? FileManager.default.removeItem(at: url)
     }
 }
 

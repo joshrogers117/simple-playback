@@ -200,9 +200,71 @@ final class TranscodeServiceTests: XCTestCase {
         XCTAssertEqual(job.progress, 1.0, accuracy: 0.0001)
     }
 
+    /// Cancellation must remove the partial `.mov` from disk so `<bundle>/Transcoded/`
+    /// does not accumulate orphans across cancellations. Uses a longer source (~120
+    /// frames @ 30 fps ≈ 4 s) to give the cancel time to land mid-export. If the
+    /// cancel races past the export's natural finish (small chance on a fast host),
+    /// the test still passes — we only assert cleanup in the actual cancel branch.
+    @MainActor
+    func testCancelledTranscodeRemovesPartialFile() async throws {
+        let source = try makeH264Movie(frameCount: 120)
+        defer { try? FileManager.default.removeItem(at: source) }
+
+        let dest = FileManager.default.temporaryDirectory
+            .appendingPathComponent("transcode-cancel-\(UUID().uuidString).mov")
+        defer { try? FileManager.default.removeItem(at: dest) }
+
+        let job = TranscodeJob(sourceURL: source, destinationURL: dest, preset: .proRes422, displayLabel: "Cancel synth")
+
+        let exp = expectation(description: "job terminal")
+        job.start { _ in exp.fulfill() }
+
+        // Give the export a moment to actually start writing before we cancel. Without
+        // this delay, the cancel sometimes lands while AVAssetExportSession is still
+        // setting up and the partial file is never created — making the cleanup
+        // assertion vacuous.
+        try await Task.sleep(nanoseconds: 100_000_000)
+        job.cancel()
+
+        await fulfillment(of: [exp], timeout: 60)
+
+        if case .cancelled = job.state {
+            XCTAssertFalse(
+                FileManager.default.fileExists(atPath: dest.path),
+                "Cancelled transcodes must clean up their partial .mov so <bundle>/Transcoded/ does not accumulate orphans."
+            )
+        }
+        // If state.isTerminal but not .cancelled (the cancel raced past completion),
+        // the test exits without asserting — the cleanup invariant only applies to
+        // the cancel branch.
+    }
+
+    func testRemovePartialFileIfNeededDeletesExistingFile() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("partial-\(UUID().uuidString).mov")
+        try Data([0x00, 0x01, 0x02]).write(to: url)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        TranscodeJob.removePartialFileIfNeeded(at: url)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    func testRemovePartialFileIfNeededIsSafeWhenAbsent() {
+        // Helper must be called repeatedly without crashing — the cancel path runs
+        // unconditionally, even on cancel-before-write-started where no file exists yet.
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("absent-\(UUID().uuidString).mov")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        TranscodeJob.removePartialFileIfNeeded(at: url)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
     // MARK: - H.264 movie synth
 
     private func makeTinyH264Movie() throws -> URL {
+        try makeH264Movie(frameCount: 4)
+    }
+
+    private func makeH264Movie(frameCount: Int) throws -> URL {
         let url = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("transcode-source-\(UUID().uuidString).mov")
         if FileManager.default.fileExists(atPath: url.path) {
@@ -236,7 +298,7 @@ final class TranscodeServiceTests: XCTestCase {
             throw XCTSkip("pixel buffer pool unavailable on this host — H.264 encoder missing?")
         }
 
-        for frameIndex in 0..<4 {
+        for frameIndex in 0..<frameCount {
             var pixelBuffer: CVPixelBuffer?
             CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pixelBuffer)
             guard let pixelBuffer else { continue }
