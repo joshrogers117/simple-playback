@@ -233,3 +233,46 @@ The plumbing shape: `MediaImporter.importSlides(from:)` keeps its old signature 
 - `RootView` open panel includes the Keynote UTType; `addMedia` filters `.key` URLs and presents `presentKeynoteNotInstalledAlert()` when the workspace can't resolve Keynote.
 - Entitlements: `com.apple.security.automation.apple-events` (true).
 - Info.plist: `NSAppleEventsUsageDescription` ("Simple Playback uses Apple Events to drive Keynote so it can export .key decks to PDF for slide rasterization.").
+
+---
+
+## 2026-05-08 — C2: transcode coordinator shape, sibling slide, modern AVAssetExportSession API
+
+**Decision**: ProRes transcode is a `TranscodeJob` ObservableObject (one per export) owned by a per-document `TranscodeCoordinator`. The coordinator returns a `TranscodeOutcome { sourceSlideID, preset, siblingSlide }` on success; RootView splices the sibling into `project.slides` immediately after the source. The export uses the modern async `AVAssetExportSession.export(to:as:)` + `states(updateInterval:)` AsyncSequence rather than the deprecated `exportAsynchronously`/`status`/`error` triplet. The right-click menu lives on `SlideGridView`'s `SlideTile.contextMenu`; the non-modal progress strip lives just above the existing transition controls in the palette column. Show Mode hides the menu but does not abort in-flight jobs.
+
+**Why**:
+- **Sibling not replacement** — Spec §3.10 doesn't dictate either direction, but Final Cut, DaVinci, and Premiere all add a sibling rather than replace the source on transcode. Non-destructive A/B is the operator-correct default; destructive replace would also break any existing cue references to the source slide's UUID, which is more surface to reason about than a future "Hide original" toggle.
+- **Coordinator returns Outcome, doesn't write project state** — Keeps `TranscodeCoordinator` testable in isolation. The splice into `project.slides` is RootView's job; the coordinator stays free of Document/Project knowledge and can be unit-tested without standing up an `NSDocument`.
+- **Injectable `siblingImporter`** — `TranscodeCoordinator.siblingImporter` defaults to `MediaImporter.importSlides(from:).first` so the sibling slide carries fresh `nativeFrameRate` + cleared `MediaFlags` (a successful ProRes transcode by definition removes long-GOP / VFR / 10-bit-4:2:0 flags — the operator wants to *see* that in the inspector). The injection point lets unit tests pin the sibling shape (UUID freshness, title format, mediaKind) without re-running AVFoundation on the transcoded artifact (already covered by C2a's end-to-end test).
+- **Modern async `export(to:as:)` over deprecated `exportAsynchronously`** — macOS 26 deployment target makes the modern API safe to assume; deprecation warnings on `status`/`error`/`exportAsynchronously` are real (the deprecated trio was generating compiler diagnostics). The new `states(updateInterval:)` AsyncSequence cleanly emits `.exporting(Progress)` for the UI without a `Timer` or KVO dance.
+- **Non-modal progress strip** — Spec §3.5 forbids modals while Program is non-empty; even in Edit Mode, a multi-minute transcode shouldn't gate the operator from doing other work. A strip in the palette column (where the source slide lives) keeps the progress visually paired with its source without taking screen real estate from PROGRAM/PREVIEW or the Show List.
+- **Bundle `Transcoded/` per spec §3.17 + App Support fallback** — Mirrors the C3 pattern exactly. Untitled docs land transcodes in `~/Library/Application Support/Simple Playback/Transcoded/<sessionUUID>/`; Save As migrates only the *project* JSON, leaving the transcoded files at their absolute path until a future "Bundle for Travel" action sweeps them in (same future pickup as C3 PDF renders).
+- **Show Mode hides menu, in-flight survives** — The §3.5 invariant is "no destructive shortcuts in Show Mode." Transcode is non-destructive (creates a sibling) but it does spin a CPU and write files; safest to gate the action surface in Show Mode while letting work the operator already started complete. Aborting in-flight jobs on Show-Mode toggle would surprise the operator more than letting them finish.
+
+**Alternatives considered**:
+- **Destructive replace** — Rejected: see "sibling not replacement" above. A future "Hide originals after transcode" toggle could ship if operators ask.
+- **Modal progress sheet** — Rejected: §3.5 anti-modal rule.
+- **Coordinator writes directly into a `Binding<PlayoutProject>`** — Rejected: forces `TranscodeCoordinator` to know about Document/Project, makes unit testing require a synthetic project. The Outcome-callback split keeps responsibilities clean.
+- **`exportAsynchronously` + KVO on `progress`** — Rejected: deprecated as of macOS 15; modern async API is cleaner and matches Apple's current direction.
+- **Per-clip transcode panel like Compressor** — Rejected for v1: the right-click + strip is the smaller surface that matches the operator's "I see a flag chip → I right-click → it transcodes" loop. A bulk-transcode action could come in a later iteration if operators ask.
+- **`Transcoded/` next to source file** (sidecar) — Rejected: clutters the user's filesystem; breaks venue portability.
+- **Pre-prompt before transcode** ("This will take ~N minutes; proceed?") — Rejected: operators picking the menu item already opted in; an extra modal is friction. The cancel button on the progress strip is the escape valve.
+
+**Reversibility**: easy. Revert = drop `Services/TranscodeService.swift`, `TranscodeServiceTests.swift`, `TranscodeCoordinatorTests.swift`, the `TranscodeCoordinator` `@StateObject` in RootView, the `requestTranscode`/`transcodedRootDirectory` helpers, the SlideGridView context-menu hooks + `TranscodeProgressStrip`, and the `transcodedDirectory` constant in `ProjectBundleLayout`. No persisted-state changes — sibling MediaSlides round-trip through the existing `MediaSlide` Codable shape; opening a project after revert keeps the sibling slides as ordinary video clips referencing their absolute paths.
+
+**What I'd revisit if**:
+- Operators want a per-clip transcode panel (Compressor-style) with multiple presets queued at once, batch source selection, bitrate overrides. Today the coordinator handles N-job concurrency fine but the UI surface is one-at-a-time.
+- Failures need operator feedback. Today a `TranscodeError.exportFailed` is silent (the row just disappears). Pair with the deferred "import status banner" so any media-pipeline failure (PDF parse, Keynote missing, transcode crash) surfaces consistently.
+- The `<bundle>/Transcoded/<UUID>.mov` accumulation needs GC. Sibling slides can be deleted from the palette but their on-disk file lingers; a future "Compact project" action would reconcile the directory against `project.slides`. Same gap as C3 PDF renders.
+- AVAssetExportSession on Apple Silicon hits the hardware ProRes encoder; on Intel it falls back to software. We don't currently surface that to the operator. If real rehearsal shows transcode times that surprise on Intel hosts, surface a "Software encoding — N minutes estimated" hint in the progress row.
+
+**Public API impact**:
+- `enum TranscodePreset { proRes422, proRes4444 }` (CaseIterable) — `label`, `avPresetName`, `fileExtension`, `avFileType` accessors.
+- `enum TranscodeError: LocalizedError, Equatable` — `.sourceNotReadable(URL)`, `.presetIncompatible(String)`, `.exportFailed(String)`, `.cancelled`.
+- `enum TranscodeService` — `siblingTitle(originalTitle:preset:) -> String`, `destinationFilename(preset:) -> String`, `canTranscode(slide:) -> Bool`.
+- `@MainActor final class TranscodeJob: ObservableObject, Identifiable` — `progress: Double`, `state: State` (idle/running/completed(URL)/failed(String)/cancelled), `displayLabel`, `start(completion:)`, `cancel()`.
+- `struct TranscodeOutcome { sourceSlideID: UUID; preset: TranscodePreset; siblingSlide: MediaSlide }`.
+- `@MainActor final class TranscodeCoordinator: ObservableObject` — `jobs: [TranscodeJob]`, `transcode(slide:preset:destinationDirectory:completion:) -> TranscodeJob?`, `cancelAll()`, `static var siblingImporter: (URL) -> MediaSlide?` test seam.
+- `ProjectBundleLayout.transcodedDirectory = "Transcoded"`.
+- `SlideGridView` gains `transcodeJobs`, `transcodeEnabled`, `requestTranscode`, `cancelTranscode` parameters (all defaulted so existing call sites compile).
+- `RootView.transcodedRootDirectory()` private helper; `requestTranscode(slide:preset:)` private callback that splices the sibling into `project.slides` after the source on success.

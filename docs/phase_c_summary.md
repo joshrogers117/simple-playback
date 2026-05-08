@@ -1,5 +1,7 @@
 # Phase C — Media pipeline — Summary
 
+**Status (session 9 — 2026-05-08)**: C2 shipped end-to-end (right-click ProRes 422 / 4444 transcode action with non-modal progress). 269 tests, all green (was 257 at session start; +12 from the C2a/C2b suites — C2c is UI-only and has no new test surface). 3 new commits on `development` (C2a / C2b / C2c). The C1 inspector-chip → action loop is now closed: every yellow chip the operator sees in the cue inspector points to the right-click menu that's now wired up.
+
 **Status (session 8 — 2026-05-08)**: C6 shipped end-to-end (Keynote `.key` import via AppleScript → PDF → bitmaps). 257 tests, all green (was 243 at session start; +14 from the C6a/C6b suites — C6c is UI-only and has no new test surface). 3 new commits on `development` (C6a / C6b / C6c).
 
 **Status (session 7 — 2026-05-08)**: C3 shipped end-to-end (PDF rasterize-on-import). 243 tests, all green (was 233 at session start). 3 new commits on `development` (C3a / C3b / C3c).
@@ -9,6 +11,69 @@
 Phase C is just starting. The codec inspector (C1) is the first piece because it has zero hardware dependency and unblocks B8 (10-bit YUV default once any clip is >8-bit) — the `MediaSlide.flags.tenBitYUV420` boolean is now the project-wide signal B8 will key off of.
 
 The remaining Phase C items (C2 transcode action, C3 PDF import, C4 GIF/APNG detect-and-convert, C5 image-sequence detect-and-encode, C6 Keynote import, C7+ asset library / audio / subtitles) are all autonomy-friendly with no hardware exposure — Phase C should be the workhorse phase for autonomous-build cycles.
+
+---
+
+## What shipped in session 9 (C2)
+
+### C2a — `TranscodeService` + `TranscodeJob`
+
+- **`Services/TranscodeService.swift`** — pure-logic helpers: `TranscodePreset` (`proRes422` / `proRes4444`) maps to AVFoundation preset constants (`AVAssetExportPresetAppleProRes422LPCM` / `AVAssetExportPresetAppleProRes4444LPCM`); `siblingTitle(originalTitle:preset:)` returns `"<orig> (ProRes 422)"`; `destinationFilename(preset:)` returns a UUID-keyed `<UUID>.mov` so concurrent transcodes never collide; `canTranscode(slide:)` gates the menu offer to video slides whose URL still resolves.
+- **`TranscodeJob`** — `@MainActor` `ObservableObject` wrapping `AVAssetExportSession`. Modern API only: `session.export(to:as:)` (deprecated `exportAsynchronously` avoided) + `session.states(updateInterval: 0.2)` AsyncSequence emitting `.exporting(Progress)` ticks for the progress bar. `state` is a `.idle / .running / .completed(URL) / .failed(String) / .cancelled` enum (Equatable). Cancellation routes through both `exportTask?.cancel()` and `stateObserverTask?.cancel()`; the `start` completion fires with `.cancelled` (or `.success` if the export raced past the cancel — the test pins both as valid).
+- **Errors** — `TranscodeError.sourceNotReadable(URL)` / `.presetIncompatible(String)` / `.exportFailed(String)` / `.cancelled`. Equatable so tests can assert on specific cases.
+- 8 tests cover preset → AVFoundation constant identity for both presets, sibling-title formatting, UUID-keyed filename uniqueness, the canTranscode predicate, idle-state init, the unreadable-source failure path (the export session itself rejects), and the end-to-end H.264 → ProRes 422 transcode of a synthesized AVAssetWriter movie (verifies output file lands at destination, output FourCC ∈ ProRes 422 family `apcn/apcs/apco/apch`, terminal state is `.completed(url)`, progress reaches 1.0).
+
+### C2b — `TranscodeCoordinator` + sibling-slide construction
+
+- **`TranscodeCoordinator`** — `@MainActor ObservableObject` owning `[TranscodeJob]`. The single public method, `transcode(slide:preset:destinationDirectory:completion:) -> TranscodeJob?`, builds the destination URL (`destinationDirectory/<UUID>.mov`), resolves the source via `slide.media.resolvedURL()`, kicks off the job, and on success constructs a `TranscodeOutcome` (sourceSlideID + sibling MediaSlide).
+- **Sibling slide** comes from `TranscodeCoordinator.siblingImporter(url)` (test-injectable static var; default delegates to `MediaImporter.importSlides(from: [url]).first`). The importer re-inspects the transcoded file with the existing C1 `MediaFlagsInspector` so the sibling carries fresh `nativeFrameRate` and cleared flags — a successful ProRes transcode by definition removes long-GOP/VFR/10-bit-4:2:0 from the inspector. The coordinator overwrites `sibling.title` to `"<original> (ProRes 422)"`.
+- **`ProjectBundleLayout.transcodedDirectory = "Transcoded"`** — pinned to spec §3.17 (`<bundle>/Transcoded/`). Sibling-of-`Cache/Renders` placement matches the C3/C6 precedent.
+- 4 tests cover empty initial state, the unresolvable-source defensive refusal (no job enqueued), the end-to-end H.264 → ProRes 422 → sibling-slide path (verifies sourceSlideID match, sibling title format, mediaKind = .video, nativeFrameRate threaded through the stub, fresh UUID, written file location and extension, jobs list drains on completion), and `cancelAll()` draining the jobs list (with both success and `.cancelled` accepted as valid outcomes for the race-window-friendly synthesized clip).
+
+### C2c — `SlideGridView` context menu + non-modal progress strip + RootView wiring
+
+- **`Views/SlideGridView.swift`** — `SlideTile.contextMenu` builds entries via `slideContextMenu(for:)` which inserts `Transcode to ProRes 422` / `Transcode to ProRes 4444` items when `transcodeEnabled && TranscodeService.canTranscode(slide:)`. Show Mode passes `transcodeEnabled = false`, hiding the menu but not aborting in-flight jobs.
+- **`TranscodeProgressStrip`** — non-modal strip rendered just above the existing `PaletteTransitionControls`. One `TranscodeProgressRow` per running job: `arrow.triangle.2.circlepath` icon, `displayLabel` (truncated middle), linear `ProgressView`, percent (monospaced digit), and a borderless `xmark.circle.fill` cancel button. Strip is hidden when `transcodeJobs.isEmpty`.
+- **`Views/RootView.swift`** — `@StateObject private var transcodeCoordinator = TranscodeCoordinator()`. `requestTranscode(slide:preset:)` calls the coordinator with `transcodedRootDirectory()` and on `.success(outcome)` splices the sibling slide into `project.slides` immediately after the source's index (or appends if the source was deleted mid-transcode), then auto-selects the sibling so the operator sees its inspector. `transcodedRootDirectory()` mirrors `renderRootDirectory()`: bundle-relative when `projectBundleURLProvider()` resolves, App Support fallback (`~/Library/Application Support/Simple Playback/Transcoded/<sessionUUID>/`) for untitled documents.
+- No new tests (UI surface only; the underlying behaviors are pinned by C2a/C2b).
+
+---
+
+## Tests added (session 9)
+
+| Test | What it covers |
+|---|---|
+| `TranscodeServiceTests.testProRes422PresetMapsToAVConstant` | `.proRes422` → `AVAssetExportPresetAppleProRes422LPCM`, `.mov`, `.mov` filetype. |
+| `TranscodeServiceTests.testProRes4444PresetMapsToAVConstant` | `.proRes4444` → `AVAssetExportPresetAppleProRes4444LPCM`, `.mov`, `.mov` filetype. |
+| `TranscodeServiceTests.testSiblingTitleAppendsPresetLabel` | `"<orig> (ProRes 422)"` / `"<orig> (ProRes 4444)"`. |
+| `TranscodeServiceTests.testDestinationFilenameUsesUUIDAndPresetExtension` | `<UUID>.mov`; two consecutive calls don't collide. |
+| `TranscodeServiceTests.testCanTranscodeRequiresVideoSlideWithResolvableURL` | Video + resolvable URL → true. Image → false. Missing URL → false. |
+| `TranscodeServiceTests.testJobStartsInIdle` | Fresh job: `.idle`, progress 0, not terminal, not running. |
+| `TranscodeServiceTests.testJobFailsOnUnreadableSource` | Non-existent source → `.failed` state + completion `.failure`. |
+| `TranscodeServiceTests.testJobTranscodesH264ToProRes422` | End-to-end: synthesized H.264 → ProRes 422 file at destination URL with FourCC ∈ {apcn/apcs/apco/apch}, terminal state `.completed(url)`, progress 1.0. |
+| `TranscodeCoordinatorTests.testCoordinatorStartsEmpty` | `jobs == []` on init. |
+| `TranscodeCoordinatorTests.testTranscodeFailsImmediatelyWhenSourceURLDoesNotResolve` | Defensive: unresolvable slide → no job enqueued, completion `.failure`. |
+| `TranscodeCoordinatorTests.testTranscodeProducesSiblingSlideWithExpectedShape` | End-to-end: synthesized H.264 source → sibling MediaSlide with sourceSlideID match, title `"<orig> (ProRes 422)"`, mediaKind .video, nativeFrameRate threaded, fresh UUID, written file at destination, jobs list drains. |
+| `TranscodeCoordinatorTests.testCancelAllCancelsRunningJobs` | After `cancelAll()`, jobs list drains; completion fires `.cancelled` or `.success` (race window), no leak. |
+
+Total: 269 tests, all green (was 257 at session start).
+
+---
+
+## Manual verification needed (session 9 deltas)
+
+These need human eyeballs and real operator-supplied media — autonomous tests don't drive SwiftUI context menus.
+
+1. Save a fresh project to disk. Drop in a typical H.264 .mp4 (a phone clip, a screen recording — anything that lights the yellow `Long-GOP` chip in C1's cue inspector). Right-click the slide tile in the asset library palette. Confirm `Transcode to ProRes 422` and `Transcode to ProRes 4444` items appear. Pick ProRes 422.
+2. The non-modal progress strip should appear above the palette transition controls: `<original-title> (ProRes 422)` / linear progress bar / percent / cancel ✕. The progress should advance smoothly (the modern `states(updateInterval:)` API ticks at 0.2 s).
+3. On completion, a new sibling slide titled `<original> (ProRes 422)` appears immediately after the source in the palette grid and is auto-selected. Open the cue inspector. The yellow C1 chips that fired on the H.264 source should be **gone** on the ProRes sibling (long-GOP and 10-bit-4:2:0 cleared by definition; untagged-color may persist if the source had no color tags).
+4. Browse `<project.spb>/Transcoded/` in Finder. The `<UUID>.mov` should be there. Open it in QuickTime — the file plays (basic sanity). Inspect with `mediainfo` or `ffprobe` — codec is ProRes 422 family.
+5. Right-click on a still image (.png, .jpg). Confirm no transcode menu items appear (canTranscode is false for images).
+6. Right-click on a video whose source file you've moved to the trash. Confirm no transcode menu items appear (resolvedURL → nil).
+7. Drop a long video, kick off a transcode, click ✕ on the strip row. The row disappears; no sibling slide appears. The partial output file is removed (the job clears the destination on the next start; today there's no explicit cleanup of cancelled-output files — a future cleanup pass would reconcile orphaned `Transcoded/<UUID>.mov` files against `project.slides`).
+8. Toggle to Show Mode (Cmd-Shift-L). Right-click a video. The transcode menu items should not appear.
+9. Drop into an *untitled* (unsaved) document. Right-click → transcode runs into `~/Library/Application Support/Simple Playback/Transcoded/<sessionUUID>/<UUID>.mov`. Save the project, restart, reopen — the sibling slide resolves via absolute path.
+10. Right-click on a ProRes-already source. The menu still offers ProRes 422 / 4444 (no harm; operator may want a specific variant). Inspector flag chips should be empty for the source already; doing this is wasteful but not incorrect.
 
 ---
 
@@ -210,7 +275,7 @@ These need human eyeballs — autonomous tests don't drive SwiftUI inspectors.
 
 ---
 
-## Still deferred (session 9+)
+## Still deferred (session 10+)
 
 **Phase B leftovers** (mostly hardware-bound):
 - **B6 (remaining)** — REF format-mismatch detection vs Stage frame rate. Needs a Blackmagic SDK spike against newer interfaces; possible blocker.
@@ -222,12 +287,17 @@ These need human eyeballs — autonomous tests don't drive SwiftUI inspectors.
 - **B16** — final Phase B summary + DeckLink mock layer for tests.
 
 **Phase C remaining** (autonomy-friendly):
-- **C2** — Right-click "Transcode to ProRes 422" action. Uses `AVAssetExportSession` with `.proRes422` preset. Open product question: does transcode replace the original slide or add a sibling? (Default to sibling — non-destructive, lets the operator A/B.) Needs a non-modal progress surface. Sibling folder location now has precedent: `<bundle>/Transcoded/` matching `<bundle>/Cache/Renders/` pattern.
-- **C4** — Animated GIF / APNG detect → offer convert-to-ProRes-4444. AVFoundation can't decode animated GIFs natively, so detection forces a conversion path. Decompose: "detect" first (an `animatedGIF` flag on MediaFlags? or a `MediaSlide.requiresConversion` enum?), then a separate "offer convert" UX.
-- **C5** — Image-sequence detect (`name.0001.png`) → offer encode-to-ProRes-4444 via `AVAssetWriter`. Pure import-time logic + AVAssetWriter wrapper.
+- **C4** — Animated GIF / APNG detect → offer convert-to-ProRes-4444. The "offer convert" UX now exists (the C2c right-click already includes `Transcode to ProRes 4444`); detection is the missing piece. Add an `animatedImage` flag to `MediaFlags` (extend with care — the flag is set per-image, but `MediaFlagsInspector.inspect(url:)` is currently video-only; either widen its scope or build a sibling `AnimatedImageInspector`). Detection: `CGImageSourceGetCount(url) > 1` for `.gif` / `.png` (APNG). Pair with an inspector chip whose copy points to the existing right-click action.
+- **C5** — Image-sequence detect (`name.0001.png`) → offer encode-to-ProRes-4444 via `AVAssetWriter`. Pure import-time logic + AVAssetWriter wrapper. Detection regex: `name.NNN[N].(png|jpg|tiff|exr)`. The encode path is structurally similar to `TranscodeJob` but with `AVAssetWriter` (frames in) instead of `AVAssetExportSession` (movie in) — could reuse `TranscodeProgressStrip` + `TranscodeJob` shape if we abstract over "thing that produces a `.mov` from some input."
 - **C7+** — Asset library, audio engine, subtitles, etc. Larger.
 
-**Recommended next pick**: **C2 (transcode action)** — closes the C1 inspector-chip → action loop the operator already sees. The `<bundle>/Transcoded/` layout from C3/C6 precedent makes the destination obvious. Or **C5 (image sequence)** for a smaller fully-autonomous win. C4 overlaps with C2 (both need the transcoded sibling pattern) — preferable to do C2 first so C4 can reuse the conversion plumbing.
+**Phase C plumbing follow-ups** (small, ergonomics):
+- **Import status banner** — PDF / Keynote imports today fail silently (corrupt source, denied permission). C2 inherits the same gap (`TranscodeError.exportFailed` is silent — the row just disappears). A non-modal "N items failed" banner exposing `PDFImportError` / `KeynoteImportError` / `TranscodeError` would close the loop across all three media-pipeline failure modes.
+- **Re-rasterize on Stage resize** — PDFs / Keynote decks rasterized at 1080p stay 1080p when the operator bumps the Stage to 2160p. C6's intermediate PDF stays in `Cache/Renders/<UUID>/` exactly so this can re-use the same source without re-driving Keynote.
+- **Compact project** — `<bundle>/Transcoded/<UUID>.mov` and `<bundle>/Cache/Renders/<UUID>/` accumulate when the operator deletes the corresponding MediaSlides. A future "Compact project" action would walk the bundle and remove orphans no slide resolves to.
+- **Apple-events permission diagnostic** — if the operator denied the macOS automation prompt for Keynote, every subsequent `.key` import returns 0 slides silently. Detect `errAEEventNotPermitted` (-1743) and surface "Open System Settings → Privacy & Security → Automation".
+
+**Recommended next pick**: **C4 (animated GIF / APNG detect)** — small, autonomy-friendly, builds on the existing `MediaFlags` chip pattern, and the "convert" half is already wired up via the C2c right-click. Or **C5 (image sequence)** for a slightly bigger win that introduces the `AVAssetWriter` encode path. The **import status banner** is the smallest UX-closing change and would benefit C2/C3/C6 simultaneously — strong candidate for a session that wants a tight, broadly-impactful win.
 
 ### Known gaps in the C6 Keynote import path
 
@@ -236,6 +306,15 @@ These need human eyeballs — autonomous tests don't drive SwiftUI inspectors.
 - **AppleScript export style not pinned.** Keynote occasionally exports as a single-page "handout" PDF rather than one-slide-per-page. If a real rehearsal hits this, add `with properties {export style:IndividualSlides}` to the AppleScript and pin the new shape in `testExportAppleScriptOpensSourceAndExportsToPDF`.
 - **No live-AppleScript test coverage.** Real Keynote can't run in CI — we test the routing chain via an injected exporter that synthesizes a PDF. The success of the live AppleScript exchange depends on manual rehearsal.
 - **Same `Stage resize` and `import status banner` gaps as C3** — Keynote-derived slides inherit those.
+
+### Known gaps in the C2 transcode path
+
+- **Failures are silent.** `TranscodeError.exportFailed` makes the progress strip row disappear with no UI indication of why. Pair with the deferred import-status banner so PDF / Keynote / transcode failures surface consistently.
+- **Cancelled jobs leave partial files.** Today the destination URL is cleared on the next start, but a cancelled transcode's `.mov` lingers in `<bundle>/Transcoded/` until then. A future cleanup pass on cancellation (or the "Compact project" action above) would reconcile.
+- **Inspector flag chips don't auto-route.** Operators reading the inspector see `Long-GOP — may not scrub frame-accurately.` and have to know to right-click the *asset library tile*, not the cue inspector itself, to find the action. A future affordance: a "Transcode this clip" button inline with the chip.
+- **No per-clip preset hint.** Today both ProRes 422 and ProRes 4444 are always offered. A smarter menu would highlight ProRes 4444 when the source has alpha (animated GIF/APNG, ProRes 4444 sources) and ProRes 422 otherwise.
+- **No bulk transcode.** Operators with 50 phone clips would have to right-click each one. A future "Transcode all flagged clips…" action could iterate `project.slides.filter { $0.flags.hasAnyFlag }`.
+- **No live AVFoundation verification.** End-to-end test transcodes an AVAssetWriter-synthesized H.264 source (≤4 frames, 32×32 px) to ProRes 422. Real-world variety (10-bit HEVC HDR, VFR screen captures, multi-track sources, encrypted media, sources with embedded chapters) needs human eyeballs.
 
 ### Known gaps in the C3 import path
 

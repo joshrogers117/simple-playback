@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B14 partial); Phase C in progress — C1 (codec inspector flags), C3 (PDF rasterize-on-import), and C6 (Keynote AppleScript→PDF→bitmaps) shipped end-to-end.
-- **Last commit**: C6c — RootView open panel + drop route `.key` files; Keynote-not-installed alert; Apple-events entitlement
+- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B14 partial); Phase C in progress — C1 (codec inspector flags), C2 (ProRes transcode action), C3 (PDF rasterize-on-import), and C6 (Keynote AppleScript→PDF→bitmaps) shipped end-to-end.
+- **Last commit**: C2c — RootView right-click → Transcode menu + non-modal progress strip in palette
 - **Branch**: `development`
 
 ---
@@ -62,7 +62,10 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
   - [x] C1a: `MediaFlags` model + pure-logic `MediaFlagsEvaluator` + spec-§3.10 warning copy
   - [x] C1b: `MediaFlagsInspector.inspect(url:)` populates `MediaSlide.flags` at import; `decodeIfPresent` for legacy projects
   - [x] C1c: `MediaFlagWarningChip` renders each active flag below the FPS conformance warning in `CueInspectorView`
-- [ ] C2: Right-click "Transcode to ProRes 422" action; writes to project-relative `Transcoded/`
+- [x] C2: Right-click "Transcode to ProRes 422" / "Transcode to ProRes 4444" action; writes to project-relative `Transcoded/`
+  - [x] C2a: `Services/TranscodeService.swift` — `TranscodePreset`, `TranscodeError`, `TranscodeJob` (modern AVAssetExportSession `export(to:as:)` + `states(updateInterval:)` progress)
+  - [x] C2b: `TranscodeCoordinator` (job lifecycle + sibling-slide construction via injectable `siblingImporter`); `ProjectBundleLayout.transcodedDirectory = "Transcoded"`
+  - [x] C2c: `SlideGridView` context menu + non-modal progress strip; `RootView` `transcodedRootDirectory()` (bundle vs App Support fallback) + sibling-slide splice on completion
 - [x] C3: PDF import via PDFKit → bitmap-per-page at output × 2
   - [x] C3a: `Services/PDFImporter.swift` rasterize service + 8 tests (PDFKit pure logic)
   - [x] C3b: `MediaImporter.importSlides(from:context:)` routes PDFs via `MediaImportContext` + 4 tests
