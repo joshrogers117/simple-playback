@@ -7,6 +7,9 @@ import QuartzCore
 
 final class PlaybackController: ObservableObject {
     @Published private(set) var devices: [VideoOutputDevice] = []
+    /// Latest DeckLink REF lock state, refreshed by `refreshDevices()` and on output start/stop.
+    /// Nil when the active output is not a DeckLink (preview, NDI, etc.).
+    @Published private(set) var deckLinkReferenceState: DeckLinkTransportSink.ReferenceState?
     @Published private(set) var liveSlideID: UUID?
     @Published private(set) var liveTitle: String = "Black"
     @Published private(set) var status: String = "Idle"
@@ -63,10 +66,11 @@ final class PlaybackController: ObservableObject {
     func refreshDevices() {
         let result = syncOutput {
             let devices = outputDriver.availableDevices()
-            return (devices, outputDriver.status)
+            return (devices, outputDriver.status, outputDriver.deckLinkReferenceState)
         }
         devices = result.0
         status = result.1
+        deckLinkReferenceState = result.2
     }
 
     func defaultDeviceID(current: String?) -> String? {
@@ -208,6 +212,7 @@ final class PlaybackController: ObservableObject {
         outputStartedForDevice = nil
         outputStartedForMode = nil
         activeSinkStage = nil
+        deckLinkReferenceState = nil
         isRunning = false
         status = "Output stopped"
     }
@@ -262,6 +267,7 @@ final class PlaybackController: ObservableObject {
         }
         outputStartedForDevice = deviceID
         outputStartedForMode = modeID
+        deckLinkReferenceState = outputDriver.deckLinkReferenceState
 
         // Re-arm auxiliary sinks for the new (device, mode) pair so additional transports
         // (NDI, Syphon, secondary DeckLink) start in lockstep with the primary output.

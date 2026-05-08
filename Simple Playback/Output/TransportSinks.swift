@@ -18,6 +18,42 @@ final class DeckLinkTransportSink: TransportSink {
 
     private let bridge: SPDeckLinkBridge
 
+    /// Genlock / external reference lock state from `IDeckLinkOutput::GetReferenceStatus`.
+    /// Refreshed on `start(stage:)` and on every `pollReferenceState()` call.
+    var referenceState: ReferenceState {
+        switch bridge.referenceState {
+        case .idle: return .idle
+        case .notSupported: return .notSupported
+        case .unlocked: return .unlocked
+        case .locked: return .locked
+        @unknown default: return .idle
+        }
+    }
+
+    /// Re-query REF status. Cheap; safe to call on the render thread.
+    @discardableResult
+    func pollReferenceState() -> ReferenceState {
+        _ = bridge.pollReferenceState()
+        return referenceState
+    }
+
+    enum ReferenceState: Hashable {
+        case idle
+        case notSupported
+        case unlocked
+        case locked
+
+        /// Operator-facing label for status bar / inspector chips.
+        var label: String {
+            switch self {
+            case .idle: return "Idle"
+            case .notSupported: return "Not supported"
+            case .unlocked: return "Free-run"
+            case .locked: return "Locked"
+            }
+        }
+    }
+
     init(deviceID: String, modeID: String, bridge: SPDeckLinkBridge = SPDeckLinkBridge()) {
         self.deviceID = deviceID
         self.modeID = modeID

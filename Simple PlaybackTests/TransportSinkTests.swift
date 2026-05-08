@@ -152,6 +152,28 @@ final class TransportSinkTests: XCTestCase {
         controller.unregister(sink: aux)
     }
 
+    // MARK: - DeckLink reference state
+
+    func testReferenceStateLabels() {
+        XCTAssertEqual(DeckLinkTransportSink.ReferenceState.idle.label, "Idle")
+        XCTAssertEqual(DeckLinkTransportSink.ReferenceState.notSupported.label, "Not supported")
+        XCTAssertEqual(DeckLinkTransportSink.ReferenceState.unlocked.label, "Free-run")
+        XCTAssertEqual(DeckLinkTransportSink.ReferenceState.locked.label, "Locked")
+    }
+
+    func testIdleSinkReferenceStateIsIdle() {
+        let sink = DeckLinkTransportSink(deviceID: "fake-device", modeID: "fake-mode")
+        // Sink is constructed but never started; bridge has no active output.
+        XCTAssertEqual(sink.referenceState, .idle,
+                       "Without an active output, REF state must be reported as idle (not silently 'locked').")
+    }
+
+    func testPreviewDriverHasNoDeckLinkReferenceState() {
+        let driver = PreviewVideoOutputDriver()
+        XCTAssertNil(driver.deckLinkReferenceState,
+                     "Software preview is not a DeckLink — REF state must be nil.")
+    }
+
     func testUnregisteringSinkStopsItEvenWithoutOutput() throws {
         let controller = PlaybackController()
         let aux = MockTransportSink(sinkID: "aux")

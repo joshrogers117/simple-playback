@@ -84,6 +84,15 @@ protocol VideoOutputDriver: AnyObject {
     func stop()
     func submitVideoFrame(_ data: Data, width: Int, height: Int, rowBytes: Int) throws
     func submitAudioPCM16(_ data: Data, sampleFrameCount: Int) throws
+
+    /// Latest DeckLink REF / genlock lock state, when this driver wraps a DeckLink output.
+    /// Returns `nil` for software-only drivers (preview, future Syphon, NDI). Re-queries the
+    /// underlying transport on every read so callers can pull at status-tick cadence.
+    var deckLinkReferenceState: DeckLinkTransportSink.ReferenceState? { get }
+}
+
+extension VideoOutputDriver {
+    var deckLinkReferenceState: DeckLinkTransportSink.ReferenceState? { nil }
 }
 
 enum VideoOutputError: LocalizedError {
@@ -139,6 +148,10 @@ final class CompositeVideoOutputDriver: VideoOutputDriver {
 
     func submitAudioPCM16(_ data: Data, sampleFrameCount: Int) throws {
         try activeDriver?.submitAudioPCM16(data, sampleFrameCount: sampleFrameCount)
+    }
+
+    var deckLinkReferenceState: DeckLinkTransportSink.ReferenceState? {
+        activeDriver?.deckLinkReferenceState
     }
 }
 
@@ -266,5 +279,10 @@ final class DeckLinkVideoOutputDriver: VideoOutputDriver {
             lastSinkStatus = activeSink.status
             throw error
         }
+    }
+
+    var deckLinkReferenceState: DeckLinkTransportSink.ReferenceState? {
+        guard let activeSink, activeSink.isRunning else { return nil }
+        return activeSink.pollReferenceState()
     }
 }

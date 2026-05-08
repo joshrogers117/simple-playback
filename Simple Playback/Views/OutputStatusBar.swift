@@ -12,10 +12,51 @@ struct OutputStatusBar: View {
                 .lineLimit(1)
                 .foregroundStyle(.secondary)
             Spacer()
+            if let refState = playback.deckLinkReferenceState {
+                referenceStatusChip(refState)
+            }
         }
         .font(.callout)
         .padding(14)
         .background(.bar)
+    }
+
+    @ViewBuilder
+    private func referenceStatusChip(_ state: DeckLinkTransportSink.ReferenceState) -> some View {
+        let palette = referencePalette(state)
+        HStack(spacing: 4) {
+            Image(systemName: palette.icon).font(.caption2)
+            Text("REF: \(state.label)").font(.caption.weight(.semibold))
+        }
+        .foregroundStyle(palette.foreground)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            Capsule().fill(palette.background)
+        )
+        .help(referenceTooltip(state))
+    }
+
+    private func referencePalette(_ state: DeckLinkTransportSink.ReferenceState) -> (foreground: Color, background: Color, icon: String) {
+        switch state {
+        case .locked: return (.green, Color.green.opacity(0.15), "checkmark.circle.fill")
+        case .unlocked: return (.orange, Color.orange.opacity(0.18), "exclamationmark.triangle.fill")
+        case .notSupported: return (.secondary, Color.secondary.opacity(0.12), "minus.circle")
+        case .idle: return (.secondary, Color.secondary.opacity(0.12), "circle")
+        }
+    }
+
+    private func referenceTooltip(_ state: DeckLinkTransportSink.ReferenceState) -> String {
+        switch state {
+        case .locked:
+            return "External reference locked. Output is genlocked."
+        case .unlocked:
+            return "External reference present but not locked. Output is free-running — confirm REF input is correct."
+        case .notSupported:
+            return "This DeckLink hardware does not provide an external reference input."
+        case .idle:
+            return "Reference status will appear when DeckLink output is running."
+        }
     }
 }
 

@@ -11,6 +11,7 @@ static constexpr uint32_t SPDeckLinkBufferedFrameTarget = 3;
 
 @interface SPDeckLinkBridge ()
 @property (nonatomic, readwrite, copy) NSString *runtimeStatus;
+@property (nonatomic, readwrite) SPDeckLinkReferenceState referenceState;
 - (void)scheduledFrameCompletedWithResult:(BMDOutputFrameCompletionResult)result;
 - (void)scheduledPlaybackStopped;
 @end
@@ -97,8 +98,33 @@ private:
     self = [super init];
     if (self) {
         _runtimeStatus = @"DeckLink runtime not loaded";
+        _referenceState = SPDeckLinkReferenceStateIdle;
     }
     return self;
+}
+
+- (SPDeckLinkReferenceState)pollReferenceState {
+    if (!_output) {
+        _referenceState = SPDeckLinkReferenceStateIdle;
+        return _referenceState;
+    }
+    BMDReferenceStatus status = 0;
+    HRESULT result = _output->GetReferenceStatus(&status);
+    if (result != SPBMD_OK) {
+        // The 15.3.1 interface returns S_OK on most cards even when the bit set is empty;
+        // treat any failure as "Unsupported" so the operator sees the no-genlock path
+        // explicitly rather than silent free-run.
+        _referenceState = SPDeckLinkReferenceStateNotSupported;
+        return _referenceState;
+    }
+    if (status & bmdReferenceNotSupportedByHardware) {
+        _referenceState = SPDeckLinkReferenceStateNotSupported;
+    } else if (status & bmdReferenceLocked) {
+        _referenceState = SPDeckLinkReferenceStateLocked;
+    } else {
+        _referenceState = SPDeckLinkReferenceStateUnlocked;
+    }
+    return _referenceState;
 }
 
 - (void)dealloc {
@@ -244,6 +270,7 @@ private:
     _activeDeviceIdentifier = [deviceIdentifier copy];
     _activeModeIdentifier = [modeIdentifier copy];
     self.runtimeStatus = @"DeckLink scheduled output enabled";
+    [self pollReferenceState];
     return YES;
 }
 
@@ -468,6 +495,7 @@ private:
     _scheduledPlaybackStarted = NO;
     _activeDeviceIdentifier = nil;
     _activeModeIdentifier = nil;
+    _referenceState = SPDeckLinkReferenceStateIdle;
 }
 
 - (IDeckLinkMutableVideoFrame *)reusableVideoFrameWithWidth:(NSInteger)width
