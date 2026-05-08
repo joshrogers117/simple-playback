@@ -70,6 +70,7 @@
 		9525CC03694D231B2D50683E /* SimplePlaybackDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29F9DCDACFB1E27A47F7D0DE /* SimplePlaybackDocument.swift */; };
 		9693BB1ACC35C9F34674A4A2 /* Timecode.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0BC03657660E157633D31C6 /* Timecode.swift */; };
 		976DD722059E40449CB77621 /* ShowControlActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CD51FEB5E50862496E8A6BA /* ShowControlActions.swift */; };
+		9877245F6768C2BD0B636B31 /* ShowLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5337B42A540319366F02D3 /* ShowLog.swift */; };
 		9F685F50F961D73764497CED /* TransportSinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24668879F6BB6C3E4ED2C3F5 /* TransportSinkTests.swift */; };
 		A0C4E2AC793B8B206E6F7128 /* PreShowCheckFixHandlersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F69D8058E585303C53CD3E3F /* PreShowCheckFixHandlersTests.swift */; };
 		A34CA8E22BA04CC530DD0597 /* LTCReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 934A545F270968E04F027F8B /* LTCReader.swift */; };
@@ -80,6 +81,7 @@
 		AC4ED3FB70B05A49DBA8AA3A /* StageScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9305D229FBA3B8EC6854577 /* StageScreen.swift */; };
 		AD31546ACCAED84FF1D140D4 /* HTTPRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189C4C83922BF987A389D797 /* HTTPRequest.swift */; };
 		B0198B8CBF5D9D7897AFAF9F /* PendingFolderImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6084981086D7D70B8E87C69E /* PendingFolderImportTests.swift */; };
+		B36D00350C08A8A28FF15181 /* ShowLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB5E45F95D97440E499B624D /* ShowLogTests.swift */; };
 		B69CE1461F740680651EFC39 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F1E1F27FCEA1C60E3C601307 /* AppIcon.icon */; };
 		BFE5FEA90AEA11BD597BEC0C /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EB3CFD9074943CC8F73C637C /* AVFoundation.framework */; };
 		C02D1DDF70B419255097C42E /* InspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC0B853C12B46AB64798C9D /* InspectorView.swift */; };
@@ -201,6 +203,7 @@
 		A66F04C7C7C26DBC9EA69F81 /* Simple PlaybackTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Simple PlaybackTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA2109CBF6D66866EB07681F /* InternalTimecodeGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InternalTimecodeGenerator.swift; sourceTree = "<group>"; };
 		AB44C4BE122979080B759770 /* AnimatedImageInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedImageInspector.swift; sourceTree = "<group>"; };
+		AE5337B42A540319366F02D3 /* ShowLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowLog.swift; sourceTree = "<group>"; };
 		AFB3106A106C37E4EE56BC7E /* MTCReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MTCReader.swift; sourceTree = "<group>"; };
 		B133348CF010D337CDA988A0 /* ImportStatusBannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportStatusBannerTests.swift; sourceTree = "<group>"; };
 		B328F432BC7CCB991A9A8373 /* MediaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporter.swift; sourceTree = "<group>"; };
@@ -210,6 +213,7 @@
 		B9392E6B9D0468959B74A1F9 /* TransportSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportSink.swift; sourceTree = "<group>"; };
 		BAB740EFC960FD945A655941 /* SimplePlaybackProjectDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackProjectDocument.swift; sourceTree = "<group>"; };
 		BAB7AC40249EC7B2A4951E24 /* AddFolderImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddFolderImportSheet.swift; sourceTree = "<group>"; };
+		BB5E45F95D97440E499B624D /* ShowLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowLogTests.swift; sourceTree = "<group>"; };
 		BB90370BA34D673675815F69 /* TranscodeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscodeService.swift; sourceTree = "<group>"; };
 		BBBA363D1C04A7119011031E /* OSCServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCServer.swift; sourceTree = "<group>"; };
 		BD3490C4BA5C4A09BDBF9415 /* MediaFlagsInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlagsInspector.swift; sourceTree = "<group>"; };
@@ -350,6 +354,7 @@
 				D930FD6914035D4FEAC331A2 /* PreShowCheckTests.swift */,
 				0E47E51BD45087956CCF2905 /* ShowControlIntegrationTests.swift */,
 				237C1358E779CC8F8EBA839E /* ShowControlTests.swift */,
+				BB5E45F95D97440E499B624D /* ShowLogTests.swift */,
 				633EE3FAB29225F6222E52AB /* TranscodeCoordinatorTests.swift */,
 				9A70EA9D270E7268A7C74D62 /* TranscodeServiceTests.swift */,
 				24668879F6BB6C3E4ED2C3F5 /* TransportSinkTests.swift */,
@@ -459,6 +464,7 @@
 				5B45DD8149F1F904849FDFC2 /* PreShowCheck.swift */,
 				0781CD54E510EE56EFE80A9D /* PreShowCheckAdapters.swift */,
 				0C5CF912A93B1EB5CA657689 /* PreShowCheckFixHandlers.swift */,
+				AE5337B42A540319366F02D3 /* ShowLog.swift */,
 				BB90370BA34D673675815F69 /* TranscodeService.swift */,
 			);
 			path = Services;
@@ -614,6 +620,7 @@
 				F52CA35701C089E08D0BFDCB /* ShowControlState.swift in Sources */,
 				2E94C7044EE3CF2C00F39C69 /* ShowController.swift in Sources */,
 				A73C56A196D7FCFABC2C00F2 /* ShowListView.swift in Sources */,
+				9877245F6768C2BD0B636B31 /* ShowLog.swift in Sources */,
 				67765CD777AA4E30553D4126 /* SimplePlaybackApp.swift in Sources */,
 				9525CC03694D231B2D50683E /* SimplePlaybackDocument.swift in Sources */,
 				51CA5DA530C6B560FA1A7989 /* SimplePlaybackProjectDocument.swift in Sources */,
@@ -658,6 +665,7 @@
 				E7E0BCCC5F1B98DD0A582010 /* PreShowCheckTests.swift in Sources */,
 				851AE7644559671FB09FD2BD /* ShowControlIntegrationTests.swift in Sources */,
 				00EC3572563AA2E459F2489F /* ShowControlTests.swift in Sources */,
+				B36D00350C08A8A28FF15181 /* ShowLogTests.swift in Sources */,
 				66B172846E254E8FCC806D8B /* TranscodeCoordinatorTests.swift in Sources */,
 				4552EA56AF59686AE3373E66 /* TranscodeServiceTests.swift in Sources */,
 				9F685F50F961D73764497CED /* TransportSinkTests.swift in Sources */,
