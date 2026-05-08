@@ -128,10 +128,17 @@ final class PlaybackController: ObservableObject {
         return device.modes
     }
 
+    /// C7d — current project bundle's `<bundle>/Media/` URL, when one exists.
+    /// Drives bundle-aware resolution for `.managed` references so a moved
+    /// `.splayback` plays its bundled media even when the absolute path
+    /// recorded at apply time is stale on the new host. RootView updates this
+    /// on document open / file-URL change. `nil` for untitled documents.
+    var bundleMediaDirectory: URL?
+
     func take(slide: MediaSlide, deviceID: String?, modeID: String?, transitionSettings: PlayoutTransitionSettings) {
         cancelPendingVideoPreparation()
 
-        guard let url = slide.media.resolvedURL() else {
+        guard let url = slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) else {
             status = "Missing media: \(slide.title)"
             return
         }

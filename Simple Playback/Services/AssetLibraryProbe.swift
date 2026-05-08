@@ -53,9 +53,24 @@ enum AssetLibraryProbe {
     /// path inside `MediaReference.resolvedURL()` and verifies the resolved URL
     /// actually points at a real file (the bookmark branch returns a URL even for
     /// missing files because the security-scoped bookmark resolution doesn't stat).
+    /// Bundle-unaware — for managed-asset bundle portability the host injects a
+    /// closure that calls `resolvedURL(bundleMediaDirectory:)`.
     static let liveIsOnline: (MediaSlide) -> Bool = { slide in
         guard let url = slide.media.resolvedURL() else { return false }
         return FileManager.default.fileExists(atPath: url.path)
+    }
+
+    /// Returns a bundle-aware online-check closure for the given media-directory
+    /// URL. Used by RootView to make the pre-show check correctly classify
+    /// managed assets as online when the project bundle has been moved between
+    /// machines (the absolute path is stale but the bundle Media/ has the file).
+    static func makeIsOnline(bundleMediaDirectory: URL?) -> (MediaSlide) -> Bool {
+        { slide in
+            guard let url = slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) else {
+                return false
+            }
+            return FileManager.default.fileExists(atPath: url.path)
+        }
     }
 
     /// Default URL resolver used by the live probe — just `media.resolvedURL()`.
@@ -63,6 +78,15 @@ enum AssetLibraryProbe {
     /// standing up real files at the slide's path.
     static let liveResolveURL: (MediaSlide) -> URL? = { slide in
         slide.media.resolvedURL()
+    }
+
+    /// Bundle-aware companion to `makeIsOnline`. The pre-show stale-check needs
+    /// the same URL the online-check used, so RootView passes both closures
+    /// keyed off the same bundle media directory.
+    static func makeResolveURL(bundleMediaDirectory: URL?) -> (MediaSlide) -> URL? {
+        { slide in
+            slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory)
+        }
     }
 
     /// Default current-metadata reader. Returns nil on stat failure; callers

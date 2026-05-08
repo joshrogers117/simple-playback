@@ -365,6 +365,54 @@ final class MediaResolverTests: XCTestCase {
 
     // MARK: - Live integration (real file)
 
+    // MARK: - MediaReference.resolvedURL(bundleMediaDirectory:)
+
+    func testManagedReferenceResolvedURLPrefersBundleMediaWhenFileExists() throws {
+        // Real filesystem so we exercise the FileManager.fileExists check.
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BundleAware-\(UUID().uuidString)", isDirectory: true)
+        let mediaDir = tmp.appendingPathComponent("Media", isDirectory: true)
+        try FileManager.default.createDirectory(at: mediaDir, withIntermediateDirectories: true)
+        let fileURL = mediaDir.appendingPathComponent("intro.mov")
+        try Data("x".utf8).write(to: fileURL)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        var ref = MediaReference(url: URL(fileURLWithPath: "/Old/Bundle/Media/intro.mov"))
+        ref.kind = .managed
+        ref.bookmarkData = nil
+
+        XCTAssertEqual(
+            ref.resolvedURL(bundleMediaDirectory: mediaDir)?.standardizedFileURL,
+            fileURL.standardizedFileURL
+        )
+    }
+
+    func testLinkedReferenceResolvedURLIgnoresBundleMediaDirectory() throws {
+        // Put a file at <mediaDir>/intro.mov, but the linked reference's
+        // original path is "/nowhere/intro.mov" with no bookmark. If the
+        // bundle-Media short-circuit erroneously fired for linked references
+        // it would return the bundle file; correct behavior is nil because
+        // the linked file genuinely doesn't exist.
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BundleAware-\(UUID().uuidString)", isDirectory: true)
+        let mediaDir = tmp.appendingPathComponent("Media", isDirectory: true)
+        try FileManager.default.createDirectory(at: mediaDir, withIntermediateDirectories: true)
+        let bundleFile = mediaDir.appendingPathComponent("intro.mov")
+        try Data("inside-bundle".utf8).write(to: bundleFile)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        var ref = MediaReference(url: URL(fileURLWithPath: "/nowhere/intro.mov"))
+        ref.kind = .linked
+        ref.bookmarkData = nil
+
+        XCTAssertNil(
+            ref.resolvedURL(bundleMediaDirectory: mediaDir),
+            "Linked reference must not silently substitute a same-name file from the bundle Media/ directory."
+        )
+    }
+
+    // MARK: - Live integration (real file)
+
     func testResolvesAtOriginalLocationOnRealFilesystem() throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("MediaResolverTests-\(UUID().uuidString).bin")

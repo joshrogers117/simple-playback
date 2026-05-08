@@ -100,6 +100,29 @@ struct MediaReference: Codable, Hashable {
     }
 
     func resolvedURL() -> URL? {
+        resolvedURL(bundleMediaDirectory: nil)
+    }
+
+    /// Bundle-aware resolution for `.managed` references. When the caller
+    /// supplies the active project's `<bundle>/Media/` URL, a managed asset
+    /// short-circuits to `<bundleMediaDirectory>/<basename of originalPath>`
+    /// before consulting the bookmark / absolute path. This is what lets a
+    /// `.splayback` bundle moved to a new machine still play managed media:
+    /// the absolute path recorded at C7d apply time is wrong on the new host,
+    /// and the security-scoped bookmark is also stale, but the file IS in the
+    /// bundle's Media/ at a host-relative location.
+    ///
+    /// `.linked` references ignore the bundleMediaDirectory hint — there is
+    /// no contract that a linked file ever lives inside a bundle.
+    func resolvedURL(bundleMediaDirectory: URL?) -> URL? {
+        if kind == .managed, let bundleMediaDirectory {
+            let candidate = bundleMediaDirectory
+                .appendingPathComponent(URL(fileURLWithPath: originalPath).lastPathComponent)
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+        }
+
         if let bookmarkData {
             var stale = false
             if let url = try? URL(

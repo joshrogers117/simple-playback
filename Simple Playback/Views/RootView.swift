@@ -201,6 +201,7 @@ struct RootView: View {
             ensureProjectHasShowList()
             configureShowController()
             lockController.evaluate(bundleURL: projectBundleURLProvider())
+            playback.bundleMediaDirectory = bundleMediaDirectory()
         }
         .onChange(of: playback.devices) {
             applyOutputDefaults()
@@ -593,8 +594,24 @@ struct RootView: View {
         ctx.audioDeviceAvailable = AudioDeviceProbe.isDefaultOutputDeviceAvailable()
         ctx.renderPathWarmed = playback.hasRenderedAnyFrame
         ctx.systemPreventsIdleSleep = energyAssertion.isHeld
-        ctx.assetLibraryStatus = AssetLibraryProbe.evaluate(slides: document.project.slides)
+        let mediaDir = bundleMediaDirectory()
+        ctx.assetLibraryStatus = AssetLibraryProbe.evaluate(
+            slides: document.project.slides,
+            isOnline: AssetLibraryProbe.makeIsOnline(bundleMediaDirectory: mediaDir),
+            resolveURL: AssetLibraryProbe.makeResolveURL(bundleMediaDirectory: mediaDir)
+        )
         return ctx
+    }
+
+    /// C7d — current project bundle's `<bundle>/Media/` URL, when one exists.
+    /// Used by the playback hot path and the pre-show check to make managed
+    /// references resolve correctly even when the bundle has been moved
+    /// between machines (stale absolute path / bookmark).
+    private func bundleMediaDirectory() -> URL? {
+        projectBundleURLProvider()?.appendingPathComponent(
+            ProjectBundleLayout.mediaDirectory,
+            isDirectory: true
+        )
     }
 
     /// Build the per-row fix-action handler dictionary the Pre-Show sheet uses.
