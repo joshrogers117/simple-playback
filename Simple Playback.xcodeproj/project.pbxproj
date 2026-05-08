@@ -10,6 +10,7 @@
 		00EC3572563AA2E459F2489F /* ShowControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237C1358E779CC8F8EBA839E /* ShowControlTests.swift */; };
 		020E6C3D173AD7E05AC7A15A /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213CB5AEDC97C0942C10558F /* RootView.swift */; };
 		02E7848C2C617A208282F42A /* OSCMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 473B7534956D23833D7E61BD /* OSCMessage.swift */; };
+		11F48F224E2E07F3A2CD4894 /* BonjourPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACFD5B151F32CFDFFECCB68 /* BonjourPublisher.swift */; };
 		154CB32BBDF7469F91B49587 /* MediaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569A548ECCAC07CC9E9B92D2 /* MediaModels.swift */; };
 		1624805A1FF72880895DDB5A /* OutputStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27589625C8FC5B053A3F725C /* OutputStatusBar.swift */; };
 		28C1335FD15B6AE87DD31AB3 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A5E1B676CDA189E4C8C26CB /* PlaybackController.swift */; };
@@ -66,6 +67,7 @@
 /* Begin PBXFileReference section */
 		00712F270D3EB78020694E87 /* OSCAddressMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCAddressMap.swift; sourceTree = "<group>"; };
 		01C17ADD674250609276D8A4 /* HTTPRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRoutes.swift; sourceTree = "<group>"; };
+		0ACFD5B151F32CFDFFECCB68 /* BonjourPublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BonjourPublisher.swift; sourceTree = "<group>"; };
 		0BC0B853C12B46AB64798C9D /* InspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorView.swift; sourceTree = "<group>"; };
 		189C4C83922BF987A389D797 /* HTTPRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRequest.swift; sourceTree = "<group>"; };
 		206A8DDCD4F82FF85D3587EC /* SubscriptionRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionRegistry.swift; sourceTree = "<group>"; };
@@ -261,6 +263,7 @@
 			isa = PBXGroup;
 			children = (
 				DBA2A137EBDAA8855CAA24A2 /* AuthTokenStore.swift */,
+				0ACFD5B151F32CFDFFECCB68 /* BonjourPublisher.swift */,
 				189C4C83922BF987A389D797 /* HTTPRequest.swift */,
 				01C17ADD674250609276D8A4 /* HTTPRoutes.swift */,
 				7B4EF3D125520DB5F0C1F703 /* HTTPServer.swift */,
@@ -383,6 +386,7 @@
 			files = (
 				62CDF088556B0DAA473AC800 /* AudioPump.swift in Sources */,
 				44E0E08A26F3691D8E7A2C44 /* AuthTokenStore.swift in Sources */,
+				11F48F224E2E07F3A2CD4894 /* BonjourPublisher.swift in Sources */,
 				5B7913C72F3E6AF0B894DE59 /* CueRuntime.swift in Sources */,
 				C9842DF5C4DF8FAA50B74011 /* DeckLinkBridge.mm in Sources */,
 				4A94C48FF22B0552314D441E /* DeckLinkDiagnostics.swift in Sources */,

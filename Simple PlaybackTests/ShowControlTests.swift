@@ -339,4 +339,14 @@ final class ShowControlTests: XCTestCase {
         let str = try XCTUnwrap(String(data: result.body, encoding: .utf8))
         XCTAssertTrue(str.contains("\"VALUE\""))
     }
+
+    // MARK: - Bonjour (D5)
+
+    func testBonjourConfigurationDefaults() {
+        let pub = BonjourPublisher()
+        XCTAssertEqual(pub.configuration.serviceName, "Simple Playback")
+        XCTAssertEqual(pub.configuration.oscUDPPort, 53000)
+        XCTAssertEqual(pub.configuration.httpPort, 53001)
+        XCTAssertFalse(pub.isRunning)
+    }
 }
