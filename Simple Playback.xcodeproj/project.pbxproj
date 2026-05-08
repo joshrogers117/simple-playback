@@ -19,11 +19,13 @@
 		0F6668050A5A92F167EDBDE6 /* AssetFingerprinter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A836746B1484C724C362CAE /* AssetFingerprinter.swift */; };
 		11107495CED0238B67C8D7AC /* ShowControlStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6023F5FCD12A96AE5EAD4313 /* ShowControlStack.swift */; };
 		11F48F224E2E07F3A2CD4894 /* BonjourPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACFD5B151F32CFDFFECCB68 /* BonjourPublisher.swift */; };
+		1347EF040A9255D95C7A5C1A /* BundleForTravelPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 959E8FA27281A1515AEF705C /* BundleForTravelPlan.swift */; };
 		154CB32BBDF7469F91B49587 /* MediaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569A548ECCAC07CC9E9B92D2 /* MediaModels.swift */; };
 		1624805A1FF72880895DDB5A /* OutputStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27589625C8FC5B053A3F725C /* OutputStatusBar.swift */; };
 		1B0E8B82E949A483E4B42B8A /* MediaFlagsInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD3490C4BA5C4A09BDBF9415 /* MediaFlagsInspector.swift */; };
 		1B306FF235F130F47D674A1E /* ShowControllerDroppedFrameLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584B35FFA22C0473DD0D81CB /* ShowControllerDroppedFrameLogTests.swift */; };
 		1D2DA3CD426E79C87480A852 /* AutosaveCheckpointerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0336D644737BA64EE43F017 /* AutosaveCheckpointerTests.swift */; };
+		1EC3502B7A2008F401A9D081 /* BundleForTravelPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBA2DABFD5EE282A4CC471FC /* BundleForTravelPlanTests.swift */; };
 		1FA47C61D92B5CF6AFD91783 /* LTCDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AAABB8C041A4E6DF8BE8685 /* LTCDecoder.swift */; };
 		27C597830A79418BECCDFEC6 /* ShowControlHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474A0C6ABB641B1CA5416495 /* ShowControlHub.swift */; };
 		2802ED3F9310BC405ED40764 /* AnimatedImageInspectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F13F77220235167A2E3CF142 /* AnimatedImageInspectorTests.swift */; };
@@ -240,6 +242,7 @@
 		93727D6450DEE3ED3934DA97 /* WebSocketFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketFrame.swift; sourceTree = "<group>"; };
 		94369DD345B9DD7E2DEC1F0E /* ProjectLockFileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectLockFileTests.swift; sourceTree = "<group>"; };
 		95005D52A657E2A60F9E2008 /* PreShowCheckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreShowCheckView.swift; sourceTree = "<group>"; };
+		959E8FA27281A1515AEF705C /* BundleForTravelPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleForTravelPlan.swift; sourceTree = "<group>"; };
 		95B1D23335E9E0BF80F8D959 /* CrashRecoveryBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashRecoveryBannerView.swift; sourceTree = "<group>"; };
 		96F3960B5C5F817DFB3377D4 /* OSCQueryServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCQueryServer.swift; sourceTree = "<group>"; };
 		9A70EA9D270E7268A7C74D62 /* TranscodeServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscodeServiceTests.swift; sourceTree = "<group>"; };
@@ -269,6 +272,7 @@
 		BAB7AC40249EC7B2A4951E24 /* AddFolderImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddFolderImportSheet.swift; sourceTree = "<group>"; };
 		BB5E45F95D97440E499B624D /* ShowLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowLogTests.swift; sourceTree = "<group>"; };
 		BB90370BA34D673675815F69 /* TranscodeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscodeService.swift; sourceTree = "<group>"; };
+		BBA2DABFD5EE282A4CC471FC /* BundleForTravelPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleForTravelPlanTests.swift; sourceTree = "<group>"; };
 		BBBA363D1C04A7119011031E /* OSCServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCServer.swift; sourceTree = "<group>"; };
 		BD3490C4BA5C4A09BDBF9415 /* MediaFlagsInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlagsInspector.swift; sourceTree = "<group>"; };
 		C0BC03657660E157633D31C6 /* Timecode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timecode.swift; sourceTree = "<group>"; };
@@ -404,6 +408,7 @@
 				F992212CAFFC42953E99C15B /* AssetRelinkPlanTests.swift */,
 				6BF01B25D49F0D899EA2AE22 /* AudioDeviceProbeTests.swift */,
 				F0336D644737BA64EE43F017 /* AutosaveCheckpointerTests.swift */,
+				BBA2DABFD5EE282A4CC471FC /* BundleForTravelPlanTests.swift */,
 				21271656A4CCF6A5AD4E2940 /* CompositorPipelineTests.swift */,
 				202509882DEF106561761E6D /* CrashRecoveryControllerTests.swift */,
 				28F1823003EC72E1D46610F5 /* CrashRecoveryDetectorTests.swift */,
@@ -541,6 +546,7 @@
 				A48741BAA260FA2E3B3E93ED /* AssetRelinkPlan.swift */,
 				9FC38AB74DB5321128E72E79 /* AudioDeviceProbe.swift */,
 				18F5B52C774E8E6CC0899D9C /* AutosaveCheckpointer.swift */,
+				959E8FA27281A1515AEF705C /* BundleForTravelPlan.swift */,
 				0D46390F473701690C95CF1E /* CrashRecoveryDetector.swift */,
 				A4758CF8E9891007D793354E /* DroppedFrameCounter.swift */,
 				32E04427E697B0F4238C1C4C /* EnergyAssertion.swift */,
@@ -669,6 +675,7 @@
 				44E0E08A26F3691D8E7A2C44 /* AuthTokenStore.swift in Sources */,
 				02967ABCE0AAFA316D52DA49 /* AutosaveCheckpointer.swift in Sources */,
 				11F48F224E2E07F3A2CD4894 /* BonjourPublisher.swift in Sources */,
+				1347EF040A9255D95C7A5C1A /* BundleForTravelPlan.swift in Sources */,
 				EDB3E5ED1721A22A5B31024C /* CompositorLayers.swift in Sources */,
 				60D24C84B7A425B9412B95C9 /* CompositorPipeline.swift in Sources */,
 				C304C03B3716404CB35470F4 /* CrashRecoveryBannerView.swift in Sources */,
@@ -756,6 +763,7 @@
 				DCEF69E2DA847BEBC9534552 /* AssetRelinkPlanTests.swift in Sources */,
 				458E7CD285F738A458DE28C1 /* AudioDeviceProbeTests.swift in Sources */,
 				1D2DA3CD426E79C87480A852 /* AutosaveCheckpointerTests.swift in Sources */,
+				1EC3502B7A2008F401A9D081 /* BundleForTravelPlanTests.swift in Sources */,
 				DCABF0FFCC0E6E0596173F64 /* CompositorPipelineTests.swift in Sources */,
 				CA516B0F7DE435ECB02646C6 /* CrashRecoveryControllerTests.swift in Sources */,
 				A495088FE7143EE70B129749 /* CrashRecoveryDetectorTests.swift in Sources */,

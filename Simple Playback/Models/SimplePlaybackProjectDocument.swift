@@ -15,6 +15,12 @@ enum ProjectBundleLayout {
     /// transcode writes one `<UUID>.mov` per transcode under this path, sibling to the
     /// original slide in the asset library.
     static let transcodedDirectory = "Transcoded"
+
+    /// Per-spec §3.17, "only present in Bundle for Travel mode". C7d copies linked
+    /// media into this directory and rewrites `MediaReference.kind` to `.managed` so
+    /// the bundle is venue-portable. The MediaResolver short-circuits to this folder
+    /// before falling through to the on-disk original path for managed assets.
+    static let mediaDirectory = "Media"
 }
 
 final class SimplePlaybackProjectDocument: NSDocument {
