@@ -9,7 +9,7 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 ## Current state
 
 - **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B14 partial); Phase C started — C1a shipped (codec inspector pure-logic flags + evaluator).
-- **Last commit**: C1b — AVFoundation adapter populates `MediaSlide.flags` at import
+- **Last commit**: C1c — flag chips visible in `CueInspectorView` below the FPS warning
 - **Branch**: `development`
 
 ---
@@ -58,10 +58,10 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Phase C — Media pipeline
 
-- [~] C1: Codec inspector — long-GOP / VFR / 10-bit 4:2:0 / untagged color flags
+- [x] C1: Codec inspector — long-GOP / VFR / 10-bit 4:2:0 / untagged color flags
   - [x] C1a: `MediaFlags` model + pure-logic `MediaFlagsEvaluator` + spec-§3.10 warning copy
   - [x] C1b: `MediaFlagsInspector.inspect(url:)` populates `MediaSlide.flags` at import; `decodeIfPresent` for legacy projects
-  - [ ] C1c: Surface flag chips in `CueInspectorView` below the FPS conformance warning
+  - [x] C1c: `MediaFlagWarningChip` renders each active flag below the FPS conformance warning in `CueInspectorView`
 - [ ] C2: Right-click "Transcode to ProRes 422" action; writes to project-relative `Transcoded/`
 - [ ] C3: PDF import via PDFKit → bitmap-per-page at output × 2
 - [ ] C4: Animated GIF / APNG detect → offer convert-to-ProRes-4444

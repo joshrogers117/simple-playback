@@ -473,6 +473,15 @@ private struct CueInspectorView: View {
                     .help("Right-click in the asset library → Transcode to ProRes 422 to render a Stage-rate copy.")
                 }
 
+                if let asset, asset.flags.hasAnyFlag {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(asset.flags.activeWarnings, id: \.self) { warning in
+                            MediaFlagWarningChip(warning: warning)
+                        }
+                    }
+                    .help("Right-click the clip in the asset library → Transcode to ProRes 422 to clear inspector warnings.")
+                }
+
                 Divider()
 
                 Picker("Continuation", selection: $cue.continuation) {
@@ -506,6 +515,30 @@ private struct CueInspectorView: View {
             }
             .padding(16)
         }
+    }
+}
+
+/// Single-line warning chip for one `MediaFlagsEvaluator.WarningKind`. Yellow palette
+/// (informational) — distinct from the orange FPS-mismatch banner above so an operator
+/// reading the inspector at a glance can tell "shape problem" (orange, action recommended)
+/// from "metadata caveat" (yellow, FYI).
+private struct MediaFlagWarningChip: View {
+    let warning: MediaFlagsEvaluator.WarningKind
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "info.circle.fill")
+                .foregroundStyle(.yellow)
+            Text(MediaFlagsEvaluator.warning(for: warning))
+                .font(.caption)
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.yellow.opacity(0.12))
+        )
     }
 }
 
