@@ -37,6 +37,16 @@ struct MediaImporter {
         try KeynoteImporter.exportToPDF(keynoteURL: source, destinationDirectory: dest)
     }
 
+    /// Test seam — every imported MediaSlide carries the result of this closure as its
+    /// `media.fingerprint`. Default streams the file via SHA-256 (C7a). Returns `nil`
+    /// on any read or attribute failure; an unfingerprinted slide is still importable
+    /// and the relink waterfall recomputes the fingerprint on first successful resolve.
+    /// Tests substitute a deterministic stub so they don't need fixtures of known
+    /// content.
+    static var fingerprinter: (URL) -> MediaAssetFingerprint? = { url in
+        try? AssetFingerprinter.fingerprint(url: url)
+    }
+
     /// Backwards-compatible entry point: no context means PDF (and other conversion-required
     /// formats) cannot be rendered, so PDFs are silently dropped. Callers that need PDF
     /// support pass the context-aware overload.
@@ -92,7 +102,9 @@ struct MediaImporter {
             case .video: flags = MediaFlagsInspector.inspect(url: url)
             case .image: flags = AnimatedImageInspector.inspect(url: url)
             }
-            slides.append(MediaSlide(url: url, mediaKind: kind, nativeFrameRate: fps, flags: flags))
+            var slide = MediaSlide(url: url, mediaKind: kind, nativeFrameRate: fps, flags: flags)
+            slide.media.fingerprint = fingerprinter(url)
+            slides.append(slide)
         }
 
         return MediaImportReport(slides: slides, failures: failures)
@@ -224,6 +236,7 @@ struct MediaImporter {
         pageURLs.enumerated().map { index, pageURL in
             var slide = MediaSlide(url: pageURL, mediaKind: .image)
             slide.title = "\(baseTitle) — page \(index + 1)"
+            slide.media.fingerprint = fingerprinter(pageURL)
             return slide
         }
     }

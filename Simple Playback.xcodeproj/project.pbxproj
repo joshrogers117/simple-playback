@@ -129,6 +129,7 @@
 		E7E0BCCC5F1B98DD0A582010 /* PreShowCheckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D930FD6914035D4FEAC331A2 /* PreShowCheckTests.swift */; };
 		E9E3C51A99F9323FE1D530DC /* PDFImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45BCD3E72BF9F52C2653862E /* PDFImporter.swift */; };
 		EAA4BC2642696555F131F8BE /* OutputPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0C8298731E2AD4C22B2306 /* OutputPreviewView.swift */; };
+		EBD764F8E39D94B5858A883B /* MediaImporterFingerprintTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A403820A52154533BFBFE661 /* MediaImporterFingerprintTests.swift */; };
 		EDB3E5ED1721A22A5B31024C /* CompositorLayers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6214E79B299E7C7AB111C790 /* CompositorLayers.swift */; };
 		EE3870434C944DFB877D89F7 /* ImageSequenceDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D597C7D54010FC1E62D378 /* ImageSequenceDetectorTests.swift */; };
 		F4D353B47C138FF5ACA1CCC2 /* TranscodeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB90370BA34D673675815F69 /* TranscodeService.swift */; };
@@ -237,6 +238,7 @@
 		9E8B4217656574F74350F1FF /* DeckLinkSDKDispatch.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DeckLinkSDKDispatch.cpp; sourceTree = "<group>"; };
 		9FC38AB74DB5321128E72E79 /* AudioDeviceProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDeviceProbe.swift; sourceTree = "<group>"; };
 		A13557C5F98007D62499B140 /* StateSnapshotEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateSnapshotEncoder.swift; sourceTree = "<group>"; };
+		A403820A52154533BFBFE661 /* MediaImporterFingerprintTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporterFingerprintTests.swift; sourceTree = "<group>"; };
 		A45B0A7CB7DDDC72B747F7C8 /* FrameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameRenderer.swift; sourceTree = "<group>"; };
 		A4758CF8E9891007D793354E /* DroppedFrameCounter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DroppedFrameCounter.swift; sourceTree = "<group>"; };
 		A62C4E147CCC6686312E0815 /* MediaImporterPDFTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporterPDFTests.swift; sourceTree = "<group>"; };
@@ -400,6 +402,7 @@
 				B133348CF010D337CDA988A0 /* ImportStatusBannerTests.swift */,
 				38F7D1388C31CB5FF57645DA /* KeynoteImporterTests.swift */,
 				FF79938EE267D36AF458C582 /* MediaFlagsTests.swift */,
+				A403820A52154533BFBFE661 /* MediaImporterFingerprintTests.swift */,
 				4938DA35785910BBFF3391DD /* MediaImporterKeynoteTests.swift */,
 				A62C4E147CCC6686312E0815 /* MediaImporterPDFTests.swift */,
 				F8536D230F07A5A41DD22032 /* MediaImportFailureTests.swift */,
@@ -743,6 +746,7 @@
 				92C91C709C683B4675395127 /* KeynoteImporterTests.swift in Sources */,
 				D93CCBEA7AE13AB4FC44F4F3 /* MediaFlagsTests.swift in Sources */,
 				CCCB5A1DDC2A8EF972427BB8 /* MediaImportFailureTests.swift in Sources */,
+				EBD764F8E39D94B5858A883B /* MediaImporterFingerprintTests.swift in Sources */,
 				54F7E3B014546AF5E82195C5 /* MediaImporterKeynoteTests.swift in Sources */,
 				5F75B62542F32AC37D1B4259 /* MediaImporterPDFTests.swift in Sources */,
 				2EDFAB97F7CA5EA4D43BA531 /* MediaReferenceTests.swift in Sources */,
