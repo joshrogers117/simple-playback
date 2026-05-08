@@ -222,6 +222,30 @@ final class MediaFlagsTests: XCTestCase {
                        "Inspector renders warnings in this fixed order.")
     }
 
+    func testActiveWarningsOrderIncludesAnimatedImageLast() {
+        // animatedImage is orthogonal to the four codec-inspector flags (it only sets on
+        // `.image` slides; the other four only on `.video`). When co-occurring (theoretical;
+        // the importer never produces both today), animatedImage trails the four video flags.
+        let allOn = MediaFlags(
+            longGOP: true,
+            variableFrameRate: true,
+            tenBitYUV420: true,
+            untaggedColor: true,
+            animatedImage: true
+        )
+        XCTAssertEqual(allOn.activeWarnings,
+                       [.longGOP, .variableFrameRate, .tenBitYUV420, .untaggedColor, .animatedImage])
+    }
+
+    func testActiveWarningsForAnimatedImageOnlyContainsAnimatedImage() {
+        let flags = MediaFlags(animatedImage: true)
+        XCTAssertEqual(flags.activeWarnings, [.animatedImage])
+    }
+
+    func testHasAnyFlagTrueWhenAnimatedImageSet() {
+        XCTAssertTrue(MediaFlags(animatedImage: true).hasAnyFlag)
+    }
+
     // MARK: - Warning copy
 
     func testWarningStringsMatchSpec() {
@@ -234,6 +258,8 @@ final class MediaFlagsTests: XCTestCase {
                        "10-bit 4:2:0 HEVC — limited hardware decode.")
         XCTAssertEqual(MediaFlagsEvaluator.warning(for: .untaggedColor),
                        "Untagged color — treating as sRGB.")
+        XCTAssertEqual(MediaFlagsEvaluator.warning(for: .animatedImage),
+                       "Animated GIF / APNG — first frame only; transcode to ProRes 4444 for full motion.")
     }
 
     // MARK: - Codable
@@ -265,6 +291,26 @@ final class MediaFlagsTests: XCTestCase {
         XCTAssertFalse(decoded.variableFrameRate)
         XCTAssertFalse(decoded.tenBitYUV420)
         XCTAssertFalse(decoded.untaggedColor)
+        XCTAssertFalse(decoded.animatedImage)
+    }
+
+    func testMediaFlagsRoundTripsAnimatedImageFlag() throws {
+        let original = MediaFlags(animatedImage: true)
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(MediaFlags.self, from: data)
+        XCTAssertEqual(decoded, original)
+        XCTAssertTrue(decoded.animatedImage)
+    }
+
+    func testMediaFlagsLegacyJSONWithFourFlagsDecodesAnimatedImageAsFalse() throws {
+        // A pre-C4 project (post-C1, pre-C4) wrote the four codec-inspector flags but no
+        // `animatedImage`. The decoder must default the new field to false.
+        let json = #"{"longGOP": true, "variableFrameRate": false, "tenBitYUV420": false, "untaggedColor": true}"#
+            .data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(MediaFlags.self, from: json)
+        XCTAssertTrue(decoded.longGOP)
+        XCTAssertTrue(decoded.untaggedColor)
+        XCTAssertFalse(decoded.animatedImage)
     }
 
     // MARK: - MediaSlide persistence

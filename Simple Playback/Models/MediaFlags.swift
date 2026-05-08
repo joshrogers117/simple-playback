@@ -70,33 +70,42 @@ struct MediaFlags: Codable, Hashable {
     /// guess, not a declaration.
     var untaggedColor: Bool
 
+    /// True for multi-frame still containers (animated GIF, APNG). Today these import as
+    /// `.image` MediaSlides and only the first frame plays — the operator's intuition that
+    /// "this should animate" only resolves after a transcode to ProRes 4444 (which preserves
+    /// alpha for typical animated-GIF use cases like lower-thirds and bug overlays).
+    var animatedImage: Bool
+
     static let none = MediaFlags(
         longGOP: false,
         variableFrameRate: false,
         tenBitYUV420: false,
-        untaggedColor: false
+        untaggedColor: false,
+        animatedImage: false
     )
 
     /// Whether any flag is set. Used by inspector views to decide whether to render the
     /// "warnings" section at all.
     var hasAnyFlag: Bool {
-        longGOP || variableFrameRate || tenBitYUV420 || untaggedColor
+        longGOP || variableFrameRate || tenBitYUV420 || untaggedColor || animatedImage
     }
 
     private enum CodingKeys: String, CodingKey {
-        case longGOP, variableFrameRate, tenBitYUV420, untaggedColor
+        case longGOP, variableFrameRate, tenBitYUV420, untaggedColor, animatedImage
     }
 
     init(
         longGOP: Bool = false,
         variableFrameRate: Bool = false,
         tenBitYUV420: Bool = false,
-        untaggedColor: Bool = false
+        untaggedColor: Bool = false,
+        animatedImage: Bool = false
     ) {
         self.longGOP = longGOP
         self.variableFrameRate = variableFrameRate
         self.tenBitYUV420 = tenBitYUV420
         self.untaggedColor = untaggedColor
+        self.animatedImage = animatedImage
     }
 
     init(from decoder: Decoder) throws {
@@ -105,6 +114,7 @@ struct MediaFlags: Codable, Hashable {
         variableFrameRate = try c.decodeIfPresent(Bool.self, forKey: .variableFrameRate) ?? false
         tenBitYUV420 = try c.decodeIfPresent(Bool.self, forKey: .tenBitYUV420) ?? false
         untaggedColor = try c.decodeIfPresent(Bool.self, forKey: .untaggedColor) ?? false
+        animatedImage = try c.decodeIfPresent(Bool.self, forKey: .animatedImage) ?? false
     }
 }
 
@@ -163,6 +173,7 @@ enum MediaFlagsEvaluator {
         case .variableFrameRate: return "Variable frame rate — will not loop seamlessly."
         case .tenBitYUV420: return "10-bit 4:2:0 HEVC — limited hardware decode."
         case .untaggedColor: return "Untagged color — treating as sRGB."
+        case .animatedImage: return "Animated GIF / APNG — first frame only; transcode to ProRes 4444 for full motion."
         }
     }
 
@@ -171,19 +182,23 @@ enum MediaFlagsEvaluator {
         case variableFrameRate
         case tenBitYUV420
         case untaggedColor
+        case animatedImage
     }
 }
 
 extension MediaFlags {
     /// The set of warning kinds that should be surfaced for this flag set. Empty when no
-    /// flags are set. Order is stable: long-GOP, VFR, 10-bit 4:2:0, untagged color — most
-    /// to least likely to require operator action.
+    /// flags are set. Order is stable: long-GOP, VFR, 10-bit 4:2:0, untagged color, animated
+    /// image — most to least likely to require operator action. The animated-image flag is
+    /// last because it only sets on `.image` MediaSlides (orthogonal to the four
+    /// codec-inspector flags above, all of which only set on `.video`).
     var activeWarnings: [MediaFlagsEvaluator.WarningKind] {
         var out: [MediaFlagsEvaluator.WarningKind] = []
         if longGOP { out.append(.longGOP) }
         if variableFrameRate { out.append(.variableFrameRate) }
         if tenBitYUV420 { out.append(.tenBitYUV420) }
         if untaggedColor { out.append(.untaggedColor) }
+        if animatedImage { out.append(.animatedImage) }
         return out
     }
 }
