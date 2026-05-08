@@ -63,6 +63,11 @@ struct RootView: View {
     /// pre-computed plan so summary + progress + result all read off the same
     /// snapshot.
     @State private var pendingBundleForTravel: BundleForTravelPlanReport?
+    /// C9 persistent banner — current asset-library status, recomputed
+    /// whenever `project.slides` changes. Driven by `AssetLibraryProbe.evaluate`
+    /// with the bundle-aware online check so a moved bundle's managed assets
+    /// classify correctly. Empty (no banner) when no slides are offline.
+    @State private var assetLibraryStatus: AssetLibraryStatus = .empty
     /// Stable per-window UUID. Untitled documents — which have no fileURL yet —
     /// rasterize PDFs (and transcode to ProRes) into an app-support subdirectory keyed
     /// by this ID so concurrent untitled windows don't collide.
@@ -202,6 +207,10 @@ struct RootView: View {
             configureShowController()
             lockController.evaluate(bundleURL: projectBundleURLProvider())
             playback.bundleMediaDirectory = bundleMediaDirectory()
+            recomputeAssetLibraryStatus()
+        }
+        .onChange(of: document.project.slides) {
+            recomputeAssetLibraryStatus()
         }
         .onChange(of: playback.devices) {
             applyOutputDefaults()
@@ -344,6 +353,12 @@ struct RootView: View {
                 OutputPreviewView(playback: playback)
 
                 ImportStatusBannerView(banner: importStatus)
+
+                MissingMediaBannerView(
+                    status: assetLibraryStatus,
+                    onRelink: { chooseRelinkFolderAndApply() },
+                    canRelink: !(showController.controller?.showMode ?? false)
+                )
 
                 ProjectLockBannerView(controller: lockController)
 
@@ -611,6 +626,19 @@ struct RootView: View {
         projectBundleURLProvider()?.appendingPathComponent(
             ProjectBundleLayout.mediaDirectory,
             isDirectory: true
+        )
+    }
+
+    /// C9 — refresh `assetLibraryStatus` from the live asset library. Cheap
+    /// pure-logic walk over `project.slides`; perf concerns on libraries
+    /// >500 slides are noted in `phase_c_summary.md` for a future debounce
+    /// pass.
+    private func recomputeAssetLibraryStatus() {
+        let mediaDir = bundleMediaDirectory()
+        assetLibraryStatus = AssetLibraryProbe.evaluate(
+            slides: document.project.slides,
+            isOnline: AssetLibraryProbe.makeIsOnline(bundleMediaDirectory: mediaDir),
+            resolveURL: AssetLibraryProbe.makeResolveURL(bundleMediaDirectory: mediaDir)
         )
     }
 
