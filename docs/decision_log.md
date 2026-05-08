@@ -276,3 +276,62 @@ The plumbing shape: `MediaImporter.importSlides(from:)` keeps its old signature 
 - `ProjectBundleLayout.transcodedDirectory = "Transcoded"`.
 - `SlideGridView` gains `transcodeJobs`, `transcodeEnabled`, `requestTranscode`, `cancelTranscode` parameters (all defaulted so existing call sites compile).
 - `RootView.transcodedRootDirectory()` private helper; `requestTranscode(slide:preset:)` private callback that splices the sibling into `project.slides` after the source on success.
+
+---
+
+## 2026-05-08 — C4: animatedImage flag widening + ProRes 4444 default
+
+**Decision**: Add `animatedImage: Bool` to `MediaFlags` rather than building a parallel `ImageMediaFlags` model; populate it from a separate `AnimatedImageInspector` (image branch) rather than widening `MediaFlagsInspector` (which is video-only).
+
+**Why**: The four codec-inspector flags (longGOP / VFR / 10-bit-4:2:0 / untaggedColor) are video-only by their semantics — they describe codec behavior. The animated-image flag is image-only and the detection mechanism (`CGImageSource`) shares no code with AVFoundation's video inspection. But the *consuming* surface (cue inspector chip, `activeWarnings` list, persistence) is identical, so reusing `MediaFlags` keeps the slide-flag surface uniform. Splitting the inspector keeps the single-responsibility tight.
+
+The widened `TranscodeService.canTranscode(slide:)` now accepts `.image` slides whose `flags.animatedImage` is true. The existing test contract — "static images return false" — is preserved because the default `animatedImage` is false. `preferredPresetOrder(for:) -> [TranscodePreset]` returns 4444-first for animated images, 422-first for everything else. Operators see ProRes 4444 as the highlighted item in the right-click menu without us depending on a SwiftUI "default" affordance that doesn't exist for context menus.
+
+**Alternatives considered**:
+- Widen `MediaFlagsInspector` to accept `.image`. Rejected — introduces an asymmetric switch inside the service and conflates two unrelated detection paths.
+- Keep `canTranscode` video-only and add a separate "Convert to ProRes 4444" action item for animated images. Rejected — duplicates the menu surface for what is structurally the same operation.
+
+**Reversibility**: easy. The flag is a strict addition; reverting would require a migration of any project that already saved with the flag set, but the `decodeIfPresent` path tolerates a missing field cleanly.
+
+**What I'd revisit if**: a real animated GIF / APNG fails to transcode through `AVAssetExportSession`. AVFoundation has read-only support for animated GIFs as movie sources on modern macOS, but if it doesn't expose APNG that way, C5b's AVAssetWriter path may need to subsume the animated-PNG transcode too.
+
+---
+
+## 2026-05-08 — C-banner: import-status surface design
+
+**Decision**: A flat `MediaImportFailure` value type (`url`, `kind`, `summary` string) instead of a discriminated union over the per-pipeline error types. New `MediaImporter.importSlidesAndReport(from:context:) -> MediaImportReport` overload; legacy `importSlides(from:)` / `importSlides(from:context:)` delegate to it and discard failures.
+
+**Why**: PDFImportError, KeynoteImportError, and TranscodeError aren't all Equatable (PDFImportError embeds `Error`). Designing the banner around a flat string sidesteps that, keeps the value type Equatable for testability, and gives the banner exactly what it needs (an operator-readable line per failure). The `Kind` enum is a discriminator only — the banner doesn't case-split on it for behavior, only for icon variation in a future pass.
+
+The `ImportStatusBanner` is per-document (each `RootView` has its own `@StateObject`) and append-only until dismissed. A second failed import never silently overwrites the first — operators in a live show must not lose a failure notice to a subsequent action.
+
+Cancellation is silent by design: `TranscodeError.cancelled` lands when the operator clicked ✕ on the progress strip, so re-surfacing it in the banner would feel like the app questioning the operator's deliberate action.
+
+**Alternatives considered**:
+- Embed each pipeline's error directly. Rejected — non-Equatable types complicate testing, and operators care about the message, not the underlying enum case.
+- Make the banner global (singleton). Rejected — multiple windows / documents should not share a failure surface.
+- Replace the modal "Keynote not installed" alert with the banner. Deferred to C-banner-c — the modal currently fires alongside the banner, which is mildly redundant but not wrong.
+
+**Reversibility**: easy. The banner is a pure addition; the legacy `importSlides` paths are intact.
+
+**What I'd revisit if**: the operator wants per-failure dismissal, "retry" buttons, or persistent (across-restart) failure history. Today the banner clears on dismiss; project bundles don't track import-failure history.
+
+---
+
+## 2026-05-08 — C5a: image-sequence detector counter widths
+
+**Decision**: Recognize 3-digit and 4-digit zero-padded counters (`name.001.png`, `name.0001.png`); reject 2-digit and 5-digit. Recognized extensions: `png`, `jpg`, `jpeg`, `tiff`, `tif`, `exr`. A "sequence" requires ≥2 frames sharing baseName + extension + pad width; gaps in the counter are allowed.
+
+**Why**: 2-digit counters false-positive on common version markers (`v1.2.png`, `iPhone X.42.tiff`). 5-digit counters are unconventional in the operator-facing world (Nuke/Houdini default to 4 digits; FFmpeg's `%04d` is the de-facto convention). Padding-width split (3-digit and 4-digit treated as separate sequences when they share a basename) keeps output numbering consistent — an operator who exported the first 999 frames at 3-digit and frames 1000+ at 4-digit gets two encodes, not a confused single encode.
+
+Recognized extensions cover the four formats operators ship sequences in: PNG (sRGB transparency), JPEG (8-bit fallback), TIFF (16-bit / floating point), EXR (HDR / floating-point linear). HEIC is intentionally excluded — sequences in HEIC are vanishingly rare and the format's metadata layout doesn't pair well with a frames-in encode.
+
+The detector returns leftovers in their original drop order so non-sequence files preserve operator intent. Sequences are returned in `(baseName, ext)` lexical order for deterministic test output.
+
+**Alternatives considered**:
+- Accept any digit width. Rejected — the false-positive rate on 1-2 digit counters is too high.
+- Use a regex (`[a-zA-Z0-9_]+\.[0-9]{3,4}\.\w+`). Rejected — operator file naming includes spaces, dots, parentheses; whitelist by extension + counter-width constraints is more permissive on the basename without false-positives.
+
+**Reversibility**: easy. The detector is pure-logic with no on-disk artifacts.
+
+**What I'd revisit if**: a real-world sequence ships with a 5-digit counter or a sub-frame fractional counter (`name.001.5.png`). Today the latter would parse as a 1-digit counter on `name.001` and reject it — that's the right behavior for the autonomous era; encoders that emit those use cases would need explicit operator opt-in.

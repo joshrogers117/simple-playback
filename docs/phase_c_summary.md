@@ -1,5 +1,7 @@
 # Phase C — Media pipeline — Summary
 
+**Status (session 10 — 2026-05-08)**: C4 shipped end-to-end (animated GIF / APNG detect + ProRes 4444 default in right-click menu), Import Status Banner shipped across PDF / Keynote / transcode failure surfaces, and C5a (ImageSequenceDetector pure-logic) shipped. 323 tests, all green (was 269 at session start; +54). 6 new commits on `development` (C4a / C4b / C4c / C-banner-a / C-banner-b / C5a). The C2c right-click action and the silent-failure plumbing across PDF / Keynote / Transcode are now reconciled — every operator-visible failure mode reaches a non-modal banner instead of disappearing.
+
 **Status (session 9 — 2026-05-08)**: C2 shipped end-to-end (right-click ProRes 422 / 4444 transcode action with non-modal progress). 269 tests, all green (was 257 at session start; +12 from the C2a/C2b suites — C2c is UI-only and has no new test surface). 3 new commits on `development` (C2a / C2b / C2c). The C1 inspector-chip → action loop is now closed: every yellow chip the operator sees in the cue inspector points to the right-click menu that's now wired up.
 
 **Status (session 8 — 2026-05-08)**: C6 shipped end-to-end (Keynote `.key` import via AppleScript → PDF → bitmaps). 257 tests, all green (was 243 at session start; +14 from the C6a/C6b suites — C6c is UI-only and has no new test surface). 3 new commits on `development` (C6a / C6b / C6c).
@@ -11,6 +13,99 @@
 Phase C is just starting. The codec inspector (C1) is the first piece because it has zero hardware dependency and unblocks B8 (10-bit YUV default once any clip is >8-bit) — the `MediaSlide.flags.tenBitYUV420` boolean is now the project-wide signal B8 will key off of.
 
 The remaining Phase C items (C2 transcode action, C3 PDF import, C4 GIF/APNG detect-and-convert, C5 image-sequence detect-and-encode, C6 Keynote import, C7+ asset library / audio / subtitles) are all autonomy-friendly with no hardware exposure — Phase C should be the workhorse phase for autonomous-build cycles.
+
+---
+
+## What shipped in session 10 (C4 + Import Status Banner + C5a)
+
+### C4a — `animatedImage` flag in `MediaFlags`
+
+- **`Models/MediaFlags.swift`** — extended with `animatedImage: Bool` (orthogonal to the four codec-inspector flags — those only set on `.video`, this only on `.image`). New `WarningKind.animatedImage` with the spec-pinned copy `"Animated GIF / APNG — first frame only; transcode to ProRes 4444 for full motion."`. `activeWarnings` order extends to `[longGOP, variableFrameRate, tenBitYUV420, untaggedColor, animatedImage]` — the existing four-flag locked order is unchanged. `decodeIfPresent` defaults the new field to false, so projects saved between C1 (post-flag) and C4 (post-animatedImage) decode cleanly.
+- 5 tests cover the new ordering with all five flags on, animatedImage-only ordering, hasAnyFlag, warning copy, JSON round-trip + post-C1/pre-C4 legacy decode.
+
+### C4b — `AnimatedImageInspector` + `MediaImporter` image-branch wiring
+
+- **`Services/AnimatedImageInspector.swift`** — `inspect(url:) -> MediaFlags` and `isAnimated(url:) -> Bool`. Detection: `CGImageSourceCreateWithURL` + `CGImageSourceGetCount > 1`, gated by a cheap `.gif`/`.png`/`.apng` extension/UTI pre-filter so static-still imports don't pay a CGImageSource-create per-file cost. Returns `false` (and `MediaFlags.none`) on any failure — better to miss the chip than false-positive on malformed media.
+- **`MediaImporter.importSlides(from:context:)`** — image branch now switches: `.video` → `MediaFlagsInspector.inspect(...)`, `.image` → `AnimatedImageInspector.inspect(...)`. The two inspectors share the same `MediaFlags` return type so the slide assembly stays uniform.
+- 11 tests — multi-frame GIF + APNG → flagged true; single-frame GIF / static PNG / JPEG → false; corrupt headers + missing files → false; `inspect(url:)` returns the right `MediaFlags`; the importer integration (animated GIF → flag set in resulting MediaSlide; static PNG → `MediaFlags.none`).
+
+### C4c — `TranscodeService` widening + right-click menu reorder
+
+- **`TranscodeService.canTranscode(slide:)`** — widened to accept `.image` slides whose `flags.animatedImage` is true. Static images still return false (the existing test contract is preserved — operators don't transcode a PNG to ProRes for fun).
+- **`TranscodeService.preferredPresetOrder(for:) -> [TranscodePreset]`** — alpha-aware default. Animated images return `[.proRes4444, .proRes422]` (the alpha-bearing codec leads — animated GIFs are typically lower-thirds / logo bugs that need alpha preserved). Everything else returns `[.proRes422, .proRes4444]`.
+- **`Views/SlideGridView.slideContextMenu(for:)`** — `ForEach(TranscodeService.preferredPresetOrder(for: slide), id: \.self)` builds menu items in the preferred order. Two presets, no defaults / disclosure / divider — just the order signal.
+- 3 tests — `canTranscode` accepts animated-image slides; `preferredPresetOrder` returns 4444-first for animated, 422-first for video.
+
+### C-banner-a — `MediaImportFailure` model + `importSlidesAndReport`
+
+- **`Services/MediaImportFailure.swift`** — `struct MediaImportFailure { id, url, kind, summary }` (Identifiable, Equatable). `Kind` enum: `pdfImport / keynoteImport / transcode / unsupportedMedia`. The summary is a flat string (operator-readable) so the banner doesn't depend on each pipeline's error type being Equatable. `MediaImportReport { slides, failures }` is the new return shape.
+- **`Services/MediaImporter.swift`** — new `importSlidesAndReport(from:context:) -> MediaImportReport` overload. Refactored `importPDF` / `importKeynote` from "return [] on error" to "throw on error", so the new top-level method can catch and convert via `makeFailure`. The legacy `importSlides(from:)` / `importSlides(from:context:)` delegate to the new method and discard failures — back-compat for every existing test (and any non-UI caller).
+- 8 tests — empty input, happy path, unsupported `.txt` reported, corrupt PDF reported, Keynote-not-installed reported (workspace provider seam), exporter-throws reported (test-injected error → summary contains the underlying message), mixed batch separates slides from failures keyed by URL, back-compat path returns slides-only.
+
+### C-banner-b — `ImportStatusBanner` ObservableObject + view + RootView wiring
+
+- **`Views/ImportStatusBanner.swift`** — `@MainActor ImportStatusBanner: ObservableObject` with `failures: [MediaImportFailure]`, `record(_:)`, `recordTranscode(url:error:)`, `dismiss()`, and a `headline` computed property that handles the singular/plural split (`"1 item failed to import"` vs. `"3 items failed to import"`). Append-only until the operator dismisses — a second failed import never silently overwrites the first.
+- **`ImportStatusBannerView`** — rendered above `OutputStatusBar` in `RootView`. Red-tinted strip with a triangle icon, the headline, a `Show Details` popover (per-failure summary + full path), and an `xmark.circle.fill` dismiss button. Hidden when `failures.isEmpty`.
+- **`Views/RootView.swift`** — `@StateObject private var importStatus = ImportStatusBanner()`. `addMedia` now calls `importSlidesAndReport` and threads `report.failures` into the banner. `requestTranscode` failure path threads non-cancellation failures into the banner (cancellations are operator-initiated; silent is the right UX).
+- 7 tests cover starts-empty, empty-batch no-op, append batch, append twice (no overwrite), record transcode failure, dismiss clears, headline pluralization.
+
+### C5a — `ImageSequenceDetector` pure-logic
+
+- **`Services/ImageSequenceDetector.swift`** — `detect(in: [URL]) -> Result { sequences, leftovers }`. Pure-logic, no filesystem access. Recognized extensions: `png / jpg / jpeg / tiff / tif / exr`. Counter widths: 3 or 4 digits (avoids false-positives on `v1.2.png`-style version markers and the `.12345.png` long-counter shape). Multi-dot basenames supported — the rightmost segment is treated as the counter, everything before as the basename. Gaps in the counter are allowed (operators export non-contiguous selections). Sequences split by basename, by extension, AND by pad width (a 3-digit and 4-digit counter sharing a basename are two sequences — keeps output numbering consistent).
+- 20 tests cover parser branches (3-digit, 4-digit, two-digit reject, five-digit reject, unrecognized extension, recognized list, case-insensitive ext, missing counter, non-numeric counter, multi-dot basename) + detect branches (empty, single-frame leftover, simple sequence, sort-by-counter, gap tolerance, sequence/singleton separation, multiple sequences by name / extension / padWidth, unrecognized extensions become leftovers).
+- The encode side (C5b — AVAssetWriter wrapping pure-logic frames-in / .mov-out) and folder-drop UX are deferred. Once C5b lands, the importer would route detected sequences through it the same way C3/C6 route PDFs and Keynote decks through PDFImporter.
+
+---
+
+## Tests added (session 10)
+
+| Test | What it covers |
+|---|---|
+| `MediaFlagsTests.testActiveWarningsOrderIncludesAnimatedImageLast` | 5-flag ordering pin (animatedImage trails the four codec-inspector flags). |
+| `MediaFlagsTests.testActiveWarningsForAnimatedImageOnlyContainsAnimatedImage` | Animated-only flag set yields exactly `[.animatedImage]`. |
+| `MediaFlagsTests.testHasAnyFlagTrueWhenAnimatedImageSet` | hasAnyFlag short-circuit for the new flag. |
+| `MediaFlagsTests.testWarningStringsMatchSpec` (extended) | Spec §3.10 wording for the animated-image warning is pinned. |
+| `MediaFlagsTests.testMediaFlagsRoundTripsAnimatedImageFlag` | JSON round-trip. |
+| `MediaFlagsTests.testMediaFlagsLegacyJSONWithFourFlagsDecodesAnimatedImageAsFalse` | Post-C1 / pre-C4 projects decode cleanly. |
+| `MediaFlagsTests.testMediaFlagsPartialJSONDecodesMissingFieldsAsFalse` (extended) | Partial JSON includes new field default. |
+| `AnimatedImageInspectorTests.*` (11) | GIF / APNG / static / JPEG / corrupt / missing detection + `inspect(url:)` + importer integration on animated GIF + static PNG. |
+| `TranscodeServiceTests.testCanTranscodeAcceptsAnimatedImageSlide` | Animated `.image` slides light up the transcode menu. |
+| `TranscodeServiceTests.testPreferredPresetOrderLeads4444ForAnimatedImages` | 4444 leads for alpha-aware sources. |
+| `TranscodeServiceTests.testPreferredPresetOrderLeads422ForVideoSlides` | 422 leads for everything else. |
+| `MediaImportFailureTests.*` (8) | empty / happy / unsupported / corrupt PDF / Keynote-not-installed / exporter-throws / mixed batch / back-compat slides-only. |
+| `ImportStatusBannerTests.*` (7) | starts-empty / empty-noop / record / append-only / record-transcode / dismiss / headline pluralization. |
+| `ImageSequenceDetectorTests.*` (20) | parser branches + detect branches (single / multi-sequence / extension split / pad-width split / unrecognized-extension leftovers / sort-by-counter / gap tolerance). |
+
+Total: 323 tests, all green (was 269 at session start; +54).
+
+---
+
+## Manual verification needed (session 10 deltas)
+
+These need human eyeballs — autonomous tests don't drive SwiftUI inspectors / context menus / popovers / drag-drop.
+
+### C4 (animated GIF / APNG)
+
+1. Drop an animated GIF (a typical "lower-thirds" or "spinner" asset) into a saved project. The asset library tile shows it as an image. Click into the cue inspector. The yellow `Animated GIF / APNG — first frame only; transcode to ProRes 4444 for full motion.` chip should appear.
+2. Right-click the same tile. The context menu's first item should read `Transcode to ProRes 4444`, with `Transcode to ProRes 422` second. Pick 4444.
+3. The non-modal progress strip appears (same as C2c). On completion, a sibling slide titled `<orig> (ProRes 4444)` appears immediately after the source. Take it — the animation should now play with full motion.
+4. Drop a static GIF (no animation). The cue inspector shows no `animatedImage` chip. The right-click menu shows no transcode items (canTranscode is false for static images).
+5. Drop an APNG (multi-frame `.png`). Same as step 1 — chip + 4444-first menu.
+6. Drop a JPEG. Cue inspector shows no chip; menu shows no transcode items.
+7. Save the project, restart, reopen. The animated-image flag persists on the slide via `MediaSlide.flags.animatedImage`.
+
+### Import Status Banner
+
+8. Drop a corrupt or zero-page PDF. Slides don't appear; a red banner at the top of the program panel reads `1 item failed to import`. Click `Show Details` — the popover shows the file path and the PDFKit error message. Click ✕ to dismiss.
+9. Drop a `.txt` file (no UTI conformance). Banner reads `1 item failed to import`; popover shows `Unsupported media: <filename>.txt`.
+10. Drop a `.key` file with Keynote not installed. The modal "Keynote not installed" alert fires (existing behavior); the banner ALSO shows the failure (since the import path returns the keynoteImport failure now). Both fire today — slated for C-banner-c reconciliation in a future session.
+11. Right-click a video, kick off a transcode against media that AVFoundation can't read (renamed/corrupt mid-transcode). The progress row disappears as the export fails; the banner appears with `Transcode failed: …`.
+12. Right-click a video, kick off a transcode, click ✕ on the progress row. The cancellation does NOT show in the banner — operator-initiated cancellation is silent by design.
+13. Drop multiple bad files in one batch (corrupt PDF + .txt + healthy PNG). Banner reads `2 items failed to import`; the healthy PNG still imports.
+
+### C5a (Image-sequence detector)
+
+14. Pure logic, no UI surface yet. Manual verification waits for C5b (encoder) + the folder-drop UX.
 
 ---
 
@@ -287,17 +382,17 @@ These need human eyeballs — autonomous tests don't drive SwiftUI inspectors.
 - **B16** — final Phase B summary + DeckLink mock layer for tests.
 
 **Phase C remaining** (autonomy-friendly):
-- **C4** — Animated GIF / APNG detect → offer convert-to-ProRes-4444. The "offer convert" UX now exists (the C2c right-click already includes `Transcode to ProRes 4444`); detection is the missing piece. Add an `animatedImage` flag to `MediaFlags` (extend with care — the flag is set per-image, but `MediaFlagsInspector.inspect(url:)` is currently video-only; either widen its scope or build a sibling `AnimatedImageInspector`). Detection: `CGImageSourceGetCount(url) > 1` for `.gif` / `.png` (APNG). Pair with an inspector chip whose copy points to the existing right-click action.
-- **C5** — Image-sequence detect (`name.0001.png`) → offer encode-to-ProRes-4444 via `AVAssetWriter`. Pure import-time logic + AVAssetWriter wrapper. Detection regex: `name.NNN[N].(png|jpg|tiff|exr)`. The encode path is structurally similar to `TranscodeJob` but with `AVAssetWriter` (frames in) instead of `AVAssetExportSession` (movie in) — could reuse `TranscodeProgressStrip` + `TranscodeJob` shape if we abstract over "thing that produces a `.mov` from some input."
+- **C5b/c** — Image-sequence encoder + UI. Detector (C5a) is in place. C5b wraps `AVAssetWriter` to write a ProRes 4444 .mov from frames; structurally similar to `TranscodeJob` but with `AVAssetWriter` (frames in) instead of `AVAssetExportSession` (movie in) — could share `TranscodeProgressStrip` + the `TranscodeJob` shape if we abstract over "thing that produces a `.mov` from some input." C5c then needs folder-drop support (`canChooseDirectories = true` on the open panel; drop handler that walks a folder and runs `ImageSequenceDetector.detect(in:)`).
 - **C7+** — Asset library, audio engine, subtitles, etc. Larger.
 
 **Phase C plumbing follow-ups** (small, ergonomics):
-- **Import status banner** — PDF / Keynote imports today fail silently (corrupt source, denied permission). C2 inherits the same gap (`TranscodeError.exportFailed` is silent — the row just disappears). A non-modal "N items failed" banner exposing `PDFImportError` / `KeynoteImportError` / `TranscodeError` would close the loop across all three media-pipeline failure modes.
-- **Re-rasterize on Stage resize** — PDFs / Keynote decks rasterized at 1080p stay 1080p when the operator bumps the Stage to 2160p. C6's intermediate PDF stays in `Cache/Renders/<UUID>/` exactly so this can re-use the same source without re-driving Keynote.
+- **C-banner-c** — Replace the modal "Keynote not installed" `NSAlert` with the `ImportStatusBanner` so the failure surface is uniform. Today both fire when Keynote isn't installed (alert + banner) — minor noise.
+- **Inline "Transcode" affordance from inspector chip** — operators reading the cue inspector see the yellow chip and have to know to right-click the asset library tile. A button next to the chip that fires `requestTranscode` directly would close the loop (deferred from C2 known gaps).
+- **Re-rasterize on Stage resize** — PDFs / Keynote decks rasterized at 1080p stay 1080p when the operator bumps the Stage to 2160p. C6's intermediate PDF stays in `Cache/Renders/<UUID>/` exactly so this can re-use the same source without re-driving Keynote. Architectural note: today MediaSlide doesn't track its source PDF/Keynote URL — adding that link is the prerequisite.
 - **Compact project** — `<bundle>/Transcoded/<UUID>.mov` and `<bundle>/Cache/Renders/<UUID>/` accumulate when the operator deletes the corresponding MediaSlides. A future "Compact project" action would walk the bundle and remove orphans no slide resolves to.
-- **Apple-events permission diagnostic** — if the operator denied the macOS automation prompt for Keynote, every subsequent `.key` import returns 0 slides silently. Detect `errAEEventNotPermitted` (-1743) and surface "Open System Settings → Privacy & Security → Automation".
+- **Apple-events permission diagnostic** — if the operator denied the macOS automation prompt for Keynote, every subsequent `.key` import returns a `KeynoteImportError.exportFailed` whose summary now lands in the banner (good!). A "Open System Settings → Privacy & Security → Automation" deep-link button on the banner would close the loop.
 
-**Recommended next pick**: **C4 (animated GIF / APNG detect)** — small, autonomy-friendly, builds on the existing `MediaFlags` chip pattern, and the "convert" half is already wired up via the C2c right-click. Or **C5 (image sequence)** for a slightly bigger win that introduces the `AVAssetWriter` encode path. The **import status banner** is the smallest UX-closing change and would benefit C2/C3/C6 simultaneously — strong candidate for a session that wants a tight, broadly-impactful win.
+**Recommended next pick**: **C5b (image-sequence encoder)** — the detector (C5a) ships with a stable contract; the encoder's the meatier next step but is structurally well-understood (wraps AVAssetWriter, shares the C2 progress UI shape). Alternatively, **the inline "Transcode" affordance from the inspector chip** is small and meaningfully closes the loop the operator already sees in the inspector. **B8 (10-bit YUV default)** is now genuinely unblocked by C1's `tenBitYUV420` flag — that's the natural Phase B re-engagement when the user wants to step back into Phase B. **E1 (pre-show check panel)** is the start of Phase E and a clean phase boundary if the user wants to pivot. **C-banner-c** (collapse the duplicate Keynote-not-installed alert) is the smallest reasonable session opener.
 
 ### Known gaps in the C6 Keynote import path
 

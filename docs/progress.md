@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B14 partial); Phase C in progress — C1 (codec inspector flags), C2 (ProRes transcode action), C3 (PDF rasterize-on-import), and C6 (Keynote AppleScript→PDF→bitmaps) shipped end-to-end.
-- **Last commit**: C2c — RootView right-click → Transcode menu + non-modal progress strip in palette
+- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B14 partial); Phase C in progress — C1 (codec inspector flags), C2 (ProRes transcode action), C3 (PDF rasterize-on-import), C4 (animated GIF/APNG detect → ProRes 4444 default), and C6 (Keynote AppleScript→PDF→bitmaps) shipped end-to-end. Plumbing follow-ups: import status banner across all three failure pipelines, and C5a image-sequence detector (encoder C5b deferred).
+- **Last commit**: C5a — ImageSequenceDetector pure-logic name.NNNN.ext grouping
 - **Branch**: `development`
 
 ---
@@ -70,8 +70,14 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
   - [x] C3a: `Services/PDFImporter.swift` rasterize service + 8 tests (PDFKit pure logic)
   - [x] C3b: `MediaImporter.importSlides(from:context:)` routes PDFs via `MediaImportContext` + 4 tests
   - [x] C3c: `RootView` drop / open-panel build the context (Stage × 2 raster; bundle `Cache/Renders/` or app-support fallback for untitled docs); `ProjectBundleLayout.rendersDirectory` pinned
-- [ ] C4: Animated GIF / APNG detect → offer convert-to-ProRes-4444
-- [ ] C5: Image-sequence detect (`name.0001.png`) → offer encode-to-ProRes-4444 via `AVAssetWriter`
+- [x] C4: Animated GIF / APNG detect → offer convert-to-ProRes-4444
+  - [x] C4a: `MediaFlags.animatedImage` + `.animatedImage` WarningKind + spec-§3.10 warning copy
+  - [x] C4b: `Services/AnimatedImageInspector.swift` (`CGImageSourceGetCount > 1`) wired into `MediaImporter` image branch
+  - [x] C4c: `TranscodeService.canTranscode` widened to animated-image slides; `preferredPresetOrder(for:)` leads ProRes 4444 for animated images; `SlideGridView` right-click menu uses preferred order
+- [~] C5: Image-sequence detect (`name.0001.png`) → offer encode-to-ProRes-4444 via `AVAssetWriter`
+  - [x] C5a: `Services/ImageSequenceDetector.swift` pure-logic — groups `name.NNN[N].(png|jpg|jpeg|tiff|tif|exr)` into Sequences vs leftovers; supports 3- or 4-digit counters, multi-dot basenames, multiple sequences in one batch, gaps in counter
+  - [ ] C5b: AVAssetWriter encoder + import-time routing + folder-drop UX (operator-supplied frame rate?)
+  - [ ] C5c: UI affordance to encode a detected sequence (could share the C2 progress strip with abstraction over the job source)
 - [x] C6: Keynote import — AppleScript-driven `.key` → PDF → bitmaps; "Keynote not installed" diagnostic
   - [x] C6a: `Services/KeynoteImporter.swift` (NSAppleScript export-to-PDF, install detection, error mapping) + 9 tests
   - [x] C6b: `MediaImporter.importSlides(from:context:)` routes `.key` via injectable `keynoteExporter` → PDFImporter + 5 tests
@@ -85,6 +91,10 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 - [ ] C13: Audio cue types — embedded, audio-only cue, background bed
 - [ ] C14: Per-cue audio: volume, mute, fade-in/out, crossfade override, varispeed with pitch correction
 - [ ] C15: SRT/WebVTT subtitle sidecar render (subtitle layer in compositor)
+- [~] C-banner: Import status banner across PDF / Keynote / transcode failures (session 10)
+  - [x] C-banner-a: `MediaImportFailure` value type + `MediaImportReport` + `MediaImporter.importSlidesAndReport(from:context:)` overload
+  - [x] C-banner-b: `ImportStatusBanner` ObservableObject + `ImportStatusBannerView` rendered above `OutputStatusBar`; PDF / Keynote / unsupported / transcode (non-cancel) failure paths feed in
+  - [ ] C-banner-c: Replace the modal "Keynote not installed" `NSAlert` with the banner (minor UX call — currently both fire when Keynote isn't installed); also wire compositor / playback runtime errors if they ever surface
 - [ ] C16: Phase C summary + manual rehearsal steps
 
 ## Phase D — Show control
