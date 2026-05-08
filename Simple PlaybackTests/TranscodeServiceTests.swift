@@ -69,6 +69,41 @@ final class TranscodeServiceTests: XCTestCase {
         XCTAssertFalse(TranscodeService.canTranscode(slide: unresolvable))
     }
 
+    // C4 widening: animated GIF / APNG slides arrive as `.image` but with
+    // `flags.animatedImage = true` set by `AnimatedImageInspector`. They should now
+    // light up the right-click menu so the operator can convert to ProRes 4444.
+    func testCanTranscodeAcceptsAnimatedImageSlide() throws {
+        let gif = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CanTranscode-\(UUID().uuidString).gif")
+        try Data().write(to: gif)
+        defer { try? FileManager.default.removeItem(at: gif) }
+
+        var slide = MediaSlide(url: gif, mediaKind: .image)
+        slide.flags = MediaFlags(animatedImage: true)
+        XCTAssertTrue(TranscodeService.canTranscode(slide: slide))
+    }
+
+    func testPreferredPresetOrderLeads4444ForAnimatedImages() {
+        let url = URL(fileURLWithPath: "/tmp/anim.gif")
+        var animated = MediaSlide(url: url, mediaKind: .image)
+        animated.flags = MediaFlags(animatedImage: true)
+        // Alpha-aware sources lead with the alpha-preserving codec; ProRes 422 is still
+        // available so an operator can override.
+        XCTAssertEqual(
+            TranscodeService.preferredPresetOrder(for: animated),
+            [.proRes4444, .proRes422]
+        )
+    }
+
+    func testPreferredPresetOrderLeads422ForVideoSlides() {
+        let url = URL(fileURLWithPath: "/tmp/clip.mov")
+        let video = MediaSlide(url: url, mediaKind: .video)
+        XCTAssertEqual(
+            TranscodeService.preferredPresetOrder(for: video),
+            [.proRes422, .proRes4444]
+        )
+    }
+
     // MARK: - Job state machine
 
     @MainActor

@@ -69,10 +69,30 @@ enum TranscodeService {
         "\(UUID().uuidString).\(preset.fileExtension)"
     }
 
-    /// Whether the asset library should offer a transcode at all. False for stills,
-    /// audio-only files, broken assets — the menu item should be hidden in those cases.
+    /// Whether the asset library should offer a transcode at all. False for static stills
+    /// (no point transcoding a PNG to ProRes), audio-only files, broken assets — the menu
+    /// item should be hidden in those cases. Animated GIF / APNG (`.image` slides whose
+    /// `flags.animatedImage` is true, per C4) are eligible: today they only play their
+    /// first frame, and the C4 chip's recommendation is to transcode to ProRes 4444 to
+    /// recover full motion. AVFoundation reads animated GIFs through `AVURLAsset` on
+    /// modern macOS, so the export-session path works the same as the video case.
     static func canTranscode(slide: MediaSlide) -> Bool {
-        slide.mediaKind == .video && slide.media.resolvedURL() != nil
+        guard slide.media.resolvedURL() != nil else { return false }
+        if slide.mediaKind == .video { return true }
+        if slide.mediaKind == .image && slide.flags.animatedImage { return true }
+        return false
+    }
+
+    /// Operator-friendly order for the right-click menu. Animated GIF / APNG sources lead
+    /// with ProRes 4444 (alpha-bearing — typical animated-GIF use cases like lower-thirds
+    /// and logo bugs need the alpha channel preserved). All other transcode-eligible
+    /// sources lead with ProRes 422 — the standard "rescue a long-GOP / VFR clip" path.
+    /// Both presets are always returned so the operator can override the default.
+    static func preferredPresetOrder(for slide: MediaSlide) -> [TranscodePreset] {
+        if slide.flags.animatedImage {
+            return [.proRes4444, .proRes422]
+        }
+        return [.proRes422, .proRes4444]
     }
 }
 

@@ -84,11 +84,10 @@ struct SlideGridView: View {
     @ViewBuilder
     private func slideContextMenu(for slide: MediaSlide) -> some View {
         if transcodeEnabled, TranscodeService.canTranscode(slide: slide) {
-            Button("Transcode to ProRes 422") {
-                requestTranscode(slide, .proRes422)
-            }
-            Button("Transcode to ProRes 4444") {
-                requestTranscode(slide, .proRes4444)
+            ForEach(TranscodeService.preferredPresetOrder(for: slide), id: \.self) { preset in
+                Button("Transcode to \(preset.label)") {
+                    requestTranscode(slide, preset)
+                }
             }
         }
     }
