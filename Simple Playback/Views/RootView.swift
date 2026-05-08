@@ -7,13 +7,14 @@ struct RootView: View {
     @ObservedObject var outputSettings: OutputSettingsStore
     @StateObject private var playback = PlaybackController()
     @StateObject private var showController: ShowControllerHolder
+    @StateObject private var transcodeCoordinator = TranscodeCoordinator()
     @State private var selectedSlideID: UUID?
     @State private var selectedCueID: UUID?
     @State private var dropTargeted = false
     @State private var inspectorMode: InspectorMode = .selection
     /// Stable per-window UUID. Untitled documents — which have no fileURL yet —
-    /// rasterize PDFs into an app-support subdirectory keyed by this ID so concurrent
-    /// untitled windows don't collide.
+    /// rasterize PDFs (and transcode to ProRes) into an app-support subdirectory keyed
+    /// by this ID so concurrent untitled windows don't collide.
     @State private var untitledSessionID = UUID()
 
     /// Returns the current document's bundle URL, or `nil` for an untitled document.
@@ -141,7 +142,15 @@ struct RootView: View {
                 selectedSlideID: $selectedSlideID,
                 liveSlideID: playback.liveSlideID,
                 transitionSettings: $document.project.transitionSettings,
-                takeAction: takeSlide
+                takeAction: takeSlide,
+                transcodeJobs: transcodeCoordinator.jobs,
+                transcodeEnabled: !(showController.controller?.showMode ?? false),
+                requestTranscode: { slide, preset in
+                    requestTranscode(slide: slide, preset: preset)
+                },
+                cancelTranscode: { job in
+                    job.cancel()
+                }
             )
             .frame(minWidth: 320, idealWidth: 460)
 
@@ -437,6 +446,57 @@ struct RootView: View {
             .appendingPathComponent("Simple Playback", isDirectory: true)
             .appendingPathComponent("Renders", isDirectory: true)
     }()
+
+    /// C2: where ProRes-converted siblings land. Mirrors the C3 `renderRootDirectory`
+    /// shape — bundle-relative when the document is saved (spec §3.17 `<bundle>/Transcoded/`)
+    /// and an App Support fallback for untitled documents (the same future "Bundle for
+    /// Travel" pickup applies). Orphaned transcodes accumulate when the operator deletes a
+    /// sibling slide; a future "Compact project" action would walk the bundle and remove
+    /// transcodes no MediaSlide resolves to (filed as a known gap).
+    private func transcodedRootDirectory() -> URL {
+        if let bundleURL = projectBundleURLProvider() {
+            return bundleURL.appendingPathComponent(
+                ProjectBundleLayout.transcodedDirectory,
+                isDirectory: true
+            )
+        }
+        return RootView.untitledTranscodedRoot
+            .appendingPathComponent(untitledSessionID.uuidString, isDirectory: true)
+    }
+
+    private static let untitledTranscodedRoot: URL = {
+        let appSupport = (try? FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )) ?? FileManager.default.temporaryDirectory
+        return appSupport
+            .appendingPathComponent("Simple Playback", isDirectory: true)
+            .appendingPathComponent("Transcoded", isDirectory: true)
+    }()
+
+    /// Kicks off a transcode for `slide` and splices the resulting sibling slide into
+    /// `project.slides` immediately after the source on completion. Failures are
+    /// silent today — a future "import status banner" (deferred from C3) would expose
+    /// `TranscodeError.exportFailed` and per-batch counts. Cancellations are silent
+    /// by design.
+    private func requestTranscode(slide: MediaSlide, preset: TranscodePreset) {
+        let dest = transcodedRootDirectory()
+        transcodeCoordinator.transcode(
+            slide: slide,
+            preset: preset,
+            destinationDirectory: dest
+        ) { [self] result in
+            guard case .success(let outcome) = result else { return }
+            if let idx = document.project.slides.firstIndex(where: { $0.id == outcome.sourceSlideID }) {
+                document.project.slides.insert(outcome.siblingSlide, at: idx + 1)
+            } else {
+                document.project.slides.append(outcome.siblingSlide)
+            }
+            selectedSlideID = outcome.siblingSlide.id
+        }
+    }
 }
 
 /// SwiftUI `@StateObject` requires the wrapped value to be initialized eagerly, but our

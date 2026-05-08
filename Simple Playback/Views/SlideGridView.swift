@@ -7,6 +7,18 @@ struct SlideGridView: View {
     var liveSlideID: UUID?
     @Binding var transitionSettings: PlayoutTransitionSettings
     var takeAction: (MediaSlide) -> Void
+    /// Live transcode jobs for the active document. Rendered as a non-modal progress
+    /// strip just above the transition controls so the operator sees them in context
+    /// with the source slides without a modal sheet (Show Mode forbids modals per
+    /// spec §3.5 — even in Edit Mode, a multi-minute ProRes export should not gate
+    /// the operator's other work).
+    var transcodeJobs: [TranscodeJob] = []
+    /// Transcode menu enablement — passed `false` while the document is in Show Mode.
+    var transcodeEnabled: Bool = true
+    /// Asks the host to kick off a transcode for the source slide via the coordinator.
+    var requestTranscode: (MediaSlide, TranscodePreset) -> Void = { _, _ in }
+    /// Asks the host to cancel a running transcode.
+    var cancelTranscode: (TranscodeJob) -> Void = { _ in }
 
     private let columns = [
         GridItem(.adaptive(minimum: 148, maximum: 190), spacing: 12)
@@ -46,6 +58,9 @@ struct SlideGridView: View {
                                     takeAction(slide)
                                 }
                                 .draggable(slide.id.uuidString)
+                                .contextMenu {
+                                    slideContextMenu(for: slide)
+                                }
                             }
                         }
                         .padding(14)
@@ -54,11 +69,85 @@ struct SlideGridView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+            if !transcodeJobs.isEmpty {
+                Divider()
+                TranscodeProgressStrip(jobs: transcodeJobs, cancel: cancelTranscode)
+            }
+
             Divider()
 
             PaletteTransitionControls(settings: $transitionSettings)
         }
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    @ViewBuilder
+    private func slideContextMenu(for slide: MediaSlide) -> some View {
+        if transcodeEnabled, TranscodeService.canTranscode(slide: slide) {
+            Button("Transcode to ProRes 422") {
+                requestTranscode(slide, .proRes422)
+            }
+            Button("Transcode to ProRes 4444") {
+                requestTranscode(slide, .proRes4444)
+            }
+        }
+    }
+}
+
+/// Non-modal progress strip rendered above the palette transition controls. One row
+/// per running job — clip name, progress bar, percent, cancel. On completion the
+/// coordinator removes the job from its list and the row disappears; the sibling
+/// MediaSlide appears in the palette grid above as the splice lands. Operators reading
+/// the palette at a glance can tell "X is transcoding" vs "X finished, here's the
+/// sibling" without a modal sheet.
+private struct TranscodeProgressStrip: View {
+    let jobs: [TranscodeJob]
+    let cancel: (TranscodeJob) -> Void
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ForEach(jobs) { job in
+                TranscodeProgressRow(job: job, cancel: { cancel(job) })
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
+}
+
+private struct TranscodeProgressRow: View {
+    @ObservedObject var job: TranscodeJob
+    let cancel: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(job.displayLabel)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                ProgressView(value: job.progress)
+                    .progressViewStyle(.linear)
+            }
+            Text(percentLabel)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(width: 36, alignment: .trailing)
+            Button(action: cancel) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help("Cancel transcode")
+        }
+    }
+
+    private var percentLabel: String {
+        let pct = Int((job.progress * 100).rounded())
+        return "\(pct)%"
     }
 }
 
