@@ -74,6 +74,11 @@ struct RootView: View {
     /// with the bundle-aware online check so a moved bundle's managed assets
     /// classify correctly. Empty (no banner) when no slides are offline.
     @State private var assetLibraryStatus: AssetLibraryStatus = .empty
+    /// Coalesces rapid `project.slides` change bursts (drag-reorder, multi-
+    /// import, bulk-delete) into a single recompute. Each `evaluate` call
+    /// stats every slide; without the 250 ms collapse window a 500-slide
+    /// reorder would fire 500 sequential `FileManager.fileExists` syscalls.
+    @State private var assetLibraryRecomputeDebouncer = Debouncer(interval: .milliseconds(250))
     /// Stable per-window UUID. Untitled documents — which have no fileURL yet —
     /// rasterize PDFs (and transcode to ProRes) into an app-support subdirectory keyed
     /// by this ID so concurrent untitled windows don't collide.
@@ -218,7 +223,9 @@ struct RootView: View {
             recomputeAssetLibraryStatus()
         }
         .onChange(of: document.project.slides) {
-            recomputeAssetLibraryStatus()
+            assetLibraryRecomputeDebouncer.schedule {
+                recomputeAssetLibraryStatus()
+            }
         }
         .onChange(of: bundleURLObserver.bundleURL) {
             // Save-As (or initial document open) just changed the bundle URL.
@@ -647,10 +654,13 @@ struct RootView: View {
         )
     }
 
-    /// C9 — refresh `assetLibraryStatus` from the live asset library. Cheap
-    /// pure-logic walk over `project.slides`; perf concerns on libraries
-    /// >500 slides are noted in `phase_c_summary.md` for a future debounce
-    /// pass.
+    /// C9 — refresh `assetLibraryStatus` from the live asset library.
+    /// `AssetLibraryProbe.evaluate` is pure-logic O(slides), but `liveIsOnline`
+    /// stats each slide, so on a 500-slide deck this is ~500 syscalls. Burst
+    /// callers (slide-change `onChange`) route through
+    /// `assetLibraryRecomputeDebouncer`; one-shot callers (`.onAppear`,
+    /// bundle-URL change) call this directly so the banner refreshes
+    /// immediately when the bundle moves.
     private func recomputeAssetLibraryStatus() {
         let mediaDir = bundleMediaDirectory()
         assetLibraryStatus = AssetLibraryProbe.evaluate(
