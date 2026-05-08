@@ -42,6 +42,7 @@
 		B69CE1461F740680651EFC39 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F1E1F27FCEA1C60E3C601307 /* AppIcon.icon */; };
 		BFE5FEA90AEA11BD597BEC0C /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EB3CFD9074943CC8F73C637C /* AVFoundation.framework */; };
 		C02D1DDF70B419255097C42E /* InspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC0B853C12B46AB64798C9D /* InspectorView.swift */; };
+		C7A4EDB0BDB83897190B4A25 /* OSCQueryServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96F3960B5C5F817DFB3377D4 /* OSCQueryServer.swift */; };
 		C9842DF5C4DF8FAA50B74011 /* DeckLinkBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = B637A693F1741DD785724AAE /* DeckLinkBridge.mm */; };
 		CC37F2E5CFC466A33AA98F58 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773B6424E99EBEA84CB2027B /* ModelTests.swift */; };
 		CF0020C246A6F8DF7BC4B6D6 /* VideoOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF2597FFE1CB9927C6CB6395 /* VideoOutput.swift */; };
@@ -92,6 +93,7 @@
 		8FD2B422FED7E9102FAEA3D2 /* ShowControlState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlState.swift; sourceTree = "<group>"; };
 		92D6FAD99797FC3C21DA725E /* AVKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVKit.framework; path = System/Library/Frameworks/AVKit.framework; sourceTree = SDKROOT; };
 		93727D6450DEE3ED3934DA97 /* WebSocketFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketFrame.swift; sourceTree = "<group>"; };
+		96F3960B5C5F817DFB3377D4 /* OSCQueryServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCQueryServer.swift; sourceTree = "<group>"; };
 		9E5D5CE935540C98B6BAAAEF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9E8B4217656574F74350F1FF /* DeckLinkSDKDispatch.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DeckLinkSDKDispatch.cpp; sourceTree = "<group>"; };
 		A13557C5F98007D62499B140 /* StateSnapshotEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateSnapshotEncoder.swift; sourceTree = "<group>"; };
@@ -264,6 +266,7 @@
 				7B4EF3D125520DB5F0C1F703 /* HTTPServer.swift */,
 				00712F270D3EB78020694E87 /* OSCAddressMap.swift */,
 				473B7534956D23833D7E61BD /* OSCMessage.swift */,
+				96F3960B5C5F817DFB3377D4 /* OSCQueryServer.swift */,
 				BBBA363D1C04A7119011031E /* OSCServer.swift */,
 				6CD51FEB5E50862496E8A6BA /* ShowControlActions.swift */,
 				70B339087E0F91F6B7504F6D /* ShowControlDispatcher.swift */,
@@ -393,6 +396,7 @@
 				154CB32BBDF7469F91B49587 /* MediaModels.swift in Sources */,
 				6B7B4C3468690A6CA15DBD56 /* OSCAddressMap.swift in Sources */,
 				02E7848C2C617A208282F42A /* OSCMessage.swift in Sources */,
+				C7A4EDB0BDB83897190B4A25 /* OSCQueryServer.swift in Sources */,
 				8E0250619812CB053444052C /* OSCServer.swift in Sources */,
 				EAA4BC2642696555F131F8BE /* OutputPreviewView.swift in Sources */,
 				1624805A1FF72880895DDB5A /* OutputStatusBar.swift in Sources */,

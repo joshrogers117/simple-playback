@@ -268,9 +268,10 @@ struct AnyCodingKey: CodingKey {
 
 extension JSONEncoder {
     /// Standard encoder for show-control replies. Sorted keys for stable output.
+    /// Slashes are kept unescaped for OSCQuery / address compatibility.
     static func standard() -> JSONEncoder {
         let e = JSONEncoder()
-        e.outputFormatting = [.sortedKeys]
+        e.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         return e
     }
 }

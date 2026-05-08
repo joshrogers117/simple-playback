@@ -275,4 +275,68 @@ final class ShowControlTests: XCTestCase {
         XCTAssertNotEqual(a, b)
         XCTAssertGreaterThanOrEqual(a.count, 16)
     }
+
+    // MARK: - OSCQuery (D4)
+
+    func testOSCQueryRootListsSpNamespace() throws {
+        let state = ShowControlState()
+        let server = OSCQueryServer(state: state)
+        let result = try XCTUnwrap(server.handle(path: "/", query: [:]))
+        XCTAssertEqual(result.status, 200)
+        let str = try XCTUnwrap(String(data: result.body, encoding: .utf8))
+        XCTAssertTrue(str.contains("\"FULL_PATH\":\"/\""))
+        XCTAssertTrue(str.contains("\"FULL_PATH\":\"/sp\""))
+    }
+
+    func testOSCQueryReturnsHostInfoOnQuery() throws {
+        let state = ShowControlState()
+        let server = OSCQueryServer(state: state)
+        let result = try XCTUnwrap(server.handle(path: "/", query: ["HOST_INFO": ""]))
+        let str = try XCTUnwrap(String(data: result.body, encoding: .utf8))
+        XCTAssertTrue(str.contains("\"NAME\":\"Simple Playback\""))
+        XCTAssertTrue(str.contains("\"OSC_PORT\":53000"))
+        XCTAssertTrue(str.contains("\"EXTENSIONS\""))
+    }
+
+    func testOSCQueryEnumeratesCueByNumber() throws {
+        let state = ShowControlState()
+        var list = ShowList()
+        let cue = Cue(number: "INTRO", title: "Intro", assetID: UUID())
+        try list.append(cue)
+        state.updateShowList(list)
+        let server = OSCQueryServer(state: state)
+        let result = try XCTUnwrap(server.handle(path: "/sp/cue", query: [:]))
+        let str = try XCTUnwrap(String(data: result.body, encoding: .utf8))
+        XCTAssertTrue(str.contains("\"INTRO\""))
+        XCTAssertTrue(str.contains("\"/sp/cue/INTRO\""))
+    }
+
+    func testOSCQueryWalksIntoCueLeafs() throws {
+        let state = ShowControlState()
+        var list = ShowList()
+        let cue = Cue(number: "INTRO", title: "Intro", assetID: UUID())
+        try list.append(cue)
+        state.updateShowList(list)
+        let server = OSCQueryServer(state: state)
+        let result = try XCTUnwrap(server.handle(path: "/sp/cue/INTRO/play", query: [:]))
+        XCTAssertEqual(result.status, 200)
+        let str = try XCTUnwrap(String(data: result.body, encoding: .utf8))
+        XCTAssertTrue(str.contains("\"/sp/cue/INTRO/play\""))
+    }
+
+    func testOSCQueryReturns404OnUnknownPath() {
+        let state = ShowControlState()
+        let server = OSCQueryServer(state: state)
+        let result = server.handle(path: "/sp/bogus/path", query: [:])
+        XCTAssertEqual(result?.status, 404)
+    }
+
+    func testOSCQueryValueQuerySelector() throws {
+        let state = ShowControlState()
+        state.updateBlackout(true)
+        let server = OSCQueryServer(state: state)
+        let result = try XCTUnwrap(server.handle(path: "/sp/output/main/blackout", query: ["VALUE": ""]))
+        let str = try XCTUnwrap(String(data: result.body, encoding: .utf8))
+        XCTAssertTrue(str.contains("\"VALUE\""))
+    }
 }
