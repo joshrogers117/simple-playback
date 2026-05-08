@@ -21,6 +21,13 @@ enum ProjectBundleLayout {
     /// the bundle is venue-portable. The MediaResolver short-circuits to this folder
     /// before falling through to the on-disk original path for managed assets.
     static let mediaDirectory = "Media"
+
+    /// C10 — per-slide poster-frame JPEG cache. `MediaImporter` writes one
+    /// `<slide.id>.jpg` per import; `SlideGridView`'s palette falls back to
+    /// these when the source asset is offline so a moved or relinked bundle
+    /// still renders thumbnails. Sibling to `Cache/Renders/` (PDF rasters)
+    /// because both are derived-from-source caches that are safe to delete.
+    static let thumbnailsDirectory = "Cache/Thumbnails"
 }
 
 /// Tiny ObservableObject that mirrors `NSDocument.fileURL` into a SwiftUI

@@ -27,6 +27,12 @@ struct MediaImportContext {
     /// subdirectory inside this root. Caller decides project-bundle (`Cache/Renders/`) vs.
     /// app-support fallback (untitled documents).
     var renderRootDirectory: URL
+
+    /// C10 — directory under which a per-slide poster-frame JPEG is written
+    /// at import time so the palette can render even when the source is
+    /// offline. Filename is `<slide.id>.jpg`. `nil` skips thumbnail caching
+    /// (untitled docs without an app-support fallback path; tests).
+    var thumbnailRootDirectory: URL? = nil
 }
 
 struct MediaImporter {
@@ -45,6 +51,15 @@ struct MediaImporter {
     /// content.
     static var fingerprinter: (URL) -> MediaAssetFingerprint? = { url in
         try? AssetFingerprinter.fingerprint(url: url)
+    }
+
+    /// Test seam — given the slide id and the still-resolvable source URL,
+    /// produce JPEG `Data` to cache under `MediaImportContext.thumbnailRootDirectory`.
+    /// Default uses `ThumbnailGenerator.generateJPEG`. Returning nil skips the
+    /// cache write (e.g., source unreadable, codec rejected at `.zero`); the
+    /// importer never blocks an import on thumbnail failure.
+    static var thumbnailEncoder: (URL, MediaKind) -> Data? = { url, kind in
+        try? ThumbnailGenerator.generateJPEG(for: url, mediaKind: kind)
     }
 
     /// Backwards-compatible entry point: no context means PDF (and other conversion-required
@@ -104,10 +119,34 @@ struct MediaImporter {
             }
             var slide = MediaSlide(url: url, mediaKind: kind, nativeFrameRate: fps, flags: flags)
             slide.media.fingerprint = fingerprinter(url)
+            cacheThumbnailIfPossible(slide: slide, sourceURL: url, kind: kind, context: context)
             slides.append(slide)
         }
 
         return MediaImportReport(slides: slides, failures: failures)
+    }
+
+    /// C10 — best-effort poster-frame cache write. Never throws into the
+    /// import path; a thumbnail failure should not block the slide from being
+    /// imported. The directory is created lazily on first write.
+    private static func cacheThumbnailIfPossible(
+        slide: MediaSlide,
+        sourceURL: URL,
+        kind: MediaKind,
+        context: MediaImportContext?
+    ) {
+        guard let directory = context?.thumbnailRootDirectory else { return }
+        guard let data = thumbnailEncoder(sourceURL, kind) else { return }
+        do {
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+            let dest = directory.appendingPathComponent("\(slide.id.uuidString).jpg")
+            try data.write(to: dest, options: .atomic)
+        } catch {
+            // Silent — best-effort cache.
+        }
     }
 
     /// Operator-facing summary string. `LocalizedError.errorDescription` is the canonical
@@ -212,7 +251,11 @@ struct MediaImporter {
             rasterSize: context.rasterSize,
             destinationDirectory: batchDirectory
         )
-        return imageSlides(forPagesAt: pageURLs, baseTitle: url.deletingPathExtension().lastPathComponent)
+        return imageSlidesWithThumbnailCache(
+            forPagesAt: pageURLs,
+            baseTitle: url.deletingPathExtension().lastPathComponent,
+            context: context
+        )
     }
 
     /// One Keynote deck in → N image MediaSlides out, via Keynote → PDF → PNG. The
@@ -229,7 +272,11 @@ struct MediaImporter {
             rasterSize: context.rasterSize,
             destinationDirectory: batchDirectory
         )
-        return imageSlides(forPagesAt: pageURLs, baseTitle: url.deletingPathExtension().lastPathComponent)
+        return imageSlidesWithThumbnailCache(
+            forPagesAt: pageURLs,
+            baseTitle: url.deletingPathExtension().lastPathComponent,
+            context: context
+        )
     }
 
     private static func imageSlides(forPagesAt pageURLs: [URL], baseTitle: String) -> [MediaSlide] {
@@ -237,6 +284,24 @@ struct MediaImporter {
             var slide = MediaSlide(url: pageURL, mediaKind: .image)
             slide.title = "\(baseTitle) — page \(index + 1)"
             slide.media.fingerprint = fingerprinter(pageURL)
+            return slide
+        }
+    }
+
+    /// C10 — variant of `imageSlides` that also caches a poster-frame
+    /// thumbnail per page. The PDF / Keynote import paths use this so the
+    /// palette renders the rasterized page even when the bundle has been
+    /// moved and the absolute Cache/Renders/ path is stale.
+    private static func imageSlidesWithThumbnailCache(
+        forPagesAt pageURLs: [URL],
+        baseTitle: String,
+        context: MediaImportContext
+    ) -> [MediaSlide] {
+        pageURLs.enumerated().map { index, pageURL in
+            var slide = MediaSlide(url: pageURL, mediaKind: .image)
+            slide.title = "\(baseTitle) — page \(index + 1)"
+            slide.media.fingerprint = fingerprinter(pageURL)
+            cacheThumbnailIfPossible(slide: slide, sourceURL: pageURL, kind: .image, context: context)
             return slide
         }
     }
