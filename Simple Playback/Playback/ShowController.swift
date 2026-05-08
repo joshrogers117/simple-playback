@@ -36,6 +36,11 @@ final class ShowController: ObservableObject {
     /// is wired up.
     weak var showLog: ShowLog?
 
+    /// E5 — recent-take history (last 200 fires). Captured on
+    /// `handleCueFired`. Optional so headless tests / early-boot wiring
+    /// don't need an instance; production sets it from `RootView`.
+    weak var takeHistory: TakeHistory?
+
     private let playback: PlaybackController
     private let assetLookup: (UUID) -> MediaSlide?
     private let transitionSettingsLookup: () -> PlayoutTransitionSettings
@@ -359,6 +364,15 @@ final class ShowController: ObservableObject {
     private func handleCueFired(_ cue: Cue) {
         liveCueID = cue.id
         revision &+= 1
+
+        // E5 — record this fire in the take history. `videoDuration` is set
+        // asynchronously after `playback.take(...)`, so capturing here yields
+        // the *previous* take's duration on the first observation. We sample
+        // it as a best-effort hint; nil on image cues (videoDuration == 0).
+        let durationHint: TimeInterval? = playback.videoDuration > 0
+            ? playback.videoDuration
+            : nil
+        takeHistory?.recordFire(cue: cue, durationSecondsAtFire: durationHint)
 
         guard let asset = assetLookup(cue.assetID) else {
             // Missing asset is a runtime error: the cue references an asset that no longer

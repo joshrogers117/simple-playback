@@ -15,6 +15,9 @@ struct RootView: View {
     /// records to the journal. Persistence destination is set in
     /// `bindShowLogFile()` once the document has a bundle URL.
     @StateObject private var showLog = ShowLog()
+    /// E5 — last 200 cue fires for the open document. Owned at the view
+    /// layer so it follows the document lifecycle (cleared on close).
+    @StateObject private var takeHistory = TakeHistory()
     /// E8 — project lock controller. Owned by the NSDocument (so the lock is
     /// released even if SwiftUI teardown beats us to it); RootView observes
     /// the published banner state to surface the warning.
@@ -44,6 +47,8 @@ struct RootView: View {
     @State private var preShowCheckPresented: Bool = false
     /// Toggle for the Phase E3 show-log viewer.
     @State private var showLogPresented: Bool = false
+    /// Toggle for the Phase E5 take-history sheet.
+    @State private var takeHistoryPresented: Bool = false
     /// Stable per-window UUID. Untitled documents — which have no fileURL yet —
     /// rasterize PDFs (and transcode to ProRes) into an app-support subdirectory keyed
     /// by this ID so concurrent untitled windows don't collide.
@@ -144,6 +149,13 @@ struct RootView: View {
                 }
                 .help("Open the show log — every cue fire, panic, clear, missing-media, OSC action.")
 
+                Button {
+                    takeHistoryPresented = true
+                } label: {
+                    Label("Take History", systemImage: "clock.arrow.circlepath")
+                }
+                .help("Open the take history — the last 200 cue fires in this session.")
+
                 Spacer()
 
                 Toggle(isOn: showModeBinding) {
@@ -206,6 +218,9 @@ struct RootView: View {
         }
         .sheet(isPresented: $showLogPresented) {
             ShowLogView(log: showLog, onClose: { showLogPresented = false })
+        }
+        .sheet(isPresented: $takeHistoryPresented) {
+            TakeHistoryView(history: takeHistory, onClose: { takeHistoryPresented = false })
         }
         .sheet(item: $pendingFolderImport) { _ in
             // The closure parameter is read-only; we drive the sheet from the @State so
@@ -408,6 +423,7 @@ struct RootView: View {
                 }
             )
             showController.controller?.showLog = showLog
+            showController.controller?.takeHistory = takeHistory
             bindShowLogFile()
         }
         syncCompositorOverlays()
