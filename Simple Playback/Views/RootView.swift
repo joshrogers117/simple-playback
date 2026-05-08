@@ -162,6 +162,7 @@ struct RootView: View {
                     project: document.project,
                     context: preShowCheckContext()
                 ),
+                fixHandlers: preShowCheckFixHandlers(),
                 onClose: { preShowCheckPresented = false }
             )
         }
@@ -446,6 +447,45 @@ struct RootView: View {
         }
         ctx.audioDeviceAvailable = AudioDeviceProbe.isDefaultOutputDeviceAvailable()
         return ctx
+    }
+
+    /// Build the per-row fix-action handler dictionary the Pre-Show sheet uses.
+    /// Each id maps to a single closure; rows without an entry render no Fix
+    /// button. Handlers stay simple (one deep-link / Finder-reveal each) so
+    /// the resolution path is easy for the operator to understand at a glance.
+    private func preShowCheckFixHandlers() -> PreShowCheckFixHandlers {
+        var handlers = PreShowCheckFixHandlers()
+
+        // system.audio — open System Settings → Sound. Same deep-link as
+        // standalone "no audio device" rescue.
+        handlers.byRowID["system.audio"] = {
+            NSWorkspace.shared.open(PreShowFixDeepLinks.soundSettings)
+        }
+
+        // system.disk — reveal the project bundle in Finder so the operator
+        // can clean up locally. For untitled documents (no bundle on disk
+        // yet) the Save-As affordance is the right answer; we suppress the
+        // Fix button in that case.
+        if let bundleURL = projectBundleURLProvider() {
+            handlers.byRowID["system.disk"] = {
+                NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
+            }
+        }
+
+        // output.reference — open Blackmagic Desktop Video Setup if installed.
+        // That's where REF/format/output configuration lives. Skip the Fix
+        // button entirely if the app isn't on disk; the operator's path is
+        // hardware-side (plug in a REF cable) and we'd rather show no Fix
+        // than a dead button.
+        let dvsPath = PreShowFixDeepLinks.blackmagicDesktopVideoSetupAppPath
+        if FileManager.default.fileExists(atPath: dvsPath) {
+            let dvsURL = URL(fileURLWithPath: dvsPath)
+            handlers.byRowID["output.reference"] = {
+                NSWorkspace.shared.open(dvsURL)
+            }
+        }
+
+        return handlers
     }
 
     private func openFolderPanel() {

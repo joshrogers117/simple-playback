@@ -71,6 +71,7 @@
 		9693BB1ACC35C9F34674A4A2 /* Timecode.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0BC03657660E157633D31C6 /* Timecode.swift */; };
 		976DD722059E40449CB77621 /* ShowControlActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CD51FEB5E50862496E8A6BA /* ShowControlActions.swift */; };
 		9F685F50F961D73764497CED /* TransportSinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24668879F6BB6C3E4ED2C3F5 /* TransportSinkTests.swift */; };
+		A0C4E2AC793B8B206E6F7128 /* PreShowCheckFixHandlersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F69D8058E585303C53CD3E3F /* PreShowCheckFixHandlersTests.swift */; };
 		A34CA8E22BA04CC530DD0597 /* LTCReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 934A545F270968E04F027F8B /* LTCReader.swift */; };
 		A73BB158118BD8B447BB9015 /* AudioDeviceProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FC38AB74DB5321128E72E79 /* AudioDeviceProbe.swift */; };
 		A73C56A196D7FCFABC2C00F2 /* ShowListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4040F3064AA861BCD17050FB /* ShowListView.swift */; };
@@ -90,6 +91,7 @@
 		CCCB5A1DDC2A8EF972427BB8 /* MediaImportFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8536D230F07A5A41DD22032 /* MediaImportFailureTests.swift */; };
 		CF0020C246A6F8DF7BC4B6D6 /* VideoOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF2597FFE1CB9927C6CB6395 /* VideoOutput.swift */; };
 		D2D87259CFD1B81F53DBC0C8 /* ImageSequenceEncodeCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DE55003A493F69B338D09BA /* ImageSequenceEncodeCoordinatorTests.swift */; };
+		D38368F7F25F022BC131466F /* PreShowCheckFixHandlers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C5CF912A93B1EB5CA657689 /* PreShowCheckFixHandlers.swift */; };
 		D93CCBEA7AE13AB4FC44F4F3 /* MediaFlagsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF79938EE267D36AF458C582 /* MediaFlagsTests.swift */; };
 		DCABF0FFCC0E6E0596173F64 /* CompositorPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21271656A4CCF6A5AD4E2940 /* CompositorPipelineTests.swift */; };
 		DE590B021826D8B2C652636D /* PreShowCheckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95005D52A657E2A60F9E2008 /* PreShowCheckView.swift */; };
@@ -130,6 +132,7 @@
 		0AAABB8C041A4E6DF8BE8685 /* LTCDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LTCDecoder.swift; sourceTree = "<group>"; };
 		0ACFD5B151F32CFDFFECCB68 /* BonjourPublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BonjourPublisher.swift; sourceTree = "<group>"; };
 		0BC0B853C12B46AB64798C9D /* InspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorView.swift; sourceTree = "<group>"; };
+		0C5CF912A93B1EB5CA657689 /* PreShowCheckFixHandlers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreShowCheckFixHandlers.swift; sourceTree = "<group>"; };
 		0E47E51BD45087956CCF2905 /* ShowControlIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlIntegrationTests.swift; sourceTree = "<group>"; };
 		189C4C83922BF987A389D797 /* HTTPRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRequest.swift; sourceTree = "<group>"; };
 		1C201B22E860FB94D92CA433 /* FrameRateConformance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameRateConformance.swift; sourceTree = "<group>"; };
@@ -226,6 +229,7 @@
 		ECEAD362FE5313C14713663D /* SimplePlaybackApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackApp.swift; sourceTree = "<group>"; };
 		F13F77220235167A2E3CF142 /* AnimatedImageInspectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedImageInspectorTests.swift; sourceTree = "<group>"; };
 		F1E1F27FCEA1C60E3C601307 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		F69D8058E585303C53CD3E3F /* PreShowCheckFixHandlersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreShowCheckFixHandlersTests.swift; sourceTree = "<group>"; };
 		F8536D230F07A5A41DD22032 /* MediaImportFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImportFailureTests.swift; sourceTree = "<group>"; };
 		FD749649E2DEED56E2B8C243 /* CueRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueRuntime.swift; sourceTree = "<group>"; };
 		FF79938EE267D36AF458C582 /* MediaFlagsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlagsTests.swift; sourceTree = "<group>"; };
@@ -342,6 +346,7 @@
 				CAD1EB0DEF2FFFA7B96C902D /* OverlayInspectorTests.swift */,
 				B631D588B2455E3C2C9EE89C /* PDFImporterTests.swift */,
 				6084981086D7D70B8E87C69E /* PendingFolderImportTests.swift */,
+				F69D8058E585303C53CD3E3F /* PreShowCheckFixHandlersTests.swift */,
 				D930FD6914035D4FEAC331A2 /* PreShowCheckTests.swift */,
 				0E47E51BD45087956CCF2905 /* ShowControlIntegrationTests.swift */,
 				237C1358E779CC8F8EBA839E /* ShowControlTests.swift */,
@@ -453,6 +458,7 @@
 				45BCD3E72BF9F52C2653862E /* PDFImporter.swift */,
 				5B45DD8149F1F904849FDFC2 /* PreShowCheck.swift */,
 				0781CD54E510EE56EFE80A9D /* PreShowCheckAdapters.swift */,
+				0C5CF912A93B1EB5CA657689 /* PreShowCheckFixHandlers.swift */,
 				BB90370BA34D673675815F69 /* TranscodeService.swift */,
 			);
 			path = Services;
@@ -597,6 +603,7 @@
 				28C1335FD15B6AE87DD31AB3 /* PlaybackController.swift in Sources */,
 				DE5FE0EC53035F43FFA246E0 /* PreShowCheck.swift in Sources */,
 				521136DC8B0B2D5FFF8C7474 /* PreShowCheckAdapters.swift in Sources */,
+				D38368F7F25F022BC131466F /* PreShowCheckFixHandlers.swift in Sources */,
 				DE590B021826D8B2C652636D /* PreShowCheckView.swift in Sources */,
 				020E6C3D173AD7E05AC7A15A /* RootView.swift in Sources */,
 				4D7E6C165E984434FD9A4BB0 /* SPFrameBlend.c in Sources */,
@@ -647,6 +654,7 @@
 				DFB8E02D46414DBF7C34D646 /* OverlayInspectorTests.swift in Sources */,
 				446ACE51C8F85BB761074619 /* PDFImporterTests.swift in Sources */,
 				B0198B8CBF5D9D7897AFAF9F /* PendingFolderImportTests.swift in Sources */,
+				A0C4E2AC793B8B206E6F7128 /* PreShowCheckFixHandlersTests.swift in Sources */,
 				E7E0BCCC5F1B98DD0A582010 /* PreShowCheckTests.swift in Sources */,
 				851AE7644559671FB09FD2BD /* ShowControlIntegrationTests.swift in Sources */,
 				00EC3572563AA2E459F2489F /* ShowControlTests.swift in Sources */,

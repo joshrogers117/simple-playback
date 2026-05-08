@@ -9,12 +9,22 @@ import SwiftUI
 /// of cross-system signal sampling (disk space, DeckLink lock state, audio device) and
 /// makes the panel itself trivially previewable / testable in isolation.
 ///
-/// **What's deferred to E2**: per-row "Fix" buttons. The current panel is read-only —
-/// the operator sees the issues and resolves them outside the panel (relink missing
-/// media, free up disk, plug in the reference cable). E2 wires fix actions per row id.
+/// E2 wires per-row "Fix" buttons. The host registers handlers keyed by
+/// `PreShowCheck.Row.id`; rows without a registered handler stay read-only.
 struct PreShowCheckView: View {
     let rows: [PreShowCheck.Row]
+    let fixHandlers: PreShowCheckFixHandlers
     let onClose: () -> Void
+
+    init(
+        rows: [PreShowCheck.Row],
+        fixHandlers: PreShowCheckFixHandlers = PreShowCheckFixHandlers(),
+        onClose: @escaping () -> Void
+    ) {
+        self.rows = rows
+        self.fixHandlers = fixHandlers
+        self.onClose = onClose
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -42,7 +52,7 @@ struct PreShowCheckView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(rows) { row in
-                            PreShowCheckRowView(row: row)
+                            PreShowCheckRowView(row: row, fixHandlers: fixHandlers)
                         }
                     }
                     .padding(.horizontal, 20)
@@ -56,6 +66,7 @@ struct PreShowCheckView: View {
 
 private struct PreShowCheckRowView: View {
     let row: PreShowCheck.Row
+    let fixHandlers: PreShowCheckFixHandlers
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -72,6 +83,12 @@ private struct PreShowCheckRowView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
+            if fixHandlers.canFix(row) {
+                Button("Fix") {
+                    fixHandlers.fix(row)
+                }
+                .controlSize(.small)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
