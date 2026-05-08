@@ -222,9 +222,16 @@ struct MediaImporter {
     /// Reads the video track's nominal frame rate. Returns `nil` if the asset has no video
     /// track or the rate could not be determined. Synchronous to match the existing import
     /// flow; used at import time, not on the render hot path.
+    ///
+    /// The deprecated sync `tracks(withMediaType:)` was replaced in macOS 13+ by
+    /// `loadTracks(withMediaType:completionHandler:)` (and the async-only
+    /// `load(.tracks(withMediaType:))`). Importer is sync, so bridge the
+    /// completion-handler variant to a synchronous result via a DispatchSemaphore +
+    /// `@unchecked Sendable` carrier — same pattern as `ThumbnailGenerator` (session 21).
+    /// Acceptable here because import is foreground, off the render hot path; track
+    /// loads typically return within a few ms.
     static func nativeFrameRate(for url: URL) -> Double? {
-        let asset = AVURLAsset(url: url)
-        guard let track = asset.tracks(withMediaType: .video).first else { return nil }
+        guard let track = loadFirstVideoTrackSync(url: url) else { return nil }
         let nominal = Double(track.nominalFrameRate)
         if nominal > 0 { return nominal }
         // Fallback: derive from minFrameDuration when nominalFrameRate reports 0 (some HEVC).
@@ -263,8 +270,34 @@ struct MediaImporter {
     }
 
     private static func hasVideoTrack(_ url: URL) -> Bool {
+        loadFirstVideoTrackSync(url: url) != nil
+    }
+
+    /// Bridge AVURLAsset's modernized async track-loading API back to a
+    /// synchronous result. The deprecated sync `tracks(withMediaType:)` is
+    /// gone from new code; the non-deprecated callback variant
+    /// `loadTracks(withMediaType:completionHandler:)` is what we hop through.
+    /// `@unchecked Sendable` box carries the result across the AVF queue;
+    /// the semaphore enforces happens-before that the type itself doesn't
+    /// express.
+    private static func loadFirstVideoTrackSync(url: URL) -> AVAssetTrack? {
         let asset = AVURLAsset(url: url)
-        return !asset.tracks(withMediaType: .video).isEmpty
+        let box = TrackLoadBox()
+        let semaphore = DispatchSemaphore(value: 0)
+        asset.loadTracks(withMediaType: .video) { tracks, _ in
+            box.tracks = tracks
+            semaphore.signal()
+        }
+        semaphore.wait()
+        return box.tracks?.first
+    }
+
+    /// Mutable carrier for the AVF completion-handler payload. Written on
+    /// AVF's internal queue, read on the calling thread after the semaphore
+    /// signal — `@unchecked Sendable` because the semaphore is the
+    /// memory-barrier rather than the type itself.
+    private final class TrackLoadBox: @unchecked Sendable {
+        var tracks: [AVAssetTrack]?
     }
 
     static func isPDF(_ url: URL) -> Bool {
