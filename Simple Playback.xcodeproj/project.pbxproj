@@ -46,6 +46,7 @@
 		A34CA8E22BA04CC530DD0597 /* LTCReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 934A545F270968E04F027F8B /* LTCReader.swift */; };
 		A73C56A196D7FCFABC2C00F2 /* ShowListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4040F3064AA861BCD17050FB /* ShowListView.swift */; };
 		A81F8D8813F0437F211EF445 /* MediaImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B328F432BC7CCB991A9A8373 /* MediaImporter.swift */; };
+		ABA983A9D89AD460EE548AF4 /* TransportSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9392E6B9D0468959B74A1F9 /* TransportSink.swift */; };
 		AC4ED3FB70B05A49DBA8AA3A /* StageScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9305D229FBA3B8EC6854577 /* StageScreen.swift */; };
 		AD31546ACCAED84FF1D140D4 /* HTTPRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189C4C83922BF987A389D797 /* HTTPRequest.swift */; };
 		B69CE1461F740680651EFC39 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F1E1F27FCEA1C60E3C601307 /* AppIcon.icon */; };
@@ -122,6 +123,7 @@
 		B328F432BC7CCB991A9A8373 /* MediaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporter.swift; sourceTree = "<group>"; };
 		B55CC65960D79FA6ECC0214F /* Simple Playback.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Simple Playback.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B637A693F1741DD785724AAE /* DeckLinkBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DeckLinkBridge.mm; sourceTree = "<group>"; };
+		B9392E6B9D0468959B74A1F9 /* TransportSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportSink.swift; sourceTree = "<group>"; };
 		BAB740EFC960FD945A655941 /* SimplePlaybackProjectDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackProjectDocument.swift; sourceTree = "<group>"; };
 		BBBA363D1C04A7119011031E /* OSCServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCServer.swift; sourceTree = "<group>"; };
 		C0BC03657660E157633D31C6 /* Timecode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timecode.swift; sourceTree = "<group>"; };
@@ -177,6 +179,7 @@
 				CF97362F36D6ED17D41359D2 /* DeckLinkDiagnostics.swift */,
 				E1B3AC760F776AC4DDC6B0F9 /* DeckLinkSDK.h */,
 				9E8B4217656574F74350F1FF /* DeckLinkSDKDispatch.cpp */,
+				B9392E6B9D0468959B74A1F9 /* TransportSink.swift */,
 				CF2597FFE1CB9927C6CB6395 /* VideoOutput.swift */,
 			);
 			path = Output;
@@ -457,6 +460,7 @@
 				E5DFE39B8CB8514358205B8E /* SubscriptionPump.swift in Sources */,
 				67058819C3FE046151E4BCAD /* SubscriptionRegistry.swift in Sources */,
 				9693BB1ACC35C9F34674A4A2 /* Timecode.swift in Sources */,
+				ABA983A9D89AD460EE548AF4 /* TransportSink.swift in Sources */,
 				CF0020C246A6F8DF7BC4B6D6 /* VideoOutput.swift in Sources */,
 				54A9764CA77C6FE799CDDC71 /* WebSocketFrame.swift in Sources */,
 			);
