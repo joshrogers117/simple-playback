@@ -22,6 +22,13 @@ struct RootView: View {
     /// released even if SwiftUI teardown beats us to it); RootView observes
     /// the published banner state to surface the warning.
     @ObservedObject private var lockController: ProjectLockController
+    /// E7 — crash-recovery controller. Same ownership story as
+    /// `lockController` — the NSDocument owns the controller so the
+    /// evaluate-on-fileURL-change machinery runs at the right time.
+    @ObservedObject private var crashRecoveryController: CrashRecoveryController
+    /// E7 — Restore handler. Implemented by the NSDocument so the project
+    /// decoder + change-count plumbing stays there. Returns true on success.
+    private let restoreFromCheckpoint: () -> Bool
     /// E6 — autosave checkpoint hook. Called by RootView when the operator
     /// toggles Show Mode. The closure is implemented by the NSDocument so
     /// the project encoder + bundle layout can stay there.
@@ -64,12 +71,16 @@ struct RootView: View {
         outputSettings: OutputSettingsStore,
         projectBundleURLProvider: @escaping () -> URL? = { nil },
         lockController: ProjectLockController,
+        crashRecoveryController: CrashRecoveryController = CrashRecoveryController(),
+        restoreFromCheckpoint: @escaping () -> Bool = { false },
         autosaveCheckpoint: @escaping (AutosaveCheckpoint.Reason) -> Void = { _ in }
     ) {
         self._document = document
         self.outputSettings = outputSettings
         self.projectBundleURLProvider = projectBundleURLProvider
         self.lockController = lockController
+        self.crashRecoveryController = crashRecoveryController
+        self.restoreFromCheckpoint = restoreFromCheckpoint
         self.autosaveCheckpoint = autosaveCheckpoint
         _showController = StateObject(wrappedValue: ShowControllerHolder())
     }
@@ -299,6 +310,11 @@ struct RootView: View {
                 ImportStatusBannerView(banner: importStatus)
 
                 ProjectLockBannerView(controller: lockController)
+
+                CrashRecoveryBannerView(
+                    controller: crashRecoveryController,
+                    onRestore: { _ = restoreFromCheckpoint() }
+                )
 
                 OutputStatusBar(
                     playback: playback,

@@ -24,6 +24,10 @@ final class SimplePlaybackProjectDocument: NSDocument {
     /// the lock is dropped when the user closes the window even if SwiftUI
     /// teardown ordering would otherwise leak it.
     private let lockController = ProjectLockController()
+    /// E7 — per-document crash-recovery controller. On document open, scans
+    /// `<bundle>/Autosave/` for any checkpoint newer than the on-disk
+    /// `Show.json`. The banner surfaces in `RootView`.
+    private let crashRecoveryController = CrashRecoveryController()
     /// Tracks `NSDocument.fileURL` changes — fires on the initial open path
     /// (set after `read(from:)` completes) and on Save-As (operator picks a
     /// new destination). Each change triggers a lock re-evaluation.
@@ -58,6 +62,7 @@ final class SimplePlaybackProjectDocument: NSDocument {
             let url = doc.fileURL
             Task { @MainActor [weak self] in
                 self?.lockController.evaluate(bundleURL: url)
+                self?.crashRecoveryController.evaluate(bundleURL: url)
             }
         }
     }
@@ -68,6 +73,10 @@ final class SimplePlaybackProjectDocument: NSDocument {
             outputSettings: OutputSettingsStore.shared,
             projectBundleURLProvider: { [weak self] in self?.fileURL },
             lockController: lockController,
+            crashRecoveryController: crashRecoveryController,
+            restoreFromCheckpoint: { [weak self] in
+                self?.restoreProjectFromRecoverableCheckpoint() ?? false
+            },
             autosaveCheckpoint: { [weak self] reason in
                 self?.writeAutosaveCheckpoint(reason: reason)
             }
@@ -114,6 +123,26 @@ final class SimplePlaybackProjectDocument: NSDocument {
     override func close() {
         lockController.release()
         super.close()
+    }
+
+    /// E7 — load the recoverable checkpoint into `playbackDocument.project`,
+    /// notifying the controller. Returns true on success so the caller (the
+    /// banner's Restore button) can drive UX from the result. Marks the doc
+    /// dirty so the operator's first save persists the recovered state.
+    @MainActor
+    func restoreProjectFromRecoverableCheckpoint() -> Bool {
+        guard let data = crashRecoveryController.loadRecoverableData() else {
+            return false
+        }
+        do {
+            let restored = try JSONDecoder.simplePlayback.decode(PlayoutProject.self, from: data)
+            playbackDocument.project = restored
+            updateChangeCount(.changeDone)
+            crashRecoveryController.didRestore()
+            return true
+        } catch {
+            return false
+        }
     }
 
     /// Extracts the project JSON payload from either a v2 directory bundle or a legacy flat file.
