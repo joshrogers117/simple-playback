@@ -43,6 +43,22 @@ struct MediaImportContext {
     /// must not block on it. `nil` skips filmstrip caching (image
     /// imports, untitled docs, tests).
     var enqueueFilmstrip: ((UUID, URL) -> Void)? = nil
+
+    /// C8 — when the operator opted into folder-mode (Add Folder /
+    /// folder-drop with a single common parent), the host captures one
+    /// `FolderBookmark` for the source directory and passes it here. The
+    /// importer stamps every direct image/video MediaReference with
+    /// `folderBookmark.id` plus the path of the slide's source URL relative
+    /// to `folderRoot`. PDF/Keynote rasterized slides do NOT carry the
+    /// folder bookmark — their media lives in the bundle's `Cache/Renders/`
+    /// and is recovered through the bundle path, not the source folder.
+    /// `nil` (default) skips stamping; the slide carries only its per-file
+    /// bookmark.
+    var folderBookmark: FolderBookmark? = nil
+    /// C8 — folder URL whose path is subtracted from each slide's source
+    /// URL to produce `MediaReference.folderRelativePath`. Required when
+    /// `folderBookmark` is non-nil; the two travel together.
+    var folderRoot: URL? = nil
 }
 
 struct MediaImporter {
@@ -129,6 +145,16 @@ struct MediaImporter {
             }
             var slide = MediaSlide(url: url, mediaKind: kind, nativeFrameRate: fps, flags: flags)
             slide.media.fingerprint = fingerprinter(url)
+            // C8 — if the host opted into folder-mode, stamp the slide with
+            // the project-level FolderBookmark id + the slide's path relative
+            // to the folder root. Only direct image/video imports carry this;
+            // PDF/Keynote rasters land in `Cache/Renders/` and are bundle-
+            // internal so they don't need the folder-bookmark fallback.
+            if let folderBookmark = context?.folderBookmark,
+               let relative = folderRelativePath(of: url, under: context?.folderRoot) {
+                slide.media.folderBookmarkID = folderBookmark.id
+                slide.media.folderRelativePath = relative
+            }
             cacheThumbnailIfPossible(slide: slide, sourceURL: url, kind: kind, context: context)
             if kind == .video {
                 context?.enqueueFilmstrip?(slide.id, url)
@@ -137,6 +163,24 @@ struct MediaImporter {
         }
 
         return MediaImportReport(slides: slides, failures: failures)
+    }
+
+    /// C8 — pure-logic helper. Returns the path of `fileURL` relative to
+    /// `folderRoot`, or nil when `folderRoot` is nil or `fileURL` does not
+    /// live under it. Path components are compared after URL standardization
+    /// so trailing slashes / `.`-segments don't reject a valid descendant.
+    /// The returned path is POSIX-style with `/` separators and never starts
+    /// with a slash.
+    static func folderRelativePath(of fileURL: URL, under folderRoot: URL?) -> String? {
+        guard let folderRoot else { return nil }
+        let fileComponents = fileURL.standardizedFileURL.pathComponents
+        let rootComponents = folderRoot.standardizedFileURL.pathComponents
+        guard fileComponents.count > rootComponents.count else { return nil }
+        guard Array(fileComponents.prefix(rootComponents.count)) == rootComponents else {
+            return nil
+        }
+        let relativeComponents = fileComponents.suffix(fileComponents.count - rootComponents.count)
+        return relativeComponents.joined(separator: "/")
     }
 
     /// C10 — best-effort poster-frame cache write. Never throws into the
