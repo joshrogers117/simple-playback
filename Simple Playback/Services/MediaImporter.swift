@@ -30,6 +30,13 @@ struct MediaImportContext {
 }
 
 struct MediaImporter {
+    /// Test seam — `.key` files route through this hook before PDFImporter. Default
+    /// implementation drives Keynote via AppleScript. Tests substitute a stub that produces
+    /// a synthetic PDF without invoking the real Keynote.
+    static var keynoteExporter: (URL, URL) throws -> URL = { source, dest in
+        try KeynoteImporter.exportToPDF(keynoteURL: source, destinationDirectory: dest)
+    }
+
     /// Backwards-compatible entry point: no context means PDF (and other conversion-required
     /// formats) cannot be rendered, so PDFs are silently dropped. Callers that need PDF
     /// support pass the context-aware overload.
@@ -42,6 +49,10 @@ struct MediaImporter {
             if isPDF(url) {
                 guard let context else { return [] }
                 return importPDF(at: url, context: context)
+            }
+            if isKeynote(url) {
+                guard let context else { return [] }
+                return importKeynote(at: url, context: context)
             }
             guard let kind = mediaKind(for: url) else { return [] }
             let fps = kind == .video ? nativeFrameRate(for: url) : nil
@@ -109,6 +120,24 @@ struct MediaImporter {
         return url.pathExtension.lowercased() == "pdf"
     }
 
+    /// Apple ships Keynote files under the UTI `com.apple.iwork.keynote.key`. We accept any
+    /// of: a resolved content type that conforms to that UTI, an extension lookup that
+    /// resolves to it, or a literal `.key` extension match (the last covers files dropped
+    /// from a context where the system hasn't registered the UTI yet).
+    static func isKeynote(_ url: URL) -> Bool {
+        guard let keynoteUTI = UTType("com.apple.iwork.keynote.key") else {
+            return url.pathExtension.lowercased() == "key"
+        }
+        if let type = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType,
+           type.conforms(to: keynoteUTI) {
+            return true
+        }
+        if let type = UTType(filenameExtension: url.pathExtension), type.conforms(to: keynoteUTI) {
+            return true
+        }
+        return url.pathExtension.lowercased() == "key"
+    }
+
     /// One PDF in → N image MediaSlides out (one per page). Each PNG lands inside a fresh
     /// per-batch subdirectory of `context.renderRootDirectory`. On render failure (corrupt
     /// PDF, write error) returns an empty array — callers see "nothing imported" rather
@@ -126,8 +155,38 @@ struct MediaImporter {
         } catch {
             return []
         }
-        let baseTitle = url.deletingPathExtension().lastPathComponent
-        return pageURLs.enumerated().map { index, pageURL in
+        return imageSlides(forPagesAt: pageURLs, baseTitle: url.deletingPathExtension().lastPathComponent)
+    }
+
+    /// One Keynote deck in → N image MediaSlides out, via Keynote → PDF → PNG. The
+    /// intermediate PDF lands in the per-batch directory next to its rasterized pages so a
+    /// future "Re-rasterize" command (deferred from C3) can re-render from the same source.
+    /// On any failure (Keynote not installed, AppleScript error, corrupt deck) returns an
+    /// empty array — UI surfaces a banner separately.
+    private static func importKeynote(at url: URL, context: MediaImportContext) -> [MediaSlide] {
+        let batchDirectory = context.renderRootDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let pdfURL: URL
+        do {
+            pdfURL = try keynoteExporter(url, batchDirectory)
+        } catch {
+            return []
+        }
+        let pageURLs: [URL]
+        do {
+            pageURLs = try PDFImporter.rasterize(
+                pdfURL: pdfURL,
+                rasterSize: context.rasterSize,
+                destinationDirectory: batchDirectory
+            )
+        } catch {
+            return []
+        }
+        return imageSlides(forPagesAt: pageURLs, baseTitle: url.deletingPathExtension().lastPathComponent)
+    }
+
+    private static func imageSlides(forPagesAt pageURLs: [URL], baseTitle: String) -> [MediaSlide] {
+        pageURLs.enumerated().map { index, pageURL in
             var slide = MediaSlide(url: pageURL, mediaKind: .image)
             slide.title = "\(baseTitle) — page \(index + 1)"
             return slide
