@@ -25,6 +25,7 @@
 		446ACE51C8F85BB761074619 /* PDFImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B631D588B2455E3C2C9EE89C /* PDFImporterTests.swift */; };
 		44E0E08A26F3691D8E7A2C44 /* AuthTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA2A137EBDAA8855CAA24A2 /* AuthTokenStore.swift */; };
 		4536CC9B693175B1A31F6425 /* OverlayInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B85E5A857820D320657302C /* OverlayInspectorView.swift */; };
+		467C57350783EEECC0DC7DFE /* KeynoteImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A8691862AC8AE01B87203D /* KeynoteImporter.swift */; };
 		4986A9905EB62FFA630409BD /* MediaFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93004BE1F2BECBBF122DB00C /* MediaFlags.swift */; };
 		4A94C48FF22B0552314D441E /* DeckLinkDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF97362F36D6ED17D41359D2 /* DeckLinkDiagnostics.swift */; };
 		4C060BE294B7C9A97DBA4FBE /* FrameRateConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C8342BEF86901A52B41C81 /* FrameRateConformanceTests.swift */; };
@@ -51,6 +52,7 @@
 		8E0250619812CB053444052C /* OSCServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBA363D1C04A7119011031E /* OSCServer.swift */; };
 		91592F7DACBD58D4C6BBE0F2 /* HTTPRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01C17ADD674250609276D8A4 /* HTTPRoutes.swift */; };
 		9293FC94ADE051275861BFE8 /* AVKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 92D6FAD99797FC3C21DA725E /* AVKit.framework */; };
+		92C91C709C683B4675395127 /* KeynoteImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38F7D1388C31CB5FF57645DA /* KeynoteImporterTests.swift */; };
 		9525CC03694D231B2D50683E /* SimplePlaybackDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29F9DCDACFB1E27A47F7D0DE /* SimplePlaybackDocument.swift */; };
 		9693BB1ACC35C9F34674A4A2 /* Timecode.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0BC03657660E157633D31C6 /* Timecode.swift */; };
 		976DD722059E40449CB77621 /* ShowControlActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CD51FEB5E50862496E8A6BA /* ShowControlActions.swift */; };
@@ -113,6 +115,7 @@
 		29F9DCDACFB1E27A47F7D0DE /* SimplePlaybackDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackDocument.swift; sourceTree = "<group>"; };
 		2B85E5A857820D320657302C /* OverlayInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayInspectorView.swift; sourceTree = "<group>"; };
 		364D651E1585BC12FAC85DC1 /* SimplePlayback.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SimplePlayback.entitlements; sourceTree = "<group>"; };
+		38F7D1388C31CB5FF57645DA /* KeynoteImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeynoteImporterTests.swift; sourceTree = "<group>"; };
 		3901F80946826E57A5B02934 /* CompositorPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositorPipeline.swift; sourceTree = "<group>"; };
 		3906CB66B7CA3652EABFE931 /* AudioPump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPump.swift; sourceTree = "<group>"; };
 		39A90630AF349E25D5676488 /* SPFrameBlend.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SPFrameBlend.h; sourceTree = "<group>"; };
@@ -165,6 +168,7 @@
 		CAD1EB0DEF2FFFA7B96C902D /* OverlayInspectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayInspectorTests.swift; sourceTree = "<group>"; };
 		CF2597FFE1CB9927C6CB6395 /* VideoOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutput.swift; sourceTree = "<group>"; };
 		CF97362F36D6ED17D41359D2 /* DeckLinkDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckLinkDiagnostics.swift; sourceTree = "<group>"; };
+		D2A8691862AC8AE01B87203D /* KeynoteImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeynoteImporter.swift; sourceTree = "<group>"; };
 		D8CA5B1A327E84EEA75F0B9F /* UniformTypeIdentifiers.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UniformTypeIdentifiers.framework; path = System/Library/Frameworks/UniformTypeIdentifiers.framework; sourceTree = SDKROOT; };
 		DBA2A137EBDAA8855CAA24A2 /* AuthTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthTokenStore.swift; sourceTree = "<group>"; };
 		E1B3AC760F776AC4DDC6B0F9 /* DeckLinkSDK.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DeckLinkSDK.h; sourceTree = "<group>"; };
@@ -268,6 +272,7 @@
 			children = (
 				21271656A4CCF6A5AD4E2940 /* CompositorPipelineTests.swift */,
 				22C8342BEF86901A52B41C81 /* FrameRateConformanceTests.swift */,
+				38F7D1388C31CB5FF57645DA /* KeynoteImporterTests.swift */,
 				FF79938EE267D36AF458C582 /* MediaFlagsTests.swift */,
 				A62C4E147CCC6686312E0815 /* MediaImporterPDFTests.swift */,
 				773B6424E99EBEA84CB2027B /* ModelTests.swift */,
@@ -370,6 +375,7 @@
 		E90F62939082F88EED632467 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				D2A8691862AC8AE01B87203D /* KeynoteImporter.swift */,
 				BD3490C4BA5C4A09BDBF9415 /* MediaFlagsInspector.swift */,
 				B328F432BC7CCB991A9A8373 /* MediaImporter.swift */,
 				45BCD3E72BF9F52C2653862E /* PDFImporter.swift */,
@@ -488,6 +494,7 @@
 				7D6E9D5D91681AA09335F8F9 /* HTTPServer.swift in Sources */,
 				C02D1DDF70B419255097C42E /* InspectorView.swift in Sources */,
 				C120F1AED083BE5B83E60533 /* InternalTimecodeGenerator.swift in Sources */,
+				467C57350783EEECC0DC7DFE /* KeynoteImporter.swift in Sources */,
 				1FA47C61D92B5CF6AFD91783 /* LTCDecoder.swift in Sources */,
 				A34CA8E22BA04CC530DD0597 /* LTCReader.swift in Sources */,
 				73DBCDAA4262F2AFB8237FC4 /* MTCReader.swift in Sources */,
@@ -536,6 +543,7 @@
 			files = (
 				DCABF0FFCC0E6E0596173F64 /* CompositorPipelineTests.swift in Sources */,
 				4C060BE294B7C9A97DBA4FBE /* FrameRateConformanceTests.swift in Sources */,
+				92C91C709C683B4675395127 /* KeynoteImporterTests.swift in Sources */,
 				D93CCBEA7AE13AB4FC44F4F3 /* MediaFlagsTests.swift in Sources */,
 				5F75B62542F32AC37D1B4259 /* MediaImporterPDFTests.swift in Sources */,
 				CC37F2E5CFC466A33AA98F58 /* ModelTests.swift in Sources */,
