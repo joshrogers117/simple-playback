@@ -230,7 +230,10 @@ struct RootView: View {
             CueInspectorView(
                 cue: selectedCueBinding,
                 slides: document.project.slides,
-                stageFPS: document.project.stages.first?.framesPerSecond
+                stageFPS: document.project.stages.first?.framesPerSecond,
+                requestTranscode: { slide, preset in
+                    requestTranscode(slide: slide, preset: preset)
+                }
             )
         } else if let selectedSlideBinding {
             InspectorView(slide: selectedSlideBinding)
@@ -549,6 +552,12 @@ private struct CueInspectorView: View {
     @Binding var cue: Cue
     let slides: [MediaSlide]
     let stageFPS: Double?
+    /// Set by RootView's selection inspector (Option B / C-inline-transcode). Optional
+    /// because preview-only inspector renders elsewhere may not need to plumb the
+    /// transcode coordinator. When present + the asset is transcode-eligible, the chip
+    /// group renders an inline "Transcode to ProRes …" button so operators can act on
+    /// inspector warnings without hunting through the asset-library context menu.
+    var requestTranscode: ((MediaSlide, TranscodePreset) -> Void)? = nil
 
     private var asset: MediaSlide? {
         slides.first(where: { $0.id == cue.assetID })
@@ -607,8 +616,21 @@ private struct CueInspectorView: View {
                         ForEach(asset.flags.activeWarnings, id: \.self) { warning in
                             MediaFlagWarningChip(warning: warning)
                         }
+                        if let requestTranscode, TranscodeService.canTranscode(slide: asset),
+                           let preferred = TranscodeService.preferredPresetOrder(for: asset).first {
+                            Button {
+                                requestTranscode(asset, preferred)
+                            } label: {
+                                Label("Transcode to \(preferred.label)", systemImage: "arrow.triangle.2.circlepath")
+                                    .font(.caption)
+                            }
+                            .controlSize(.small)
+                            .buttonStyle(.borderedProminent)
+                            .padding(.top, 2)
+                            .help("Run the transcode now — produces a sibling \"\(asset.title) (\(preferred.label))\" slide.")
+                        }
                     }
-                    .help("Right-click the clip in the asset library → Transcode to ProRes 422 to clear inspector warnings.")
+                    .help("Inspector flags. Click Transcode (or right-click the asset in the palette) to render a ProRes copy.")
                 }
 
                 Divider()
