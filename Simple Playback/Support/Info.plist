@@ -57,6 +57,8 @@
 			</dict>
 		</dict>
 	</array>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Simple Playback uses Apple Events to drive Keynote so it can export .key decks to PDF for slide rasterization.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSPrincipalClass</key>
