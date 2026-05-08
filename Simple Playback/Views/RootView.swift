@@ -13,6 +13,10 @@ struct RootView: View {
     /// C7d — Bundle for Travel coordinator. Owns the active copy pass; the
     /// confirm sheet binds to it. Lifetime is the document window.
     @StateObject private var bundleForTravelCoordinator = BundleForTravelCoordinator()
+    /// C11 — background filmstrip-sprite-sheet generator. Auto-enqueued by
+    /// the import path (video imports only); the future cue-inspector
+    /// scrub UI consumes the resulting `<slide.id>.png` lazily on open.
+    @StateObject private var filmstripCoordinator = FilmstripCoordinator()
     /// E3 — append-only show log for this document. Wired into ShowController
     /// after configuration so every verb (GO/PANIC/CLEAR/BLACKOUT/Show-Mode)
     /// records to the journal. Persistence destination is set in
@@ -959,12 +963,52 @@ struct RootView: View {
         let baseWidth = stage?.width ?? document.project.outputWidth
         let baseHeight = stage?.height ?? document.project.outputHeight
         let rasterSize = CGSize(width: max(1, baseWidth) * 2, height: max(1, baseHeight) * 2)
+        let filmstripDir = filmstripRootDirectory()
+        let coordinator = filmstripCoordinator
         return MediaImportContext(
             rasterSize: rasterSize,
             renderRootDirectory: renderRootDirectory(),
-            thumbnailRootDirectory: thumbnailRootDirectory()
+            thumbnailRootDirectory: thumbnailRootDirectory(),
+            enqueueFilmstrip: { slideID, sourceURL in
+                let destination = filmstripDir
+                    .appendingPathComponent("\(slideID.uuidString).png")
+                coordinator.enqueue(
+                    slideID: slideID,
+                    sourceURL: sourceURL,
+                    destinationURL: destination
+                )
+            }
         )
     }
+
+    /// C11 — where per-slide filmstrip sprite-sheet PNGs land. Bundle-
+    /// relative when the document is saved (spec §3.17
+    /// `<bundle>/Cache/Filmstrips/`); App Support fallback per
+    /// untitled-session ID otherwise. Mirrors `thumbnailRootDirectory()`
+    /// shape so the cue-inspector scrub UI can read from the same place
+    /// writes go regardless of save state.
+    func filmstripRootDirectory() -> URL {
+        if let bundleURL = projectBundleURLProvider() {
+            return bundleURL.appendingPathComponent(
+                ProjectBundleLayout.filmstripsDirectory,
+                isDirectory: true
+            )
+        }
+        return RootView.untitledFilmstripRoot
+            .appendingPathComponent(untitledSessionID.uuidString, isDirectory: true)
+    }
+
+    private static let untitledFilmstripRoot: URL = {
+        let appSupport = (try? FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )) ?? FileManager.default.temporaryDirectory
+        return appSupport
+            .appendingPathComponent("Simple Playback", isDirectory: true)
+            .appendingPathComponent("Filmstrips", isDirectory: true)
+    }()
 
     /// C10 — where per-slide poster JPEGs land. Bundle-relative when the
     /// document is saved (spec §3.17 `<bundle>/Cache/Thumbnails/`); App

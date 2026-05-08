@@ -28,6 +28,12 @@ enum ProjectBundleLayout {
     /// still renders thumbnails. Sibling to `Cache/Renders/` (PDF rasters)
     /// because both are derived-from-source caches that are safe to delete.
     static let thumbnailsDirectory = "Cache/Thumbnails"
+
+    /// C11 — per-slide filmstrip sprite-sheet cache. Background-generated
+    /// PNGs (`<slide.id>.png`) used by the future cue-inspector scrub UI;
+    /// auto-enqueued at video-import time via `FilmstripCoordinator`.
+    /// Derived-from-source so safe to delete; regenerated lazily.
+    static let filmstripsDirectory = "Cache/Filmstrips"
 }
 
 /// Tiny ObservableObject that mirrors `NSDocument.fileURL` into a SwiftUI

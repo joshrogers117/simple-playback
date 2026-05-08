@@ -33,6 +33,16 @@ struct MediaImportContext {
     /// offline. Filename is `<slide.id>.jpg`. `nil` skips thumbnail caching
     /// (untitled docs without an app-support fallback path; tests).
     var thumbnailRootDirectory: URL? = nil
+
+    /// C11 — invoked once per imported video slide so the host can kick
+    /// off background filmstrip-sprite-sheet generation. Receives the new
+    /// slide's id + the still-resolvable source URL; the host computes
+    /// the destination filename (`<slide.id>.png`) under whichever
+    /// filmstrip cache root applies. The hook is intentionally fire-and-
+    /// forget — filmstrip generation is asynchronous and the import path
+    /// must not block on it. `nil` skips filmstrip caching (image
+    /// imports, untitled docs, tests).
+    var enqueueFilmstrip: ((UUID, URL) -> Void)? = nil
 }
 
 struct MediaImporter {
@@ -120,6 +130,9 @@ struct MediaImporter {
             var slide = MediaSlide(url: url, mediaKind: kind, nativeFrameRate: fps, flags: flags)
             slide.media.fingerprint = fingerprinter(url)
             cacheThumbnailIfPossible(slide: slide, sourceURL: url, kind: kind, context: context)
+            if kind == .video {
+                context?.enqueueFilmstrip?(slide.id, url)
+            }
             slides.append(slide)
         }
 
