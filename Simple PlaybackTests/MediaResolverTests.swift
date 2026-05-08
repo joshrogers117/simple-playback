@@ -425,4 +425,23 @@ final class MediaResolverTests: XCTestCase {
         XCTAssertEqual(result.step, .original)
         XCTAssertEqual(result.url?.standardizedFileURL, url.standardizedFileURL)
     }
+
+    func testResolvedURLReturnsNilWhenBookmarkResolvesToDeletedFile() throws {
+        // A security-scoped bookmark created over a real file resolves to a URL
+        // even after that file is deleted (with `stale = true`). Pre-fix, the
+        // bookmark branch returned that URL unconditionally — and downstream
+        // consumers (TranscodeService.canTranscode, AssetLibraryProbe) treated
+        // a non-nil resolvedURL as "online." Gate on fileExists so a deleted
+        // file is reported as offline at this layer.
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MediaResolverTests-\(UUID().uuidString).bin")
+        try Data("hello".utf8).write(to: url)
+        let reference = MediaReference(url: url)
+        XCTAssertNotNil(reference.bookmarkData,
+                        "Bookmark must be set up so the test exercises the bookmark branch.")
+        try FileManager.default.removeItem(at: url)
+
+        XCTAssertNil(reference.resolvedURL(),
+                     "Bookmark resolving to a now-deleted file must return nil, not a URL pointing nowhere.")
+    }
 }

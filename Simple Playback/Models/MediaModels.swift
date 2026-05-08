@@ -130,7 +130,14 @@ struct MediaReference: Codable, Hashable {
                 options: [.withSecurityScope],
                 relativeTo: nil,
                 bookmarkDataIsStale: &stale
-            ) {
+            ), FileManager.default.fileExists(atPath: url.path) {
+                // A bookmark resolves to a URL even when the file at that URL
+                // was deleted or moved out from under it. Gate on fileExists
+                // so consumers (TranscodeService.canTranscode, AssetLibraryProbe,
+                // CompositorPipeline overlay resolver) get a "no longer present"
+                // signal instead of a misleading-but-non-existent URL — and the
+                // originalPath fallback below gets a chance to find it at the
+                // recorded absolute path.
                 return url
             }
         }
