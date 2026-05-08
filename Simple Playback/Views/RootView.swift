@@ -26,6 +26,8 @@ struct RootView: View {
     /// Toggle for the Phase E1 pre-show check sheet. The rows are computed on demand
     /// when the sheet opens (cheap — pure-logic over the project + sampled signals).
     @State private var preShowCheckPresented: Bool = false
+    /// Toggle for the Phase E3 show-log viewer.
+    @State private var showLogPresented: Bool = false
     /// Stable per-window UUID. Untitled documents — which have no fileURL yet —
     /// rasterize PDFs (and transcode to ProRes) into an app-support subdirectory keyed
     /// by this ID so concurrent untitled windows don't collide.
@@ -115,6 +117,13 @@ struct RootView: View {
                 }
                 .help("Run the pre-show check — media resolution, frame-rate conformance, output, system signals.")
 
+                Button {
+                    showLogPresented = true
+                } label: {
+                    Label("Show Log", systemImage: "list.bullet.rectangle")
+                }
+                .help("Open the show log — every cue fire, panic, clear, missing-media, OSC action.")
+
                 Spacer()
 
                 Toggle(isOn: showModeBinding) {
@@ -170,6 +179,9 @@ struct RootView: View {
                 fixHandlers: preShowCheckFixHandlers(),
                 onClose: { preShowCheckPresented = false }
             )
+        }
+        .sheet(isPresented: $showLogPresented) {
+            ShowLogView(log: showLog, onClose: { showLogPresented = false })
         }
         .sheet(item: $pendingFolderImport) { _ in
             // The closure parameter is read-only; we drive the sheet from the @State so

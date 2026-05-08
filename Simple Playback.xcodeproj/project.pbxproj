@@ -47,6 +47,7 @@
 		54F7E3B014546AF5E82195C5 /* MediaImporterKeynoteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4938DA35785910BBFF3391DD /* MediaImporterKeynoteTests.swift */; };
 		5602C3EC7F566873E1629051 /* FrameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45B0A7CB7DDDC72B747F7C8 /* FrameRenderer.swift */; };
 		5B7913C72F3E6AF0B894DE59 /* CueRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD749649E2DEED56E2B8C243 /* CueRuntime.swift */; };
+		5B885964A9D26E13264F5D97 /* ShowLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 332208860C29B553E0BE52D0 /* ShowLogView.swift */; };
 		5F75B62542F32AC37D1B4259 /* MediaImporterPDFTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62C4E147CCC6686312E0815 /* MediaImporterPDFTests.swift */; };
 		606D52F6D2E3F0F49B4DD22E /* ShowControlDispatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70B339087E0F91F6B7504F6D /* ShowControlDispatcher.swift */; };
 		60D24C84B7A425B9412B95C9 /* CompositorPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3901F80946826E57A5B02934 /* CompositorPipeline.swift */; };
@@ -150,6 +151,7 @@
 		29F9DCDACFB1E27A47F7D0DE /* SimplePlaybackDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackDocument.swift; sourceTree = "<group>"; };
 		2B85E5A857820D320657302C /* OverlayInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayInspectorView.swift; sourceTree = "<group>"; };
 		2D06F636A6229A0C418EE285 /* ImageSequenceEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSequenceEncoder.swift; sourceTree = "<group>"; };
+		332208860C29B553E0BE52D0 /* ShowLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowLogView.swift; sourceTree = "<group>"; };
 		364D651E1585BC12FAC85DC1 /* SimplePlayback.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SimplePlayback.entitlements; sourceTree = "<group>"; };
 		38F7D1388C31CB5FF57645DA /* KeynoteImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeynoteImporterTests.swift; sourceTree = "<group>"; };
 		3901F80946826E57A5B02934 /* CompositorPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositorPipeline.swift; sourceTree = "<group>"; };
@@ -311,6 +313,7 @@
 				95005D52A657E2A60F9E2008 /* PreShowCheckView.swift */,
 				213CB5AEDC97C0942C10558F /* RootView.swift */,
 				4040F3064AA861BCD17050FB /* ShowListView.swift */,
+				332208860C29B553E0BE52D0 /* ShowLogView.swift */,
 				75B620D6408556D32380C918 /* SlideGridView.swift */,
 			);
 			path = Views;
@@ -624,6 +627,7 @@
 				2E94C7044EE3CF2C00F39C69 /* ShowController.swift in Sources */,
 				A73C56A196D7FCFABC2C00F2 /* ShowListView.swift in Sources */,
 				9877245F6768C2BD0B636B31 /* ShowLog.swift in Sources */,
+				5B885964A9D26E13264F5D97 /* ShowLogView.swift in Sources */,
 				67765CD777AA4E30553D4126 /* SimplePlaybackApp.swift in Sources */,
 				9525CC03694D231B2D50683E /* SimplePlaybackDocument.swift in Sources */,
 				51CA5DA530C6B560FA1A7989 /* SimplePlaybackProjectDocument.swift in Sources */,
