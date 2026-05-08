@@ -102,6 +102,9 @@ struct RootView: View {
         .onChange(of: activeShowListSnapshot) {
             syncActiveShowList()
         }
+        .onChange(of: document.project.stages.first?.compositorOverlays) {
+            syncCompositorOverlays()
+        }
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $dropTargeted) { providers in
             handleDrop(providers: providers)
         }
@@ -266,12 +269,19 @@ struct RootView: View {
                 }
             )
         }
+        syncCompositorOverlays()
     }
 
     private func syncActiveShowList() {
         guard let controller = showController.controller,
               let activeList = document.project.activeShowList else { return }
         controller.syncShowListFromProject(activeList)
+    }
+
+    private func syncCompositorOverlays() {
+        guard let controller = showController.controller else { return }
+        let overlays = document.project.stages.first?.compositorOverlays ?? .empty
+        controller.applyCompositorOverlays(overlays)
     }
 
     private func applyOutputDefaults() {

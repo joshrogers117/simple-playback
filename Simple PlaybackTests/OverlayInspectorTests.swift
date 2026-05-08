@@ -27,4 +27,29 @@ final class OverlayInspectorTests: XCTestCase {
         XCTAssertEqual(InspectorMode.selection.label, "Selection")
         XCTAssertEqual(InspectorMode.overlays.label, "Overlays")
     }
+
+    @MainActor
+    func testShowControllerForwardsOverlaysToPlayback() {
+        let playback = PlaybackController()
+        let controller = ShowController(
+            showList: ShowList(name: "Test"),
+            playback: playback,
+            assetLookup: { _ in nil },
+            transitionSettings: { PlayoutTransitionSettings() },
+            outputBinding: { (nil, nil) }
+        )
+
+        XCTAssertEqual(playback.compositorOverlays, .empty,
+                       "Fresh controller should not mutate playback overlays.")
+
+        var overlays = CompositorOverlays.empty
+        overlays.message = MessageOverlay(enabled: true, text: "STAND BY")
+        controller.applyCompositorOverlays(overlays)
+        XCTAssertEqual(playback.compositorOverlays.message.text, "STAND BY")
+        XCTAssertTrue(playback.compositorOverlays.message.isVisible)
+
+        controller.applyCompositorOverlays(.empty)
+        XCTAssertEqual(playback.compositorOverlays, .empty,
+                       "Resetting to empty must restore inert overlays.")
+    }
 }

@@ -108,6 +108,17 @@ final class ShowController: ObservableObject {
         showMode.toggle()
     }
 
+    // MARK: - Compositor overlays bridge (B12e)
+
+    /// Forwards the active Stage's persisted overlay state into `PlaybackController` so the
+    /// next composed frame picks up the new bug / message. The view layer calls this on every
+    /// project mutation (single subscriber); `PlaybackController.compositorOverlays` is the
+    /// source of truth for the rendering hot path. Inert overlays cost nothing per the
+    /// pipeline's short-circuit.
+    func applyCompositorOverlays(_ overlays: CompositorOverlays) {
+        playback.compositorOverlays = overlays
+    }
+
     // MARK: - List management
 
     /// Replaces the runtime's show list when the active list selection changes.
