@@ -25,6 +25,7 @@
 		446ACE51C8F85BB761074619 /* PDFImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B631D588B2455E3C2C9EE89C /* PDFImporterTests.swift */; };
 		44E0E08A26F3691D8E7A2C44 /* AuthTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA2A137EBDAA8855CAA24A2 /* AuthTokenStore.swift */; };
 		4536CC9B693175B1A31F6425 /* OverlayInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B85E5A857820D320657302C /* OverlayInspectorView.swift */; };
+		4552EA56AF59686AE3373E66 /* TranscodeServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A70EA9D270E7268A7C74D62 /* TranscodeServiceTests.swift */; };
 		467C57350783EEECC0DC7DFE /* KeynoteImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A8691862AC8AE01B87203D /* KeynoteImporter.swift */; };
 		4986A9905EB62FFA630409BD /* MediaFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93004BE1F2BECBBF122DB00C /* MediaFlags.swift */; };
 		4A94C48FF22B0552314D441E /* DeckLinkDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF97362F36D6ED17D41359D2 /* DeckLinkDiagnostics.swift */; };
@@ -80,6 +81,7 @@
 		E9E3C51A99F9323FE1D530DC /* PDFImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45BCD3E72BF9F52C2653862E /* PDFImporter.swift */; };
 		EAA4BC2642696555F131F8BE /* OutputPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0C8298731E2AD4C22B2306 /* OutputPreviewView.swift */; };
 		EDB3E5ED1721A22A5B31024C /* CompositorLayers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6214E79B299E7C7AB111C790 /* CompositorLayers.swift */; };
+		F4D353B47C138FF5ACA1CCC2 /* TranscodeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB90370BA34D673675815F69 /* TranscodeService.swift */; };
 		F52CA35701C089E08D0BFDCB /* ShowControlState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FD2B422FED7E9102FAEA3D2 /* ShowControlState.swift */; };
 		F6777B6986F9083E1C779BD2 /* CoreImage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E66F934F6D6C5561905E6550 /* CoreImage.framework */; };
 		F716F5B63074FD21302982EE /* OutputInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50CF28D157920076A3C82649 /* OutputInspectorView.swift */; };
@@ -149,6 +151,7 @@
 		934A545F270968E04F027F8B /* LTCReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LTCReader.swift; sourceTree = "<group>"; };
 		93727D6450DEE3ED3934DA97 /* WebSocketFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketFrame.swift; sourceTree = "<group>"; };
 		96F3960B5C5F817DFB3377D4 /* OSCQueryServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCQueryServer.swift; sourceTree = "<group>"; };
+		9A70EA9D270E7268A7C74D62 /* TranscodeServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscodeServiceTests.swift; sourceTree = "<group>"; };
 		9E5D5CE935540C98B6BAAAEF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9E8B4217656574F74350F1FF /* DeckLinkSDKDispatch.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DeckLinkSDKDispatch.cpp; sourceTree = "<group>"; };
 		A13557C5F98007D62499B140 /* StateSnapshotEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateSnapshotEncoder.swift; sourceTree = "<group>"; };
@@ -163,6 +166,7 @@
 		B637A693F1741DD785724AAE /* DeckLinkBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DeckLinkBridge.mm; sourceTree = "<group>"; };
 		B9392E6B9D0468959B74A1F9 /* TransportSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportSink.swift; sourceTree = "<group>"; };
 		BAB740EFC960FD945A655941 /* SimplePlaybackProjectDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackProjectDocument.swift; sourceTree = "<group>"; };
+		BB90370BA34D673675815F69 /* TranscodeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscodeService.swift; sourceTree = "<group>"; };
 		BBBA363D1C04A7119011031E /* OSCServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCServer.swift; sourceTree = "<group>"; };
 		BD3490C4BA5C4A09BDBF9415 /* MediaFlagsInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlagsInspector.swift; sourceTree = "<group>"; };
 		C0BC03657660E157633D31C6 /* Timecode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timecode.swift; sourceTree = "<group>"; };
@@ -284,6 +288,7 @@
 				B631D588B2455E3C2C9EE89C /* PDFImporterTests.swift */,
 				0E47E51BD45087956CCF2905 /* ShowControlIntegrationTests.swift */,
 				237C1358E779CC8F8EBA839E /* ShowControlTests.swift */,
+				9A70EA9D270E7268A7C74D62 /* TranscodeServiceTests.swift */,
 				24668879F6BB6C3E4ED2C3F5 /* TransportSinkTests.swift */,
 			);
 			path = "Simple PlaybackTests";
@@ -382,6 +387,7 @@
 				BD3490C4BA5C4A09BDBF9415 /* MediaFlagsInspector.swift */,
 				B328F432BC7CCB991A9A8373 /* MediaImporter.swift */,
 				45BCD3E72BF9F52C2653862E /* PDFImporter.swift */,
+				BB90370BA34D673675815F69 /* TranscodeService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -533,6 +539,7 @@
 				E5DFE39B8CB8514358205B8E /* SubscriptionPump.swift in Sources */,
 				67058819C3FE046151E4BCAD /* SubscriptionRegistry.swift in Sources */,
 				9693BB1ACC35C9F34674A4A2 /* Timecode.swift in Sources */,
+				F4D353B47C138FF5ACA1CCC2 /* TranscodeService.swift in Sources */,
 				ABA983A9D89AD460EE548AF4 /* TransportSink.swift in Sources */,
 				2AE84FFB58E06C9A60B6C982 /* TransportSinks.swift in Sources */,
 				CF0020C246A6F8DF7BC4B6D6 /* VideoOutput.swift in Sources */,
@@ -556,6 +563,7 @@
 				446ACE51C8F85BB761074619 /* PDFImporterTests.swift in Sources */,
 				851AE7644559671FB09FD2BD /* ShowControlIntegrationTests.swift in Sources */,
 				00EC3572563AA2E459F2489F /* ShowControlTests.swift in Sources */,
+				4552EA56AF59686AE3373E66 /* TranscodeServiceTests.swift in Sources */,
 				9F685F50F961D73764497CED /* TransportSinkTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
