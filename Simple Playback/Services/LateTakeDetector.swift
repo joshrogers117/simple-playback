@@ -4,9 +4,14 @@ import Foundation
 /// first rendered frame didn't reach the output within an operator-set
 /// threshold. Spec §3.16 ("show log writer must record late takes" alongside
 /// dropped frames). The detector is independent of `PlaybackController` and
-/// `ShowController` so it unit-tests deterministically; live integration is
-/// host-side wiring (deferred — `PlaybackController` doesn't yet expose a
-/// "first frame for cue X" callback).
+/// `ShowController` so it unit-tests deterministically. Live integration
+/// (path 2 — load-latency proxy via `PlaybackController.$liveSlideID`) ships
+/// in `ShowController`: every `handleCueFired` calls `recordGoFired` and the
+/// next non-nil `liveSlideID` publish closes the verdict via
+/// `recordFrameSubmitted`. The proxy catches per-take video load latency but
+/// reads as zero for image takes (liveSlideID flips synchronously inside
+/// `take(...)`); a future "first composed frame for cue X reached SDI"
+/// callback would tighten the measurement.
 ///
 /// Latency model: the host calls `recordGoFired(...)` when the cue-runtime
 /// state transitions (operator GO accepted; cue is loading). Frames stream

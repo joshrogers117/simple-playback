@@ -47,6 +47,21 @@ final class ShowController: ObservableObject {
     private let outputBindingLookup: () -> (deviceID: String?, modeID: String?)
     private var panicCompletionTask: DispatchWorkItem?
     private var droppedFrameCancellable: AnyCancellable?
+    /// E3+ tail — pure-logic late-take detector. ShowController bridges
+    /// `handleCueFired` → `recordGoFired` and `playback.$liveSlideID` →
+    /// `recordFrameSubmitted`. The signal is **load-latency proxy**: for video
+    /// cues `liveSlideID` flips after `AVPlayerItemVideoOutput` preparation
+    /// completes (real per-take load latency); for image cues it flips
+    /// synchronously inside `take(...)` (always reads as on-time). A future
+    /// "first composed frame for cue X reached SDI" callback would tighten the
+    /// measurement; today the proxy at least catches operator-visible video-
+    /// load delays — exposed to allow tests to inject the detector directly.
+    let lateTakeDetector = LateTakeDetector()
+    private var liveSlideIDCancellable: AnyCancellable?
+    /// Operator-readable descriptor (cue number or title) cached at
+    /// `recordGoFired` time so the late-take log entry can name the cue. The
+    /// detector itself only carries cueID; we cache the human form here.
+    private var pendingLateTakeCueDescriptor: String?
     /// Most recent cumulative drop count we've already logged. Drives the
     /// debounce — only the delta since this value reaches the show log,
     /// gated by a 1 s throttle so a long stall lands as one event, not 30.
@@ -83,6 +98,59 @@ final class ShowController: ObservableObject {
             self?.recordDispatchedAction(action, source: source)
         }
         wireDroppedFrameLog()
+        wireLateTakeDetector()
+    }
+
+    /// E3+ tail — pipe `playback.$liveSlideID` into the late-take detector. The
+    /// first non-nil publish whose slideID matches the pending take closes the
+    /// measurement; verdict.late lands as a `.lateTake` show-log entry with
+    /// `latency=Nms cue=<descriptor>` detail.
+    private func wireLateTakeDetector() {
+        liveSlideIDCancellable = playback.$liveSlideID
+            .compactMap { $0 }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] slideID in
+                self?.handleLiveSlideTransition(slideID: slideID, now: Date())
+            }
+    }
+
+    /// Test seam — set the human cue descriptor that will name the next
+    /// `.lateTake` log entry. Production uses `handleCueFired` to set this
+    /// alongside `recordGoFired`; tests bypass cue-runtime mechanics and
+    /// drive the detector + bridge directly.
+    func setPendingLateTakeCueDescriptor(_ descriptor: String) {
+        pendingLateTakeCueDescriptor = descriptor
+    }
+
+    /// Test seam — clear the cached descriptor so a later frame doesn't
+    /// reattach a stale cue name. Production clears it inside the panic
+    /// handler / completion path.
+    func clearPendingLateTakeCueDescriptorForTesting() {
+        pendingLateTakeCueDescriptor = nil
+    }
+
+    /// Pure-logic decision so tests can drive the late-take bridge by injecting
+    /// an explicit `now` rather than synthesizing a real `liveSlideID` publish.
+    func handleLiveSlideTransition(slideID: UUID, now: Date) {
+        guard let verdict = lateTakeDetector.recordFrameSubmitted(slideID: slideID, at: now) else {
+            // No pending take, no clock-skew win, or slide doesn't match. Either
+            // way the descriptor is stale — keep it for any subsequent matching
+            // frame (the detector has already returned nil and didn't clear
+            // its own pending state for the slide-mismatch / no-pending cases).
+            if lateTakeDetector.pending == nil {
+                pendingLateTakeCueDescriptor = nil
+            }
+            return
+        }
+        let descriptor = pendingLateTakeCueDescriptor ?? "?"
+        pendingLateTakeCueDescriptor = nil
+        if verdict.isLate {
+            showLog?.appendNow(
+                action: .lateTake,
+                source: .system,
+                detail: "latency=\(verdict.latencyMS)ms cue=\(descriptor)"
+            )
+        }
     }
 
     /// E3+ — observe the playback controller's dropped-frame counter and
@@ -352,6 +420,13 @@ final class ShowController: ObservableObject {
         runtime.onPanicChanged = { [weak self] active, _ in
             DispatchQueue.main.async {
                 self?.panicActive = active
+                if active {
+                    // PANIC interrupts the in-flight take; abandon any pending
+                    // late-take measurement so the next GO doesn't measure
+                    // against a stale firedAt.
+                    self?.lateTakeDetector.clearPending()
+                    self?.pendingLateTakeCueDescriptor = nil
+                }
             }
         }
         runtime.onGoRejected = { [weak self] reason in
@@ -387,6 +462,13 @@ final class ShowController: ObservableObject {
 
         let (deviceID, modeID) = outputBindingLookup()
         let resolvedTransition = effectiveTransitionSettings(for: cue)
+        // E3+ tail — start the late-take measurement just before kicking off
+        // the take so the GO timestamp is as close to the operator press as
+        // we can capture inside the controller. The detector matches on
+        // slideID; cache the cue's human descriptor for the log detail.
+        let goFiredAt = Date()
+        pendingLateTakeCueDescriptor = cue.number.isEmpty ? cue.title : cue.number
+        lateTakeDetector.recordGoFired(cueID: cue.id, slideID: asset.id, at: goFiredAt)
         playback.take(
             slide: asset,
             deviceID: deviceID,
