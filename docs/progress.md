@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B14 partial); Phase C in progress — C1 (codec inspector flags), C2 (ProRes transcode action), C3 (PDF rasterize-on-import), C4 (animated GIF/APNG detect → ProRes 4444 default), and C6 (Keynote AppleScript→PDF→bitmaps) shipped end-to-end. Plumbing follow-ups: import status banner across all three failure pipelines, and C5a image-sequence detector (encoder C5b deferred).
-- **Last commit**: C5a — ImageSequenceDetector pure-logic name.NNNN.ext grouping
+- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B8 pure-logic recommendation + inspector hint shipped; B14 partial); Phase C in progress — C1, C2, C3, C4, C5a, C5b (encoder + coordinator), C6, C-banner all shipped end-to-end. C5c (folder-drop UX) is next. Inline transcode button on cue inspector chips closes the C2/C4 gap.
+- **Last commit**: C5b coordinator — ImageSequenceEncodeCoordinator + sibling outcome
 - **Branch**: `development`
 
 ---
@@ -46,7 +46,7 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
   - [x] B5d: Router/sink unit tests + PlaybackController register/unregister hooks
 - [~] B6: DeckLink REF input handling — surface lock state via `IDeckLinkOutput::GetReferenceStatus`, status-bar REF chip with idle/locked/free-run/not-supported palette (B6 session-2). Project-level `expectsExternalReference` toggle on `PlayoutProject` + Output inspector tab + escalating red "REF EXPECTED — Output is free-running" banner above the status row when the toggle is on and the bridge reports `unlocked` (B6b session-5). **Still deferred**: REF format-mismatch warning vs Stage frame rate (needs incoming-REF frame-rate query, which the v15.3.1 `IDeckLinkOutput` interface does not expose — likely needs `IDeckLinkProfileAttributes::BMDDeckLinkSupportsReferenceInputTimingOffset` or input-side enumeration; small SDK-API spike required before scoping).
 - [ ] B7: DeckLink format negotiation — explicit at start, mid-show change requires re-arm
-- [ ] B8: 10-bit YUV 4:2:2 default when any clip in the project is >8-bit
+- [~] B8: 10-bit YUV 4:2:2 default when any clip in the project is >8-bit. `PlayoutProject.recommendsTenBitOutput` pure-logic computed property + yellow info hint in Output inspector when true (session 11). **Still deferred**: applying the recommendation as the actual default at DeckLink-binding-creation time (no UI surface for that yet) and hardware verification of 10-bit format negotiation against a real card.
 - [ ] B9: "Output in use" detection + recovery path
 - [ ] B10: Audio embed over SDI with channel-pair routing
 - [ ] B11: NDI Full sender as a transport binding
@@ -76,8 +76,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
   - [x] C4c: `TranscodeService.canTranscode` widened to animated-image slides; `preferredPresetOrder(for:)` leads ProRes 4444 for animated images; `SlideGridView` right-click menu uses preferred order
 - [~] C5: Image-sequence detect (`name.0001.png`) → offer encode-to-ProRes-4444 via `AVAssetWriter`
   - [x] C5a: `Services/ImageSequenceDetector.swift` pure-logic — groups `name.NNN[N].(png|jpg|jpeg|tiff|tif|exr)` into Sequences vs leftovers; supports 3- or 4-digit counters, multi-dot basenames, multiple sequences in one batch, gaps in counter
-  - [ ] C5b: AVAssetWriter encoder + import-time routing + folder-drop UX (operator-supplied frame rate?)
-  - [ ] C5c: UI affordance to encode a detected sequence (could share the C2 progress strip with abstraction over the job source)
+  - [x] C5b: `Services/ImageSequenceEncoder.swift` — `@MainActor ObservableObject` wrapping `AVAssetWriter` (frames in → ProRes 4444 .mov out); state enum mirrors `TranscodeJob`; FourCC pinned to `ap4h`/`ap4x` end-to-end. Plus `ImageSequenceEncodeCoordinator` mirroring `TranscodeCoordinator` (jobs list + injectable `siblingImporter` test seam). Frame rate is operator-supplied; default committal deferred to C5c.
+  - [ ] C5c: Folder-drop UX (`canChooseDirectories = true` open panel; drop handler that walks a folder and runs `ImageSequenceDetector.detect(in:)`, then enqueues encode jobs through the coordinator). **Product blocker**: frame-rate default for image-sequence encoding (Stage rate? operator-supplied per import? 30 fps fallback?).
 - [x] C6: Keynote import — AppleScript-driven `.key` → PDF → bitmaps; "Keynote not installed" diagnostic
   - [x] C6a: `Services/KeynoteImporter.swift` (NSAppleScript export-to-PDF, install detection, error mapping) + 9 tests
   - [x] C6b: `MediaImporter.importSlides(from:context:)` routes `.key` via injectable `keynoteExporter` → PDFImporter + 5 tests
@@ -91,10 +91,10 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 - [ ] C13: Audio cue types — embedded, audio-only cue, background bed
 - [ ] C14: Per-cue audio: volume, mute, fade-in/out, crossfade override, varispeed with pitch correction
 - [ ] C15: SRT/WebVTT subtitle sidecar render (subtitle layer in compositor)
-- [~] C-banner: Import status banner across PDF / Keynote / transcode failures (session 10)
+- [x] C-banner: Import status banner across PDF / Keynote / transcode failures (session 10–11)
   - [x] C-banner-a: `MediaImportFailure` value type + `MediaImportReport` + `MediaImporter.importSlidesAndReport(from:context:)` overload
   - [x] C-banner-b: `ImportStatusBanner` ObservableObject + `ImportStatusBannerView` rendered above `OutputStatusBar`; PDF / Keynote / unsupported / transcode (non-cancel) failure paths feed in
-  - [ ] C-banner-c: Replace the modal "Keynote not installed" `NSAlert` with the banner (minor UX call — currently both fire when Keynote isn't installed); also wire compositor / playback runtime errors if they ever surface
+  - [x] C-banner-c: Modal "Keynote not installed" `NSAlert` removed; banner is the single uniform non-modal failure surface (session 11).
 - [ ] C16: Phase C summary + manual rehearsal steps
 
 ## Phase D — Show control

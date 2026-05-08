@@ -1,5 +1,7 @@
 # Phase C — Media pipeline — Summary
 
+**Status (session 11 — 2026-05-08)**: C5b shipped end-to-end (`ImageSequenceEncoder` + `ImageSequenceEncodeCoordinator` — AVAssetWriter wrapping ProRes 4444). Plus three reconciliations: **C-banner-c** (modal "Keynote not installed" alert dropped — banner is the single failure surface), **inline transcode button** on the cue inspector flag chips (closes the C2/C4 chip → action gap), and **B8 logic** (`PlayoutProject.recommendsTenBitOutput` pure-logic computed property + Output inspector hint, now genuinely unblocked by C1's `tenBitYUV420` flag). 5 commits; 341 tests, all green (was 323 at session start; +18). C5c (folder-drop UX) is the next pickup, gated only on the operator-supplied frame-rate default decision.
+
 **Status (session 10 — 2026-05-08)**: C4 shipped end-to-end (animated GIF / APNG detect + ProRes 4444 default in right-click menu), Import Status Banner shipped across PDF / Keynote / transcode failure surfaces, and C5a (ImageSequenceDetector pure-logic) shipped. 323 tests, all green (was 269 at session start; +54). 6 new commits on `development` (C4a / C4b / C4c / C-banner-a / C-banner-b / C5a). The C2c right-click action and the silent-failure plumbing across PDF / Keynote / Transcode are now reconciled — every operator-visible failure mode reaches a non-modal banner instead of disappearing.
 
 **Status (session 9 — 2026-05-08)**: C2 shipped end-to-end (right-click ProRes 422 / 4444 transcode action with non-modal progress). 269 tests, all green (was 257 at session start; +12 from the C2a/C2b suites — C2c is UI-only and has no new test surface). 3 new commits on `development` (C2a / C2b / C2c). The C1 inspector-chip → action loop is now closed: every yellow chip the operator sees in the cue inspector points to the right-click menu that's now wired up.
@@ -13,6 +15,92 @@
 Phase C is just starting. The codec inspector (C1) is the first piece because it has zero hardware dependency and unblocks B8 (10-bit YUV default once any clip is >8-bit) — the `MediaSlide.flags.tenBitYUV420` boolean is now the project-wide signal B8 will key off of.
 
 The remaining Phase C items (C2 transcode action, C3 PDF import, C4 GIF/APNG detect-and-convert, C5 image-sequence detect-and-encode, C6 Keynote import, C7+ asset library / audio / subtitles) are all autonomy-friendly with no hardware exposure — Phase C should be the workhorse phase for autonomous-build cycles.
+
+---
+
+## What shipped in session 11 (C5b + C-banner-c + inline transcode button + B8 logic)
+
+### C5b — `ImageSequenceEncoder` + `ImageSequenceEncodeCoordinator`
+
+- **`Services/ImageSequenceEncoder.swift`** — `@MainActor ObservableObject` wrapping `AVAssetWriter`. Mirrors C2's `TranscodeJob` shape: `state` enum (`.idle / .running / .completed(URL) / .failed(String) / .cancelled`), `progress: Double`, `start(completion:)` / `cancel()`. Pipeline runs on `Task.detached` so synchronous CGImageSource decode + CVPixelBuffer fill don't block the main thread on long sequences. Per-frame: read via `CGImageSourceCreateWithURL` + `CGImageSourceCreateImageAtIndex(0)`; allocate from the adaptor's `pixelBufferPool`; lock + clear-to-transparent + draw via `CGContext` (premultipliedFirst, byteOrder32Little, BGRA); `adaptor.append` at `CMTime(value: index, timescale: frameRate)`. Final state requires `writer.status == .completed`.
+- **Frame rate is operator-supplied.** The encoder takes it as an init parameter — no default committed. The frame-rate default question (Stage rate? operator-picked per import? 30 fps fallback?) belongs to C5c (folder-drop UX) and is filed as the C5c product blocker.
+- **Pixel format choice**: `kCVPixelFormatType_32BGRA` for the buffer pool (8-bit BGRA, premultiplied alpha). Sufficient for the typical PNG / JPG / TIFF / EXR sequence content; ProRes 4444 carries the alpha through losslessly. A future enhancement could switch to 16-bit per channel (`_64ARGB`) for EXR sources to preserve >8-bit content; today the encoder is correctness-first and matches the PNG sequences operators most often produce.
+- **Frame-size mismatch handling**: the canonical canvas is the first frame's `CGImage` width × height. Later frames whose dimensions differ are drawn into the canonical rect via `context.draw(image, in: rect)`, which scales them — soft landing rather than thrown error. The detector groups by basename, so cross-frame size mismatches are unlikely; if they happen, the operator gets a stretched / fit-into-canvas frame rather than a failed encode.
+- **`ImageSequenceEncodeCoordinator`** — owns live `[ImageSequenceEncoder]`. Mirrors `TranscodeCoordinator`: jobs list + injectable `siblingImporter` test seam (default delegates to `MediaImporter.importSlides`, so the resulting slide carries fresh `nativeFrameRate` + `MediaFlags`). `encode(sequence:frameRate:destinationDirectory:completion:)` builds the destination URL (`<UUID>.mov`), kicks off the encoder, and on success constructs an `ImageSequenceEncodeOutcome { baseName, siblingSlide }`. The sibling slide's title is the detected sequence's `baseName` (e.g. `shot07.0001.png … shot07.0240.png` → `"shot07"`).
+- **End-to-end FourCC pin**: the encoder test synthesizes a 3-frame 32×32 PNG sequence at runtime, encodes at 30 fps, asserts the output `.mov` has FourCC ∈ `{ap4h, ap4x}` (ProRes 4444 family) and duration ~3/30 = 0.1 s within tolerance.
+
+### Tests added (session 11 — C5b)
+
+| Test | What it covers |
+|---|---|
+| `ImageSequenceEncoderTests.testEncoderStartsInIdle` | `.idle` initial state, progress 0, not terminal, not running. |
+| `ImageSequenceEncoderTests.testCancelBeforeStartIsNoOp` | `cancel()` before `start()` does not transition state. |
+| `ImageSequenceEncoderTests.testEncoderFailsWhenFrameListEmpty` | Empty input → `.noFrames`. |
+| `ImageSequenceEncoderTests.testEncoderFailsWhenFrameRateLessThanOne` | `frameRate == 0` → `.invalidFrameRate(0)`. |
+| `ImageSequenceEncoderTests.testEncoderFailsWhenFrameUnreadable` | Missing source frame → `.unreadableFrame`. |
+| `ImageSequenceEncoderTests.testEncodesPNGSequenceToProRes4444` | End-to-end: 3 PNG frames @ 30 fps → `.mov` with FourCC `ap4h`/`ap4x` and ~0.1 s duration. |
+| `ImageSequenceEncoderTests.testCancelAfterCompletionIsNoOp` | `cancel()` after terminal state preserves `.completed`. |
+| `ImageSequenceEncoderTests.testStartTwiceIsNoOpOnSecondCall` | Second `start()` while running does not fire its completion. |
+| `ImageSequenceEncoderTests.testMakeCGImageReadsPNG` | `makeCGImage` happy path (16×16 PNG). |
+| `ImageSequenceEncoderTests.testMakeCGImageReturnsNilForMissingFile` | Missing file → nil. |
+| `ImageSequenceEncodeCoordinatorTests.testCoordinatorStartsEmpty` | `jobs == []` on init. |
+| `ImageSequenceEncodeCoordinatorTests.testEncodeProducesSiblingSlideWithSequenceBaseName` | End-to-end with stubbed sibling importer: outcome carries baseName + sibling.title = baseName + sibling.mediaKind = .video. |
+| `ImageSequenceEncodeCoordinatorTests.testEncodeFailsWhenSiblingImporterReturnsNil` | Importer-returns-nil → `.finishFailed`. |
+| `ImageSequenceEncodeCoordinatorTests.testCancelAllCancelsRunningJobs` | After `cancelAll()`, jobs list drains; either success-or-failure outcome accepted (race window). |
+
+### C-banner-c — Modal Keynote alert dropped
+
+- `RootView.addMedia` no longer presents the "Keynote not installed" `NSAlert`. The banner already captures Keynote-not-installed via the existing `importKeynoteThrowing` → `KeynoteImportError.keynoteNotInstalled` → `makeFailure` chain. Removing the modal gives a single uniform non-modal failure surface across PDF / Keynote / transcode / unsupported pipelines, which is also what spec §3.5 prefers (modal-forbidden invariant). No tests changed.
+
+### Inline transcode button on cue inspector flag chips
+
+- `CueInspectorView` now takes an optional `requestTranscode: ((MediaSlide, TranscodePreset) -> Void)?` parameter; `RootView.selectionInspector` passes its existing `requestTranscode(slide:preset:)` implementation. When the asset is transcode-eligible (`TranscodeService.canTranscode`), the chip group renders a single inline `"Transcode to ProRes 422"` / `"Transcode to ProRes 4444"` button below the chips, using `TranscodeService.preferredPresetOrder(for: slide).first` so animated images lead with 4444 and everything else leads with 422 — same order signal the right-click menu uses, no parallel preference. Closes the C2 known gap "Inspector flag chips don't auto-route." No new tests (closure pass-through; underlying `preferredPresetOrder` + `canTranscode` behavior is already pinned by C2/C4).
+
+### B8 logic — `recommendsTenBitOutput` + Output inspector hint
+
+- **`PlayoutProject.recommendsTenBitOutput`** — pure-logic computed property: true iff `slides.contains { $0.mediaKind == .video && $0.flags.tenBitYUV420 }`. Phase B8 ("10-bit YUV 4:2:2 default when any clip in the project is >8-bit") is now genuinely unblocked by C1's inspector flag.
+- **`OutputInspectorView`** — when `recommendsTenBitOutput` is true, renders a yellow info row: "10-bit content detected — Configure the DeckLink output as 10-bit YUV 4:2:2 to preserve quality." Informational only — no auto-toggle. The actual default-as-tenBit-true at DeckLink-binding-creation time waits for a UI surface that creates DeckLink bindings (today no such surface exists). Hardware verification of 10-bit format negotiation against a real card remains operator-driven.
+- 4 tests pin the recommendation contract: empty project (false), all-8-bit (false), any-10-bit (true), `.image` slide with `tenBitYUV420 == true` (false — recommendation only fires on `.video`).
+
+### Tests added (session 11 — B8)
+
+| Test | What it covers |
+|---|---|
+| `ModelTests.testRecommendsTenBitOutputFalseOnEmptyProject` | Empty project → false. |
+| `ModelTests.testRecommendsTenBitOutputFalseWhenAllVideoIs8Bit` | All slides 8-bit → false. |
+| `ModelTests.testRecommendsTenBitOutputTrueWhenAnyVideoIsTenBit` | Any video 10-bit → true. |
+| `ModelTests.testRecommendsTenBitOutputIgnoresNonVideoSlides` | `.image` slide with `tenBitYUV420 == true` is ignored. |
+
+Total: 341 tests, all green (was 323 at session start; +18 across C5b encoder + C5b coordinator + B8).
+
+---
+
+## Manual verification needed (session 11 deltas)
+
+These need human eyeballs — autonomous tests cover the encoder's FourCC contract end-to-end against synthesized PNGs, but real-world image-sequence variety (EXR with alpha, mixed-aspect frames, TIFF with embedded color profiles, multi-thousand-frame sequences) needs operator-supplied media.
+
+### C5b (image-sequence encoder)
+
+1. The encoder currently has no UI surface — C5c lands the open-panel + drop handler. Until then, the encoder + coordinator are exercised only by the test suite. A minimal smoke-test would be a one-shot harness in the tests directory (synthesize 60 frames, encode at 24 fps, verify on disk) — not part of this session.
+2. Open the resulting `.mov` from a test-run in QuickTime; the alpha channel should preserve any transparency in the source PNGs (use a sequence with embedded alpha to verify).
+
+### C-banner-c
+
+3. Without Keynote installed, drop a `.key` file. Previously: modal alert + banner. Now: banner only. Click "Show Details" — the popover entry reads "Keynote not installed — install Keynote to import .key files".
+4. Drop a mixed batch (one `.key`, one healthy `.png`) without Keynote installed. The banner shows 1 item failed; the PNG still imports.
+
+### Inline transcode button
+
+5. Import an H.264 .mp4. Open its cue in the cue inspector. Confirm the yellow "Long-GOP" chip appears with a "Transcode to ProRes 422" button below it. Click it — the non-modal progress strip appears (same as right-click); on completion the sibling slide is auto-selected. Inspector chips on the sibling are gone (long-GOP cleared).
+6. Import an animated GIF. Open its cue. Confirm the chip says "Animated GIF / APNG …" and the button reads "Transcode to ProRes 4444" (alpha-bearing default for animated images). Click it — the sibling is a ProRes 4444 .mov and plays with full motion.
+7. Import a clean ProRes file. Confirm no chips, no button.
+8. Show Mode (Cmd-Shift-L) — the cue inspector still shows chips, but `requestTranscode` is plumbed through `RootView.requestTranscode` which is gated by Show Mode at the asset library level. The button itself doesn't gate on Show Mode — operators in Show Mode might still press the inline button, which would fail downstream. (Known gap; pair with a Show-Mode disable on `requestTranscode` as a future cleanup.)
+
+### B8 hint
+
+9. Save a project, drop in an HEVC Main 10 source (an iPhone HDR clip). Open the Output inspector tab. The bottom of the inspector should show a yellow row "10-bit content detected …".
+10. Drop only ProRes 422 / 8-bit H.264 sources. The hint section is hidden.
+11. The hint is informational only — no toggle to flip the DeckLink output to 10-bit. That ships with the B7 / DeckLink-binding-creation UI.
 
 ---
 
@@ -370,29 +458,29 @@ These need human eyeballs — autonomous tests don't drive SwiftUI inspectors.
 
 ---
 
-## Still deferred (session 10+)
+## Still deferred (session 11+)
 
 **Phase B leftovers** (mostly hardware-bound):
 - **B6 (remaining)** — REF format-mismatch detection vs Stage frame rate. Needs a Blackmagic SDK spike against newer interfaces; possible blocker.
 - **B7** — DeckLink format negotiation. Has product-UX questions (mid-show re-arm flow — modal? non-modal banner?) that warrant a fresh session with options surfaced to the user.
-- **B8** — 10-bit YUV 4:2:2 default — **now unblocked by C1**. Once C1's `tenBitYUV420` flag exists across all video assets, B8 can key the 10-bit conversion path on `project.slides.contains { $0.flags.tenBitYUV420 || $0.flags.bitsPerComponent >= 10 }` (the latter would need exposing in C1 too — or just driving off the flag).
+- **B8 (remaining)** — Apply the `recommendsTenBitOutput` recommendation as the actual default at DeckLink-binding-creation time. Today there's no UI surface that creates DeckLink bindings; once one exists (B7-adjacent), pre-fill `tenBit` from `project.recommendsTenBitOutput`. Hardware verification of the 10-bit format negotiation against a real card remains operator-driven.
 - **B11** — NDI Full sender as a `TransportSink`. Independent of DeckLink. Needs the NDI SDK as a new dependency — confirm license + size in `decision_log.md` first.
 - **B13** — Color pipeline (sits on top of B5+B12).
 - **B9 / B15 / B10** — long tail.
 - **B16** — final Phase B summary + DeckLink mock layer for tests.
 
 **Phase C remaining** (autonomy-friendly):
-- **C5b/c** — Image-sequence encoder + UI. Detector (C5a) is in place. C5b wraps `AVAssetWriter` to write a ProRes 4444 .mov from frames; structurally similar to `TranscodeJob` but with `AVAssetWriter` (frames in) instead of `AVAssetExportSession` (movie in) — could share `TranscodeProgressStrip` + the `TranscodeJob` shape if we abstract over "thing that produces a `.mov` from some input." C5c then needs folder-drop support (`canChooseDirectories = true` on the open panel; drop handler that walks a folder and runs `ImageSequenceDetector.detect(in:)`).
+- **C5c** — Folder-drop UX. Encoder (C5b) + coordinator are in place with stable contracts; C5c needs the open panel (`canChooseDirectories = true`), the drop handler that walks a folder and runs `ImageSequenceDetector.detect(in:)`, the per-sequence enqueue through `ImageSequenceEncodeCoordinator.encode(...)`, and the operator-supplied frame-rate input. Also needs to abstract `TranscodeProgressStrip` over both `TranscodeJob` and `ImageSequenceEncoder` (or duplicate it — pick based on how heavy the abstraction would be). **Product blocker on the frame-rate default** — Stage rate? operator-picked per import? 30 fps fallback? File a `docs/blockers.md` entry or surface options when the next session opens C5c.
 - **C7+** — Asset library, audio engine, subtitles, etc. Larger.
 
 **Phase C plumbing follow-ups** (small, ergonomics):
-- **C-banner-c** — Replace the modal "Keynote not installed" `NSAlert` with the `ImportStatusBanner` so the failure surface is uniform. Today both fire when Keynote isn't installed (alert + banner) — minor noise.
-- **Inline "Transcode" affordance from inspector chip** — operators reading the cue inspector see the yellow chip and have to know to right-click the asset library tile. A button next to the chip that fires `requestTranscode` directly would close the loop (deferred from C2 known gaps).
-- **Re-rasterize on Stage resize** — PDFs / Keynote decks rasterized at 1080p stay 1080p when the operator bumps the Stage to 2160p. C6's intermediate PDF stays in `Cache/Renders/<UUID>/` exactly so this can re-use the same source without re-driving Keynote. Architectural note: today MediaSlide doesn't track its source PDF/Keynote URL — adding that link is the prerequisite.
+- **Re-rasterize on Stage resize** — PDFs / Keynote decks rasterized at 1080p stay 1080p when the operator bumps the Stage to 2160p. C6's intermediate PDF stays in `Cache/Renders/<UUID>/` exactly so this can re-use the same source without re-driving Keynote. Architectural note: today `MediaSlide` doesn't track its source PDF/Keynote URL — adding that link is the prerequisite.
 - **Compact project** — `<bundle>/Transcoded/<UUID>.mov` and `<bundle>/Cache/Renders/<UUID>/` accumulate when the operator deletes the corresponding MediaSlides. A future "Compact project" action would walk the bundle and remove orphans no slide resolves to.
-- **Apple-events permission diagnostic** — if the operator denied the macOS automation prompt for Keynote, every subsequent `.key` import returns a `KeynoteImportError.exportFailed` whose summary now lands in the banner (good!). A "Open System Settings → Privacy & Security → Automation" deep-link button on the banner would close the loop.
+- **Apple-events permission diagnostic** — if the operator denied the macOS automation prompt for Keynote, every subsequent `.key` import returns a `KeynoteImportError.exportFailed` whose summary now lands in the banner. A "Open System Settings → Privacy & Security → Automation" deep-link button on the banner would close the loop.
+- **Show-Mode gating on the inline transcode button** — `RootView.requestTranscode` is gated by Show Mode at the asset library level, but `CueInspectorView`'s inline button doesn't add its own check. Operators in Show Mode could press the inline button (which would fail downstream). Add a `showMode` Boolean parameter to the inspector and hide the button when set.
+- **Cancelled transcode partial-file cleanup** — known C2 gap; cancelled jobs leave a partial `<bundle>/Transcoded/<UUID>.mov` until the next start. A cleanup pass on cancellation (or "Compact project") would reconcile.
 
-**Recommended next pick**: **C5b (image-sequence encoder)** — the detector (C5a) ships with a stable contract; the encoder's the meatier next step but is structurally well-understood (wraps AVAssetWriter, shares the C2 progress UI shape). Alternatively, **the inline "Transcode" affordance from the inspector chip** is small and meaningfully closes the loop the operator already sees in the inspector. **B8 (10-bit YUV default)** is now genuinely unblocked by C1's `tenBitYUV420` flag — that's the natural Phase B re-engagement when the user wants to step back into Phase B. **E1 (pre-show check panel)** is the start of Phase E and a clean phase boundary if the user wants to pivot. **C-banner-c** (collapse the duplicate Keynote-not-installed alert) is the smallest reasonable session opener.
+**Recommended next pick**: **C5c (folder-drop UX)** — the only thing standing between operators and end-to-end image-sequence ingestion. Surface the frame-rate default decision as a `docs/blockers.md` entry the moment the session opens, then either resume after the user picks one or ship a "frame-rate picker per sequence" UX (operator types the rate when they confirm the encode — no committed default). **E1 (pre-show check panel)** is the start of Phase E and a clean phase boundary if the user wants to pivot. **B11 (NDI Full sender)** is the next contained Phase B item once the NDI SDK dependency call is made. **The Show-Mode inline-button gate** is the smallest one-commit cleanup.
 
 ### Known gaps in the C6 Keynote import path
 
