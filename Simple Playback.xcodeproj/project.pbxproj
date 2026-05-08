@@ -10,6 +10,7 @@
 		00EC3572563AA2E459F2489F /* ShowControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237C1358E779CC8F8EBA839E /* ShowControlTests.swift */; };
 		020E6C3D173AD7E05AC7A15A /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213CB5AEDC97C0942C10558F /* RootView.swift */; };
 		02E7848C2C617A208282F42A /* OSCMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 473B7534956D23833D7E61BD /* OSCMessage.swift */; };
+		05124FD2A6536D48F63AD2C9 /* AddFolderImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C41349B62BEDC6D03ED0DA6 /* AddFolderImporter.swift */; };
 		05B0542CB3BD8AC9F77CEDFA /* OutputStatusBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0971F0E4FF56FD74F21EC0 /* OutputStatusBarTests.swift */; };
 		0DC6F58F420AAD20BD0336A5 /* MediaImportFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2762065E2D1FE5D3F052F8FF /* MediaImportFailure.swift */; };
 		11107495CED0238B67C8D7AC /* ShowControlStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6023F5FCD12A96AE5EAD4313 /* ShowControlStack.swift */; };
@@ -32,6 +33,7 @@
 		4552EA56AF59686AE3373E66 /* TranscodeServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A70EA9D270E7268A7C74D62 /* TranscodeServiceTests.swift */; };
 		467C57350783EEECC0DC7DFE /* KeynoteImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A8691862AC8AE01B87203D /* KeynoteImporter.swift */; };
 		46F067BBC06E93A8F2D556E9 /* ImportStatusBannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B133348CF010D337CDA988A0 /* ImportStatusBannerTests.swift */; };
+		497003F120EE87DE50995F6E /* AddFolderImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0989D3568265E79CF99893F5 /* AddFolderImporterTests.swift */; };
 		4986A9905EB62FFA630409BD /* MediaFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93004BE1F2BECBBF122DB00C /* MediaFlags.swift */; };
 		4A94C48FF22B0552314D441E /* DeckLinkDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF97362F36D6ED17D41359D2 /* DeckLinkDiagnostics.swift */; };
 		4C060BE294B7C9A97DBA4FBE /* FrameRateConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C8342BEF86901A52B41C81 /* FrameRateConformanceTests.swift */; };
@@ -114,6 +116,7 @@
 		00712F270D3EB78020694E87 /* OSCAddressMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCAddressMap.swift; sourceTree = "<group>"; };
 		01C17ADD674250609276D8A4 /* HTTPRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRoutes.swift; sourceTree = "<group>"; };
 		06A94FE5F5AA25EE58FF77A3 /* ImageSequenceEncoderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSequenceEncoderTests.swift; sourceTree = "<group>"; };
+		0989D3568265E79CF99893F5 /* AddFolderImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddFolderImporterTests.swift; sourceTree = "<group>"; };
 		0A0971F0E4FF56FD74F21EC0 /* OutputStatusBarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputStatusBarTests.swift; sourceTree = "<group>"; };
 		0AAABB8C041A4E6DF8BE8685 /* LTCDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LTCDecoder.swift; sourceTree = "<group>"; };
 		0ACFD5B151F32CFDFFECCB68 /* BonjourPublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BonjourPublisher.swift; sourceTree = "<group>"; };
@@ -165,6 +168,7 @@
 		7B4EF3D125520DB5F0C1F703 /* HTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPServer.swift; sourceTree = "<group>"; };
 		87395AF6ACFB3496B47EFFB3 /* ShowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowController.swift; sourceTree = "<group>"; };
 		8A5E1B676CDA189E4C8C26CB /* PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackController.swift; sourceTree = "<group>"; };
+		8C41349B62BEDC6D03ED0DA6 /* AddFolderImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddFolderImporter.swift; sourceTree = "<group>"; };
 		8FD2B422FED7E9102FAEA3D2 /* ShowControlState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlState.swift; sourceTree = "<group>"; };
 		92D6FAD99797FC3C21DA725E /* AVKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVKit.framework; path = System/Library/Frameworks/AVKit.framework; sourceTree = SDKROOT; };
 		93004BE1F2BECBBF122DB00C /* MediaFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlags.swift; sourceTree = "<group>"; };
@@ -301,6 +305,7 @@
 		5DCAA6C450AB6D61658449BB /* Simple PlaybackTests */ = {
 			isa = PBXGroup;
 			children = (
+				0989D3568265E79CF99893F5 /* AddFolderImporterTests.swift */,
 				F13F77220235167A2E3CF142 /* AnimatedImageInspectorTests.swift */,
 				21271656A4CCF6A5AD4E2940 /* CompositorPipelineTests.swift */,
 				22C8342BEF86901A52B41C81 /* FrameRateConformanceTests.swift */,
@@ -415,6 +420,7 @@
 		E90F62939082F88EED632467 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				8C41349B62BEDC6D03ED0DA6 /* AddFolderImporter.swift */,
 				AB44C4BE122979080B759770 /* AnimatedImageInspector.swift */,
 				6FD2EFC1C287DD9480AF2D2F /* ImageSequenceDetector.swift */,
 				2D06F636A6229A0C418EE285 /* ImageSequenceEncoder.swift */,
@@ -523,6 +529,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				05124FD2A6536D48F63AD2C9 /* AddFolderImporter.swift in Sources */,
 				E047E0CE35C78C80772F54ED /* AnimatedImageInspector.swift in Sources */,
 				62CDF088556B0DAA473AC800 /* AudioPump.swift in Sources */,
 				44E0E08A26F3691D8E7A2C44 /* AuthTokenStore.swift in Sources */,
@@ -592,6 +599,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				497003F120EE87DE50995F6E /* AddFolderImporterTests.swift in Sources */,
 				2802ED3F9310BC405ED40764 /* AnimatedImageInspectorTests.swift in Sources */,
 				DCABF0FFCC0E6E0596173F64 /* CompositorPipelineTests.swift in Sources */,
 				4C060BE294B7C9A97DBA4FBE /* FrameRateConformanceTests.swift in Sources */,
