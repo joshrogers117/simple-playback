@@ -967,3 +967,54 @@ if storedHash == nil && storedSize == nil {
 **Reversibility**: medium. The async signature is the natural shape; reverting requires a thread-blocking semaphore wait in the coordinator's detached Task.
 
 **What I'd revisit if**: ThumbnailGenerator's `image(at:)` migration goes through later. At that point the FilmstripGenerator + ThumbnailGenerator could share a small "decode one CGImage at time T from URL" async helper.
+
+---
+
+## 2026-05-08 — Path 1 token arming inside the outputQueue critical section
+
+**Why**: pre-fix, `commitPreparedVideoTransition` and the transition branch of `commitPreparedImageTransition` called `setPendingCueFireSlideID(prepared.slide.id)` on the main thread *after* `stopMediaOnly(preservingMediaForTransition: true)` had started the outgoing-handoff timer on `outputQueue`. A handoff tick that landed between the main-side arm and the first composed-frame `submitFrame` would consume the token by submitting an outgoing-video frame, firing `onFirstComposedFrameForCue` with `firedAt` ahead of the new cue's actual first composed frame. The late-take detector would record `latency≈0` for what should have been a slow new-cue load.
+
+**Decision**: move arming into the same `syncOutput { ... }` block that cancels the outgoing-handoff timer and submits the first composed frame. For the still-transition image branch (where the first submit happens later in `renderStillTransitionFrame` on the timer-driven outputQueue), wrap the cancel + arm in their own `syncOutput { cancelOutgoingHandoffTimer(); setPendingCueFireSlideID(...) }` block immediately before `startStillTransition` schedules its first tick.
+
+**Alternatives considered**:
+- **Cancel the outgoing handoff timer on main before arming.** Works for the non-still-transition paths; fails for the still-transition image path because `cancelOutgoingHandoffTimer` mutates `outgoingHandoffSource` and that field is also read on outputQueue from `renderStillTransitionFrame`. syncOutput-wrapping is the cleaner contract.
+- **Plumb a "this submit is a primary take frame" flag through `submitFrame`.** Adds a parameter with one truthy callsite; the outputQueue serialization argument is simpler.
+- **Test the race deterministically.** The race is timing-dependent and would require either a fake DispatchSource that fires synchronously on a test-controlled tick, or a refactor that exposes the handoff timer's tick callback for direct invocation. The cost vs. value tradeoff favored doc-comment pinning instead.
+
+**Reversibility**: easy. Reverting moves the arming back to the main-side, which is the pre-fix behavior.
+
+**What I'd revisit if**: a future test suite gains a deterministic outputQueue-time-stepping primitive (some kind of "advance the queue by N ticks" hook). At that point the race could be reproduced + pinned with a fail-then-fix test.
+
+---
+
+## 2026-05-08 — ThumbnailGenerator: completion-handler bridge instead of full async migration
+
+**Why**: `copyCGImage(at:actualTime:)` was deprecated in macOS 15 in favor of the async-only `image(at:)`. ThumbnailGenerator is called synchronously from `MediaImporter.thumbnailEncoder`, which is itself a sync closure invoked from the importer's slide-construction loop. Migrating ThumbnailGenerator to `async throws` would force MediaImporter to become async, which would ripple through RootView's drop/open-panel handlers, ImageSequenceEncoder.siblingImporter, TranscodeService.siblingImporter, and ~25 tests.
+
+**Decision**: keep the public `generateJPEG(for:mediaKind:size:quality:)` signature sync `throws -> Data`. Internally, replace `copyCGImage(at:actualTime:)` with the non-deprecated completion-handler variant `generateCGImageAsynchronously(for:completionHandler:)` and bridge to a sync result via `DispatchSemaphore` + a small `@unchecked Sendable` box. The semaphore enforces the happens-before relationship that the box doesn't express on its own.
+
+**Alternatives considered**:
+- **Make ThumbnailGenerator async + propagate through MediaImporter.** Honest async migration but ~25-test ripple and 3-5 commits of plumbing. Punted as a follow-up gardening sweep when the importer naturally needs to become async (e.g., for bulk async metadata extraction).
+- **Keep `copyCGImage` and accept the deprecation warning.** Ships warnings into every clean build that's passed forward. Tolerable but not zero-cost.
+- **`Task.detached { await image(at:) }` with semaphore wait at the call site.** Allocates a Task per frame extract just to sync-wait; the completion-handler API is the same primitive without the actor hop.
+
+**Reversibility**: easy. The bridge is local to one method; reverting drops the box + semaphore + completion-handler in favor of the deprecated sync API.
+
+**What I'd revisit if**: MediaImporter naturally becomes async (a future async fingerprint API, or a bulk pre-fetch pass that benefits from `withTaskGroup`). At that point this method also goes async and the bridge is removed.
+
+---
+
+## 2026-05-08 — C8 folder bookmarks: project-level registry, not inline per-MediaReference
+
+**Why**: spec §3.10 implies a folder-level bookmark + per-file relative path so a 50-clip folder produces ONE 1–2 KB security-scoped bookmark blob shared across every slide instead of 50 copies. The deduplication value is modest in raw KB (50 × ~1 KB → ~3 KB savings) but real in operator-facing semantics: a folder rename heals every slide that came from that folder via one bookmark, rather than relying on each per-file bookmark to survive independently.
+
+**Decision**: store FolderBookmarks on `PlayoutProject.folderBookmarks: [FolderBookmark]` keyed by `id`. `MediaReference` carries `folderBookmarkID: UUID?` + `folderRelativePath: String?` — small references back into the project's lookup. Resolution callsites that want the new rung accept a `[UUID: FolderBookmark]` parameter (cheap dict construction at call time in RootView). The bundle-only `resolvedURL(bundleMediaDirectory:)` overload continues to work for callsites that haven't been threaded yet (PlaybackController/Compositor/TranscodeService).
+
+**Alternatives considered**:
+- **Inline-per-MediaReference: each slide carries its own copy of the folder bookmark Data.** No threading required; resolution stays self-contained. Loses the dedup goal (the whole point of folder bookmarks per the spec direction); arguably also breaks the C9 "show the operator which folder bookmarks are stale" surface that a future banner could expose by enumerating `project.folderBookmarks` directly.
+- **Capture the bookmark eagerly in an opt-in wrapper at every read callsite.** Forces synchronization on every access (the bookmark resolve is cheap but not zero); the once-per-pre-show dict construction is far cheaper than once-per-take.
+- **Use Swift `URL.bookmarkData(options: [.withSecurityScope])` with `relativeTo:` to make per-file bookmarks folder-relative.** Apple supports this but the sandbox semantics get fragile when the folder bookmark itself is stale (the relative-to bookmark's resolve depends on the parent's resolve, so a stale parent invalidates every relative-to child even when the file itself is reachable). The two-field approach we're using is the more robust shape.
+
+**Reversibility**: medium. Removing FolderBookmark from the model is straightforward (decode-if-present everywhere); the resolver rung removal would be a one-line patch. The Add Folder importer wiring is the largest delete (one method + one optional parameter).
+
+**What I'd revisit if**: operator workflows need *deep* per-file bookmark recovery (file moved out of the folder, parent folder renamed, etc.). The current rung 2 only handles "file moved within its imported folder." A more general "rebuild from common-prefix-path" recovery would need a different design.
