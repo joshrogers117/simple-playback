@@ -47,17 +47,56 @@ enum AlignmentPreset: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// C7 — linked vs managed media. `linked` is the default: the file lives at its
+/// original on-disk location and the project carries a security-scoped bookmark + path.
+/// `managed` is set by Bundle for Travel (C7d): the file has been copied into the
+/// project bundle's `Media/` directory and resolution is bundle-relative.
+enum MediaReferenceKind: String, Codable, CaseIterable, Identifiable {
+    case linked
+    case managed
+
+    var id: String { rawValue }
+}
+
 struct MediaReference: Codable, Hashable {
     var originalPath: String
     var bookmarkData: Data?
+    /// Linked vs managed. Defaults to `.linked` for backwards compatibility with
+    /// pre-C7 projects (they decode without the field and inherit linked).
+    var kind: MediaReferenceKind = .linked
+    /// SHA-256 + size + mtime captured at last successful import or relink. `nil` for
+    /// references created before C7 (the field decodes-if-present and the relink
+    /// waterfall recomputes it on first successful resolve in a future iteration).
+    var fingerprint: MediaAssetFingerprint?
 
-    init(url: URL) {
+    init(
+        url: URL,
+        fingerprint: MediaAssetFingerprint? = nil,
+        kind: MediaReferenceKind = .linked
+    ) {
         originalPath = url.path
         bookmarkData = try? url.bookmarkData(
             options: [.withSecurityScope],
             includingResourceValuesForKeys: nil,
             relativeTo: nil
         )
+        self.fingerprint = fingerprint
+        self.kind = kind
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case originalPath
+        case bookmarkData
+        case kind
+        case fingerprint
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        originalPath = try c.decode(String.self, forKey: .originalPath)
+        bookmarkData = try c.decodeIfPresent(Data.self, forKey: .bookmarkData)
+        kind = try c.decodeIfPresent(MediaReferenceKind.self, forKey: .kind) ?? .linked
+        fingerprint = try c.decodeIfPresent(MediaAssetFingerprint.self, forKey: .fingerprint)
     }
 
     func resolvedURL() -> URL? {
