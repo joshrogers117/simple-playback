@@ -23,6 +23,15 @@ enum ProjectBundleLayout {
     static let mediaDirectory = "Media"
 }
 
+/// Tiny ObservableObject that mirrors `NSDocument.fileURL` into a SwiftUI
+/// observable signal. RootView observes it via `@ObservedObject` so a Save-As
+/// (the only way the bundle URL changes after open) can refresh both
+/// `PlaybackController.bundleMediaDirectory` and the C9 missing-media banner
+/// without polling. Symmetry with `lockController.evaluate(bundleURL:)`.
+final class BundleURLObserver: ObservableObject {
+    @Published var bundleURL: URL?
+}
+
 final class SimplePlaybackProjectDocument: NSDocument {
     private var playbackDocument = SimplePlaybackDocument()
     /// E8 — per-document lock controller. Acquires/releases `<bundle>/.lock`
@@ -34,6 +43,10 @@ final class SimplePlaybackProjectDocument: NSDocument {
     /// `<bundle>/Autosave/` for any checkpoint newer than the on-disk
     /// `Show.json`. The banner surfaces in `RootView`.
     private let crashRecoveryController = CrashRecoveryController()
+    /// C7d — per-document bundle-URL signal. Republished from the fileURL
+    /// observer below so RootView can refresh playback.bundleMediaDirectory
+    /// + the missing-media banner on Save-As.
+    private let bundleURLObserver = BundleURLObserver()
     /// Tracks `NSDocument.fileURL` changes — fires on the initial open path
     /// (set after `read(from:)` completes) and on Save-As (operator picks a
     /// new destination). Each change triggers a lock re-evaluation.
@@ -69,6 +82,7 @@ final class SimplePlaybackProjectDocument: NSDocument {
             Task { @MainActor [weak self] in
                 self?.lockController.evaluate(bundleURL: url)
                 self?.crashRecoveryController.evaluate(bundleURL: url)
+                self?.bundleURLObserver.bundleURL = url
             }
         }
     }
@@ -80,6 +94,7 @@ final class SimplePlaybackProjectDocument: NSDocument {
             projectBundleURLProvider: { [weak self] in self?.fileURL },
             lockController: lockController,
             crashRecoveryController: crashRecoveryController,
+            bundleURLObserver: bundleURLObserver,
             restoreFromCheckpoint: { [weak self] in
                 self?.restoreProjectFromRecoverableCheckpoint() ?? false
             },

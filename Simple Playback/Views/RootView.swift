@@ -29,6 +29,12 @@ struct RootView: View {
     /// `lockController` — the NSDocument owns the controller so the
     /// evaluate-on-fileURL-change machinery runs at the right time.
     @ObservedObject private var crashRecoveryController: CrashRecoveryController
+    /// C7d — bundle-URL signal mirrored from `NSDocument.fileURL`. RootView
+    /// observes it so a Save-As (the only way the bundle URL changes after
+    /// open) refreshes `playback.bundleMediaDirectory` and the C9 missing-
+    /// media banner. Default is a fresh observer for previews / tests that
+    /// don't construct an NSDocument.
+    @ObservedObject private var bundleURLObserver: BundleURLObserver
     /// E7 — Restore handler. Implemented by the NSDocument so the project
     /// decoder + change-count plumbing stays there. Returns true on success.
     private let restoreFromCheckpoint: () -> Bool
@@ -84,6 +90,7 @@ struct RootView: View {
         projectBundleURLProvider: @escaping () -> URL? = { nil },
         lockController: ProjectLockController,
         crashRecoveryController: CrashRecoveryController = CrashRecoveryController(),
+        bundleURLObserver: BundleURLObserver = BundleURLObserver(),
         restoreFromCheckpoint: @escaping () -> Bool = { false },
         autosaveCheckpoint: @escaping (AutosaveCheckpoint.Reason) -> Void = { _ in }
     ) {
@@ -92,6 +99,7 @@ struct RootView: View {
         self.projectBundleURLProvider = projectBundleURLProvider
         self.lockController = lockController
         self.crashRecoveryController = crashRecoveryController
+        self.bundleURLObserver = bundleURLObserver
         self.restoreFromCheckpoint = restoreFromCheckpoint
         self.autosaveCheckpoint = autosaveCheckpoint
         _showController = StateObject(wrappedValue: ShowControllerHolder())
@@ -210,6 +218,13 @@ struct RootView: View {
             recomputeAssetLibraryStatus()
         }
         .onChange(of: document.project.slides) {
+            recomputeAssetLibraryStatus()
+        }
+        .onChange(of: bundleURLObserver.bundleURL) {
+            // Save-As (or initial document open) just changed the bundle URL.
+            // Refresh playback's bundle-aware resolution and the missing-media
+            // banner so they don't keep using the stale `nil` from `.onAppear`.
+            playback.bundleMediaDirectory = bundleMediaDirectory()
             recomputeAssetLibraryStatus()
         }
         .onChange(of: playback.devices) {
