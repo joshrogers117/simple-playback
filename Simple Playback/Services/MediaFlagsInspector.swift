@@ -24,8 +24,10 @@ enum MediaFlagsInspector {
     /// files, missing files, or any inspection failure — never throws. Empty flags is the
     /// "I couldn't inspect this" sentinel; downstream UI just shows nothing.
     static func inspect(url: URL) -> MediaFlags {
-        guard let track = loadFirstVideoTrackSync(url: url) else { return .none }
-        guard let formatDescription = (track.formatDescriptions as? [CMFormatDescription])?.first else {
+        guard let inspection = AVTrackLoader.loadFirstVideoTrackInspection(url: url) else {
+            return .none
+        }
+        guard let formatDescription = inspection.formatDescriptions.first else {
             return .none
         }
 
@@ -33,7 +35,10 @@ enum MediaFlagsInspector {
         let hasColorPrimariesTag = colorPrimariesPresent(in: formatDescription)
         let bitsPerComponent = bitsPerComponent(in: formatDescription)
         let chromaSubsampling420 = chromaIsLikely420(codec: codec, formatDescription: formatDescription)
-        let frameRateInconsistent = frameRateLooksVariable(track: track)
+        let frameRateInconsistent = frameRateLooksVariable(
+            nominalFrameRate: inspection.nominalFrameRate,
+            minFrameDuration: inspection.minFrameDuration
+        )
 
         return MediaFlagsEvaluator.evaluate(
             codec: codec,
@@ -129,39 +134,16 @@ enum MediaFlagsInspector {
     /// the clip as "not constant frame rate." False negatives (genuinely VFR clips that
     /// muxed cleanly enough that AVFoundation reports a steady rate) are a known limitation
     /// of metadata-only inspection — a full timestamp scan is out of scope for v1 import.
-    private static func frameRateLooksVariable(track: AVAssetTrack) -> Bool {
-        let nominal = Double(track.nominalFrameRate)
+    private static func frameRateLooksVariable(
+        nominalFrameRate: Float,
+        minFrameDuration: CMTime
+    ) -> Bool {
+        let nominal = Double(nominalFrameRate)
         if nominal <= 0 { return true }
 
-        let minDuration = track.minFrameDuration
-        guard minDuration.isValid, minDuration.seconds > 0 else { return false }
+        guard minFrameDuration.isValid, minFrameDuration.seconds > 0 else { return false }
 
-        let derivedFromMinDuration = 1.0 / minDuration.seconds
+        let derivedFromMinDuration = 1.0 / minFrameDuration.seconds
         return abs(derivedFromMinDuration - nominal) > nominal * Self.vfrFractionalTolerance
-    }
-
-    // MARK: - Async-bridge helper
-
-    /// Same DispatchSemaphore + `@unchecked Sendable` carrier shape as
-    /// `MediaImporter.loadFirstVideoTrackSync` (session 21–22 — see Option-J
-    /// commits) — bridges the deprecated sync `tracks(withMediaType:)` to the
-    /// non-deprecated callback variant `loadTracks(withMediaType:_:)`. Local
-    /// to MediaFlagsInspector to keep MediaImporter's helper private; both
-    /// helpers are intentionally tiny and could be merged in a future
-    /// refactor if a third site needs the same shape.
-    private static func loadFirstVideoTrackSync(url: URL) -> AVAssetTrack? {
-        let asset = AVURLAsset(url: url)
-        let box = TrackLoadBox()
-        let semaphore = DispatchSemaphore(value: 0)
-        asset.loadTracks(withMediaType: .video) { tracks, _ in
-            box.tracks = tracks
-            semaphore.signal()
-        }
-        semaphore.wait()
-        return box.tracks?.first
-    }
-
-    private final class TrackLoadBox: @unchecked Sendable {
-        var tracks: [AVAssetTrack]?
     }
 }
