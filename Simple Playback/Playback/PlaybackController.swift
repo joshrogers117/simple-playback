@@ -746,9 +746,13 @@ final class PlaybackController: ObservableObject {
 
         beginTransition(transition, outgoingVideo: outgoingVideo)
         liveSlideID = prepared.slide.id
-        // Path 1 — arm "first composed frame for cue X" emission for the
-        // video-transition path (mirrors the non-transition arm in `take`).
-        setPendingCueFireSlideID(prepared.slide.id)
+        // Path 1 — arming is deferred to the syncOutput block below where the
+        // first composed frame is submitted. Arming here on main would race
+        // the outgoing-handoff timer (still ticking on outputQueue at this
+        // point) and let an outgoing-video frame consume the token, causing
+        // the late-take callback to fire with `firedAt` ahead of the new
+        // cue's first actual composed-frame submission. See pin in
+        // `PlaybackControllerCueFireTests.testTransitionPathDoesNotArmOnMain`.
         liveTitle = prepared.slide.title
         isRunning = true
 
@@ -796,6 +800,13 @@ final class PlaybackController: ObservableObject {
             try syncOutput {
                 var frame = firstFrame
                 cancelOutgoingHandoffTimer()
+                // Arm the Path 1 token inside the same outputQueue-serialized
+                // block that cancels the outgoing-handoff timer and submits the
+                // first composed frame. This guarantees the cancel + arm + submit
+                // are atomic relative to the handoff timer's ticks — the timer
+                // can no longer fire after the cancel, and the first submitFrame
+                // (this one) is the one that consumes the token.
+                self.setPendingCueFireSlideID(prepared.slide.id)
                 applyTransition(to: &frame)
                 try submitFrame(frame)
             }
@@ -899,9 +910,12 @@ final class PlaybackController: ObservableObject {
 
         beginTransition(transition, outgoingVideo: outgoingVideo)
         liveSlideID = prepared.slide.id
-        // Path 1 — arm "first composed frame for cue X" emission for the
-        // image-transition path. Mirror with the video and non-transition arms.
-        setPendingCueFireSlideID(prepared.slide.id)
+        // Path 1 — arming deferred (see twin doc-comment in
+        // `commitPreparedVideoTransition`). For the transition path, the
+        // outgoing-handoff timer is cancelled and the token is armed inside a
+        // syncOutput block before `startStillTransition` schedules the first
+        // composed-frame submit. For the non-transition path the
+        // arm-and-submit happen together in the syncOutput block below.
         liveTitle = prepared.slide.title
         isRunning = true
 
@@ -919,12 +933,17 @@ final class PlaybackController: ObservableObject {
                 self.videoCurrentTime = 0
                 self.videoDuration = 0
             }
+            syncOutput {
+                cancelOutgoingHandoffTimer()
+                self.setPendingCueFireSlideID(prepared.slide.id)
+            }
             startStillTransition(to: frame)
             status = "Crossfading image"
         } else {
             previewImage = image
             do {
                 try syncOutput {
+                    self.setPendingCueFireSlideID(prepared.slide.id)
                     try submitFrame(frame)
                 }
                 status = "Live image"
