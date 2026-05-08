@@ -9,6 +9,7 @@ struct RootView: View {
     @State private var selectedSlideID: UUID?
     @State private var selectedCueID: UUID?
     @State private var dropTargeted = false
+    @State private var inspectorMode: InspectorMode = .selection
 
     init(document: Binding<SimplePlaybackDocument>, outputSettings: OutputSettingsStore) {
         self._document = document
@@ -155,20 +156,69 @@ struct RootView: View {
 
                 Divider()
 
-                if let selectedCueBinding {
-                    CueInspectorView(
-                        cue: selectedCueBinding,
-                        slides: document.project.slides,
-                        stageFPS: document.project.stages.first?.framesPerSecond
-                    )
-                } else if let selectedSlideBinding {
-                    InspectorView(slide: selectedSlideBinding)
-                } else {
-                    InspectorPlaceholder()
-                }
+                inspectorModePicker
+
+                Divider().padding(.top, 8)
+
+                inspectorContent
             }
             .frame(minWidth: 320, idealWidth: 380)
         }
+    }
+
+    @ViewBuilder
+    private var inspectorModePicker: some View {
+        Picker("Inspector", selection: $inspectorMode) {
+            ForEach(InspectorMode.allCases) { mode in
+                Text(mode.label).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+    }
+
+    @ViewBuilder
+    private var inspectorContent: some View {
+        switch inspectorMode {
+        case .selection:
+            selectionInspector
+        case .overlays:
+            overlaysInspector
+        }
+    }
+
+    @ViewBuilder
+    private var selectionInspector: some View {
+        if let selectedCueBinding {
+            CueInspectorView(
+                cue: selectedCueBinding,
+                slides: document.project.slides,
+                stageFPS: document.project.stages.first?.framesPerSecond
+            )
+        } else if let selectedSlideBinding {
+            InspectorView(slide: selectedSlideBinding)
+        } else {
+            InspectorPlaceholder()
+        }
+    }
+
+    @ViewBuilder
+    private var overlaysInspector: some View {
+        if let overlaysBinding = firstStageOverlaysBinding {
+            OverlayInspectorView(overlays: overlaysBinding)
+        } else {
+            InspectorPlaceholder(message: "Save the project to initialize the Stage.")
+        }
+    }
+
+    private var firstStageOverlaysBinding: Binding<CompositorOverlays>? {
+        guard !document.project.stages.isEmpty else { return nil }
+        return Binding(
+            get: { document.project.stages[0].compositorOverlays },
+            set: { document.project.stages[0].compositorOverlays = $0 }
+        )
     }
 
     private var showModeBinding: Binding<Bool> {
@@ -318,17 +368,33 @@ private struct ShowListSnapshot: Equatable {
 }
 
 private struct InspectorPlaceholder: View {
+    var message: String = "Select a cue or asset to inspect"
+
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: "rectangle.and.text.magnifyingglass")
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
-            Text("Select a cue or asset to inspect")
+            Text(message)
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(20)
+    }
+}
+
+enum InspectorMode: String, CaseIterable, Identifiable {
+    case selection
+    case overlays
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .selection: "Selection"
+        case .overlays: "Overlays"
+        }
     }
 }
 
