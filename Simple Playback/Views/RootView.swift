@@ -10,10 +10,24 @@ struct RootView: View {
     @State private var selectedCueID: UUID?
     @State private var dropTargeted = false
     @State private var inspectorMode: InspectorMode = .selection
+    /// Stable per-window UUID. Untitled documents — which have no fileURL yet —
+    /// rasterize PDFs into an app-support subdirectory keyed by this ID so concurrent
+    /// untitled windows don't collide.
+    @State private var untitledSessionID = UUID()
 
-    init(document: Binding<SimplePlaybackDocument>, outputSettings: OutputSettingsStore) {
+    /// Returns the current document's bundle URL, or `nil` for an untitled document.
+    /// Driven by `SimplePlaybackProjectDocument.fileURL`. RootView only reads this when
+    /// it needs to write rasterized imports into the bundle (C3 PDF import today).
+    private let projectBundleURLProvider: () -> URL?
+
+    init(
+        document: Binding<SimplePlaybackDocument>,
+        outputSettings: OutputSettingsStore,
+        projectBundleURLProvider: @escaping () -> URL? = { nil }
+    ) {
         self._document = document
         self.outputSettings = outputSettings
+        self.projectBundleURLProvider = projectBundleURLProvider
         _showController = StateObject(wrappedValue: ShowControllerHolder())
     }
 
@@ -329,7 +343,7 @@ struct RootView: View {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.image, .movie, .video]
+        panel.allowedContentTypes = [.image, .movie, .video, .pdf]
         if panel.runModal() == .OK {
             addMedia(panel.urls)
         }
@@ -358,11 +372,49 @@ struct RootView: View {
 
     private func addMedia(_ urls: [URL]) {
         guard !(showController.controller?.showMode ?? false) else { return }
-        let imported = MediaImporter.importSlides(from: urls)
+        let context = currentMediaImportContext()
+        let imported = MediaImporter.importSlides(from: urls, context: context)
         guard !imported.isEmpty else { return }
         document.project.slides.append(contentsOf: imported)
         selectedSlideID = imported.last?.id
     }
+
+    /// Builds the per-import context the importer needs for source formats that require
+    /// conversion (PDF today). The raster size is the active Stage's pixel dimensions × 2
+    /// (spec §3.10), and the render root is project-bundle-relative (`Cache/Renders/`)
+    /// when the document has been saved, app-support otherwise. App-support fallbacks
+    /// stay portable across launches but require a future "Bundle for Travel" pass to
+    /// migrate them into the bundle for venue handoff.
+    private func currentMediaImportContext() -> MediaImportContext {
+        let stage = document.project.stages.first
+        let baseWidth = stage?.width ?? document.project.outputWidth
+        let baseHeight = stage?.height ?? document.project.outputHeight
+        let rasterSize = CGSize(width: max(1, baseWidth) * 2, height: max(1, baseHeight) * 2)
+        return MediaImportContext(rasterSize: rasterSize, renderRootDirectory: renderRootDirectory())
+    }
+
+    private func renderRootDirectory() -> URL {
+        if let bundleURL = projectBundleURLProvider() {
+            return bundleURL.appendingPathComponent(
+                ProjectBundleLayout.rendersDirectory,
+                isDirectory: true
+            )
+        }
+        return RootView.untitledRenderRoot
+            .appendingPathComponent(untitledSessionID.uuidString, isDirectory: true)
+    }
+
+    private static let untitledRenderRoot: URL = {
+        let appSupport = (try? FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )) ?? FileManager.default.temporaryDirectory
+        return appSupport
+            .appendingPathComponent("Simple Playback", isDirectory: true)
+            .appendingPathComponent("Renders", isDirectory: true)
+    }()
 }
 
 /// SwiftUI `@StateObject` requires the wrapped value to be initialized eagerly, but our

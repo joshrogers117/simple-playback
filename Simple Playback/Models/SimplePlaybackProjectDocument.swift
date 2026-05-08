@@ -5,6 +5,11 @@ import SwiftUI
 enum ProjectBundleLayout {
     /// Top-level JSON file inside the bundle holding the `PlayoutProject` schema.
     static let projectFilename = "Show.json"
+
+    /// Per-spec §3.17, rasterized assets (PDF→PNG today; future PPT/Keynote→PNG) live
+    /// inside the bundle so the show file remains venue-portable. C3 PDF import writes
+    /// per-batch UUID subdirectories under this path.
+    static let rendersDirectory = "Cache/Renders"
 }
 
 final class SimplePlaybackProjectDocument: NSDocument {
@@ -22,7 +27,8 @@ final class SimplePlaybackProjectDocument: NSDocument {
     override func makeWindowControllers() {
         let rootView = RootView(
             document: documentBinding,
-            outputSettings: OutputSettingsStore.shared
+            outputSettings: OutputSettingsStore.shared,
+            projectBundleURLProvider: { [weak self] in self?.fileURL }
         )
         let hostingController = NSHostingController(rootView: rootView)
         let window = NSWindow(contentViewController: hostingController)
