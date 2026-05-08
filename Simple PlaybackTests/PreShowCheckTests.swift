@@ -214,6 +214,28 @@ final class PreShowCheckTests: XCTestCase {
         XCTAssertEqual(rows.first?.severity, .error)
     }
 
+    // MARK: - Render path
+
+    func testRenderPathRowSuppressedWhenNoMeasurement() {
+        XCTAssertNil(PreShowCheck.evaluateRenderPath(context: PreShowCheck.Context()))
+    }
+
+    func testRenderPathRowOKWhenWarmed() {
+        var ctx = PreShowCheck.Context()
+        ctx.renderPathWarmed = true
+        let row = PreShowCheck.evaluateRenderPath(context: ctx)
+        XCTAssertEqual(row?.id, "render.warmed")
+        XCTAssertEqual(row?.severity, .ok)
+    }
+
+    func testRenderPathRowWarningWhenCold() {
+        var ctx = PreShowCheck.Context()
+        ctx.renderPathWarmed = false
+        let row = PreShowCheck.evaluateRenderPath(context: ctx)
+        XCTAssertEqual(row?.severity, .warning)
+        XCTAssertTrue(row?.summary.lowercased().contains("cold") ?? false)
+    }
+
     // MARK: - DeckLink adapter
 
     /// The bridge state → PreShowCheck enum mapping is the single seam between the

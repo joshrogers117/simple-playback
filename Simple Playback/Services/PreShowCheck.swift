@@ -36,6 +36,12 @@ enum PreShowCheck {
         /// Whether the host has confirmed an audio output device is available. `nil`
         /// when the host has not yet sampled.
         var audioDeviceAvailable: Bool?
+
+        /// Whether the render path has pushed at least one composed frame through to
+        /// its outputs since the controller started. Spec §3.16 lists "render path
+        /// warmed" as a pre-show requirement — operators want to verify the pipeline
+        /// isn't cold before a show. `nil` when the host has not yet sampled.
+        var renderPathWarmed: Bool?
     }
 
     enum DeckLinkReferenceStatus: Equatable {
@@ -91,6 +97,9 @@ enum PreShowCheck {
         }
         if let audio = evaluateAudioDevice(context: context) {
             rows.append(audio)
+        }
+        if let render = evaluateRenderPath(context: context) {
+            rows.append(render)
         }
         // Stable order: severity-major (errors first), title-tiebreak.
         return rows.sorted { lhs, rhs in
@@ -281,6 +290,27 @@ enum PreShowCheck {
             severity: .ok,
             title: "Disk",
             summary: "Free space: \(availableString)."
+        )
+    }
+
+    /// Render path row. `renderPathWarmed == true` is OK; `false` is a warning
+    /// ("render path cold — push at least one cue before the show"); nil is suppressed
+    /// (host has not yet sampled).
+    static func evaluateRenderPath(context: Context) -> Row? {
+        guard let warmed = context.renderPathWarmed else { return nil }
+        if warmed {
+            return Row(
+                id: "render.warmed",
+                severity: .ok,
+                title: "Render Path",
+                summary: "Render path has pushed at least one frame to output."
+            )
+        }
+        return Row(
+            id: "render.warmed",
+            severity: .warning,
+            title: "Render Path",
+            summary: "Render path is cold — fire a cue to warm the pipeline before doors open."
         )
     }
 

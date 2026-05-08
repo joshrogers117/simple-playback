@@ -10,6 +10,11 @@ final class PlaybackController: ObservableObject {
     /// Latest DeckLink REF lock state, refreshed by `refreshDevices()` and on output start/stop.
     /// Nil when the active output is not a DeckLink (preview, NDI, etc.).
     @Published private(set) var deckLinkReferenceState: DeckLinkTransportSink.ReferenceState?
+    /// Flips true the first time `submitFrame` runs successfully — i.e. the render path
+    /// has pushed at least one composed frame to its outputs. Pre-show check (E1) reads
+    /// this as the "render path warmed" signal: spec §3.16 expects an operator to be able
+    /// to verify the output pipeline isn't cold before a show. Cleared on `stop()`.
+    @Published private(set) var hasRenderedAnyFrame: Bool = false
     @Published private(set) var liveSlideID: UUID?
     @Published private(set) var liveTitle: String = "Black"
     @Published private(set) var status: String = "Idle"
@@ -229,6 +234,7 @@ final class PlaybackController: ObservableObject {
         outputStartedForMode = nil
         activeSinkStage = nil
         deckLinkReferenceState = nil
+        hasRenderedAnyFrame = false
         isRunning = false
         status = "Output stopped"
     }
@@ -1226,6 +1232,7 @@ final class PlaybackController: ObservableObject {
         )
         try outputDriver.submitVideoFrame(composed.data, width: composed.width, height: composed.height, rowBytes: composed.rowBytes)
         auxiliarySinks.submit(frame: composed)
+        if !hasRenderedAnyFrame { hasRenderedAnyFrame = true }
         if cacheAsCurrent {
             // Cache the BASE frame, not the composed one. Transitions blend cached frames
             // with new media; if we cached composed frames the bug+message would get blended

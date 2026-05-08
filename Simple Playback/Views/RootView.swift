@@ -446,6 +446,7 @@ struct RootView: View {
             ctx.deckLinkReferenceStatus = .from(live)
         }
         ctx.audioDeviceAvailable = AudioDeviceProbe.isDefaultOutputDeviceAvailable()
+        ctx.renderPathWarmed = playback.hasRenderedAnyFrame
         return ctx
     }
 
