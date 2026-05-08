@@ -1,98 +1,102 @@
 # Phase E — Reliability — Summary
 
-**Status (session 12 — 2026-05-08)**: **Phase E started**. E1 (pre-show check panel) shipped end-to-end: pure-logic `PreShowCheck.evaluate(project:context:)` + sheet UI + toolbar "Pre-Show" button. Six rules wired (media resolution, FPS conformance, 10-bit recommendation, external-reference × DeckLink lock, disk space, audio device); two system-signal adapters (DeckLink lock state, audio device availability) are deferred to follow-up sessions because their adapters don't exist yet. 21 tests in `PreShowCheckTests`. The panel is read-only — E2 fix actions are deferred.
+**Status (session 13 — 2026-05-08)**: **Phase E meaningfully advanced**. E1 (pre-show check) is now end-to-end with live system signals — DeckLink lock state, audio device, and render-path-warmed are all sampled and feed into the evaluator. E2 (per-row Fix actions) shipped the first slice of system-deep-link handlers. E3 (show log) shipped end-to-end: append-only CSV writer, ShowController integration for every verb (GO / PREVIOUS / PANIC / CLEAR / BLACKOUT / Show-Mode / missing-media), dispatcher integration so OSC / HTTP / TC actions are recorded with their source attribution, and a read-only viewer with CSV export. Tests: 383 → 430 (+47 across 9 commits this session).
+
+The Pre-Show panel now reads as live data on a real machine, not a hand-supplied Context — the operator opens it and sees actual disk space, an actual audio-device check, an actual DeckLink REF state if armed, and an actual render-path-warm/cold signal. The Show Log panel now records every operator action with source attribution (local UI / OSC ip:port / HTTP token suffix / TC) for replay and forensics.
 
 ---
 
-## What shipped in session 12 (E1 first slice)
+## What shipped in session 13
 
-### `Services/PreShowCheck.swift` — pure-logic evaluator
+### E1+ — system-signal adapters
 
-- **`PreShowCheck.evaluate(project:context:)`** — entry point. Returns an ordered `[Row]` (errors first → warnings → info → ok; title-tiebreak within severity). Each rule is its own `static func` so tests can drive each rule independently.
-- **`PreShowCheck.Row { id, severity, title, summary }`** — operator-facing row. `id` is stable across runs ("media.resolution", "fps.conformance", "output.tenBit", "output.reference", "system.disk", "system.audio") so SwiftUI's diffing animates updates smoothly and so E2 can map fix actions per id.
-- **`PreShowCheck.Severity { error, warning, info, ok }`** — sort-ordered. `Comparable` so callers can `.sorted` directly.
-- **`PreShowCheck.Context`** — value type the host populates with system signals. Fields are optional; nil signals "host hasn't sampled yet" and the corresponding row is either suppressed or rendered as informational. Keeps the evaluator free of AppKit / IOKit / DeckLink imports — the rules stay unit-testable.
+**`Services/PreShowCheckAdapters.swift`** — `PreShowCheck.DeckLinkReferenceStatus.from(_:)` translates `DeckLinkTransportSink.ReferenceState` into the pure-logic enum. RootView's `preShowCheckContext()` plumbs `playback.deckLinkReferenceState` (the same source the B6 status-bar chip reads) through the adapter. Reference rows escalate from `.info` ("not yet sampled") to live data once the DeckLink is armed.
 
-### Rules
+**`Services/AudioDeviceProbe.swift`** — `AudioDeviceProbe.isDefaultOutputDeviceAvailable()` wraps `kAudioHardwarePropertyDefaultOutputDevice` behind an injectable provider. Production reads the system answer; tests pin both branches without mutating host audio.
 
-| Rule | Severity logic | Notes |
+**`PlaybackController.hasRenderedAnyFrame`** — Published bool that flips true on the first successful `submitFrame` and clears on `stopOutput()`. Plumbed into `PreShowCheck.Context.renderPathWarmed`; new `evaluateRenderPath` rule emits OK when warm, warning when cold.
+
+### E2 — fix actions per row
+
+**`Services/PreShowCheckFixHandlers.swift`** — `PreShowCheckFixHandlers` is a dictionary keyed by `PreShowCheck.Row.id`. Pre-Show view renders a "Fix" button only for rows the host has registered something for; rules without a sensible automatable resolution stay read-only. RootView wires three handlers:
+
+- `system.audio` → `x-apple.systempreferences:com.apple.preference.sound`
+- `system.disk` → `NSWorkspace.shared.activateFileViewerSelecting([bundleURL])` (suppressed for untitled documents)
+- `output.reference` → opens `/Applications/Blackmagic Desktop Video Setup.app` if installed (suppressed otherwise — the operator path is hardware-side at that point)
+
+`media.resolution` deliberately has no Fix handler this iteration; the relink path belongs to C7 (asset library). `fps.conformance` and `output.tenBit` are project-edit territory the operator addresses inside the app.
+
+### E3 — show log
+
+**`Services/ShowLog.swift`** — `ShowLogEvent` (timestamp + optional chase TC + action + source + optional detail) and `ShowLog` ObservableObject. Source attribution is first-class: every event records *who* fired it (local hotkey / operator UI button / OSC `host:port` / HTTP token-suffix-only / TC / system). RFC 4180 CSV serialization; `ShowLog` seeds a header row when binding to a fresh URL and appends one CSV line per event. File-writer is injectable for testability — production uses a FileHandle append; failed writes drop the URL but keep the in-memory log alive (a transient I/O error doesn't lose events).
+
+**`ShowController` integration** — Each verb method now records a corresponding event. Default source `.operatorButton` keeps existing UI call sites compiling unchanged; hotkey / OSC / HTTP / TC sites can override. `handleCueFired` missing-asset path logs a `.missingMedia` event with `.system` attribution. `weak var showLog: ShowLog?` is set by RootView after configuration; tests construct an isolated log directly.
+
+**Dispatcher integration** — `ShowControlSource.toShowLogSource()` extension translates the dispatcher's source enum (HTTP tokens collapse to their last 4 characters so a leaked log file can't be replayed). ShowController sets `ShowControlHub.shared.stack.dispatcher.onActionDispatched = { ... }` to its own `recordDispatchedAction`; verbs map onto the matching `ShowLog` action; non-verb cue / output / TC / workspace actions collapse onto a generic `.oscAction` row with a short human-readable name. Diagnostic chatter (ping / subscribe) deliberately never logs.
+
+**`Views/ShowLogView.swift`** — Read-only viewer rendering the per-document log as a chronological list (timestamp / TC / action / source / detail). High-signal actions get colour: PANIC + MISSING_MEDIA red, CLEAR + BLACKOUT orange, GO/PREVIOUS primary, Show-Mode accent, OSC chatter secondary. Empty state renders a `ContentUnavailableView`. Export CSV button funnels `ShowLog.exportCSV()` into an `NSSavePanel`; the action is swappable for tests.
+
+**RootView wiring** — Per-document `@StateObject ShowLog` instance; bound to `<bundle>/Logs/<yyyy-MM-dd>.log` once the document has a fileURL on disk. Untitled documents keep events in memory until the first save. Toolbar "Show Log" button (`list.bullet.rectangle`) opens the viewer sheet.
+
+---
+
+## Tests added (session 13)
+
+| Test file | Test | What it covers |
 |---|---|---|
-| Media resolution | `.ok` when every cue's `assetID` is in `project.slides`; `.error` otherwise. Summary lists the first 3 missing cue numbers + count of remaining. | Most common pre-show breakage (media moved off external drive, deleted asset). |
-| Frame-rate conformance | `.ok` when every video cue matches Stage rate (B14 evaluator with 0.1 fps tolerance); `.warning` on any mismatch; `.info` when no video cues present or only unknown rates; `.warning` when project has no Stage. | Reuses `FrameRateConformance` from B14 — same severity decisions as the cue-inspector chip but aggregated. |
-| 10-bit recommendation | `.info` when `project.recommendsTenBitOutput` (B8); suppressed entirely when no 10-bit content present. | Pre-show panels degrade fast with noise rows — suppression is the right default. |
-| External reference | `.ok` when expected + DeckLink reports `locked`; `.error` when expected + `unlocked` (matches B6b banner escalation); `.warning` when expected + `notSupported`; `.info` when expected + `notRequired` or status not yet sampled; suppressed when `expectsExternalReference` is false. | Cross-checks project intent vs live bridge state. |
-| Disk space | `.ok` when `availableDiskBytes >= minimumDiskBytes` (default 5 GB); `.warning` otherwise. Suppressed when host has not sampled. | Host samples via `URLResourceValues.volumeAvailableCapacity`. |
-| Audio device | `.ok` when host reports device available; `.error` when host reports false. Suppressed when host has not sampled. | Audio adapter not yet built — row is suppressed today. |
+| `PreShowCheckTests` | `testDeckLinkAdapterMaps{Idle,NotSupported,Unlocked,Locked}` | Adapter mapping pinned per-case. |
+| `PreShowCheckTests` | `testRenderPathRow{Suppressed,OKWhenWarmed,WarningWhenCold}` | Render-path rule's three states. |
+| `AudioDeviceProbeTests` | 4 tests | Probe-level branches + real-CoreAudio smoke. |
+| `PreShowCheckFixHandlersTests` | 7 tests | Dispatch behaviour + URL contracts (Sound deep-link, DVS path). |
+| `ShowLogTests` | 12 tests | CSV shape, source labels, in-memory append, file-writer hook (header on first write, append after, failure suppression). |
+| `ShowControllerLogTests` | 14 tests | Verb-level logging (8) + source translation (5) + dispatcher integration (5) + missing-media. |
 
-### `Views/PreShowCheckView.swift` — sheet
-
-- Renders the row list with severity-coloured icons (`.error` red, `.warning` orange, `.info` yellow, `.ok` green) and matching translucent backgrounds. Title in subheadline-bold; summary in callout-secondary, fixed-vertical so multi-line summaries don't truncate.
-- Empty-state: `ContentUnavailableView` with a checklist icon and a hint to add cues / arm output.
-- Read-only — E2 will add per-row "Fix" buttons keyed off `Row.id`.
-
-### `RootView` wiring
-
-- Toolbar "Pre-Show" button (checklist icon) presents the sheet via `@State preShowCheckPresented`.
-- `preShowCheckContext()` builds the `Context` synchronously: free disk space at `projectBundleURLProvider() ?? RootView.untitledRenderRoot` via `URLResourceValues.volumeAvailableCapacity`. DeckLink lock-state and audio-device fields stay nil this iteration — their adapters don't exist yet.
+Total: **430 tests, all green** (was 383 at session start; +47).
 
 ---
 
-## Tests added (session 12 — E1)
+## Manual verification needed (session-13 deltas)
 
-| Test | What it covers |
-|---|---|
-| `PreShowCheckTests.testMediaRowOKWhenAllCuesResolve` | Happy path. |
-| `PreShowCheckTests.testMediaRowErrorWhenCueAssetMissing` | Missing assetID → `.error`; cue number appears in summary. |
-| `PreShowCheckTests.testMediaRowSummaryTruncatesAtThree` | "+N more" suffix when >3 cues missing. |
-| `PreShowCheckTests.testFPSRowOKWhenAllVideosMatchStage` | `30` Stage + 30/29.97 cues → ok (both within fractional/integer tolerance). |
-| `PreShowCheckTests.testFPSRowWarningWhenAnyVideoMismatches` | 60 Stage + 24 cue → warning, "AVFoundation will re-time" copy. |
-| `PreShowCheckTests.testFPSRowInfoWhenNoVideoCues` | Image-only project → info, "No video cues to check". |
-| `PreShowCheckTests.testFPSRowWarningWhenStageMissingFrameRate` | No stage → warning, id `stage.frameRate`. |
-| `PreShowCheckTests.testTenBitRowSuppressedWhenNoTenBitContent` | nil row when no flag — pre-show panels degrade fast with noise. |
-| `PreShowCheckTests.testTenBitRowInfoWhenAnyTenBitContentPresent` | Any video slide with `flags.tenBitYUV420` → info. |
-| `PreShowCheckTests.testReferenceRowSuppressedWhenNotExpected` | `expectsExternalReference == false` → suppressed entirely. |
-| `PreShowCheckTests.testReferenceRowOKWhenLocked` | Status `.locked` → ok. |
-| `PreShowCheckTests.testReferenceRowErrorWhenExpectedButUnlocked` | Status `.unlocked` → error (matches B6b banner escalation). |
-| `PreShowCheckTests.testReferenceRowWarningWhenDeckLinkDoesNotSupportLock` | Status `.notSupported` → warning. |
-| `PreShowCheckTests.testReferenceRowInfoWhenLockNotYetSampled` | Status nil → info ("not yet sampled"). |
-| `PreShowCheckTests.testDiskRowSuppressedWhenNoMeasurement` | Context.availableDiskBytes nil → suppressed. |
-| `PreShowCheckTests.testDiskRowOKWhenAboveFloor` | 50 GB above 5 GB default floor → ok. |
-| `PreShowCheckTests.testDiskRowWarningBelowFloor` | 1 GB below 5 GB → warning. |
-| `PreShowCheckTests.testAudioRowSuppressedWhenNoMeasurement` | nil → suppressed. |
-| `PreShowCheckTests.testAudioRowErrorWhenNoDevice` | false → error. |
-| `PreShowCheckTests.testAudioRowOKWhenDevicePresent` | true → ok. |
-| `PreShowCheckTests.testEvaluateSortsErrorsBeforeWarningsBeforeInfoBeforeOk` | Top-level sort invariant — error rows surface first. |
-
-Total: 383 tests, all green (was 341 at session start; +42 across all session-12 work).
+1. **Pre-Show DeckLink rows** — open Pre-Show with a DeckLink armed and `expectsExternalReference == true`; the reference row should escalate from `.info` ("not yet sampled") to live data (locked → `.ok`, unlocked → `.error`, notSupported → `.warning`).
+2. **Pre-Show audio row** — open Pre-Show on a host with built-in speakers; the audio row should read `.ok`. Disconnect every audio device (rare in practice — virtual machines or headless minis) and the row should read `.error`.
+3. **Pre-Show render-path row** — open Pre-Show on a fresh document with output armed but no cues fired yet; row reads `.warning`. Fire a cue, reopen Pre-Show; row reads `.ok`. Stop output; row goes back to `.warning` on next open (since `hasRenderedAnyFrame` clears on stopOutput).
+4. **E2 Fix actions**:
+   - Click "Fix" on the audio row when it's `.error` — System Settings → Sound should open.
+   - Click "Fix" on the disk row when the document is saved — Finder should reveal the project bundle.
+   - Click "Fix" on the reference row with Blackmagic Desktop Video Setup installed — DVS should launch.
+   - Untitled document: the disk row's Fix button should not appear.
+   - Without Blackmagic Desktop Video Setup installed: the reference row's Fix button should not appear.
+5. **Show Log viewer** — open the viewer toolbar button. With no events, empty-state renders. Fire a cue; the GO row appears. Hit Escape (panic); a PANIC row appears in red. Toggle Show Mode twice; the SHOW_MODE_ON / SHOW_MODE_OFF rows appear.
+6. **Show Log CSV export** — click "Export CSV…" with events present. Save to a `.csv` file. Open in any spreadsheet; verify the header row + one row per event with the five-column shape.
+7. **Show Log on-disk persistence** — save a project. Fire a cue. Inspect `<bundle>/Logs/<today>.log` — the file should contain the CSV header + the GO row. Quit and reopen the project; old events are not re-loaded into the in-memory list (the file is the source of truth for past sessions; the view is the source of truth for the current session). The next event appended writes to the same file (today) or a fresh dated file (next day).
+8. **OSC source attribution** — fire a cue via OSC from a remote IP. The event in the log should read `osc <host>:<port>` for source. Same path via HTTP should read `http …<last4>`.
 
 ---
 
-## Manual verification needed (E1 deltas)
+## Still deferred (session 14+)
 
-1. With a fresh project (no slides, no cues), open Pre-Show. Panel renders three rows: media `.ok` ("All cues resolve"), fps `.warning` (no Stage), disk `.ok`/`.warning` depending on host. No reference row, no 10-bit row, no audio row (suppressed).
-2. Add a 30 fps Stage, drop two video clips at 30 fps + 24 fps, build a Show List of two cues — one referencing each clip. Pre-Show shows fps `.warning` ("1 of 2 video cue(s) do not match Stage 30 fps").
-3. Delete one of the source assets via the asset library. Pre-Show now also shows media `.error` listing the orphaned cue.
-4. Toggle `expectsExternalReference` on the Output inspector. Pre-Show adds a reference row at `.info` severity ("not yet sampled"). With a DeckLink wired up and the bridge reporting `unlocked`, the row escalates to `.error` (matches the B6b status-bar banner). With `locked`, it drops to `.ok`. *DeckLink Context plumbing is not yet wired this session, so the row stays at `.info` until the adapter lands.*
-5. Drop a 10-bit HEVC source into the project. Pre-Show adds the `output.tenBit` info row. Drop only 8-bit content into a fresh project — the row is suppressed entirely.
-6. The Encode button on the Add Folder…  sheet shares the same disk-space concerns; if disk space drops below the floor mid-show, Pre-Show flags it next time the operator opens the panel.
-
----
-
-## Still deferred (E1+)
-
-- **DeckLink lock-state Context plumbing** — needs a small `PlaybackController` → `PreShowCheck.DeckLinkReferenceStatus` adapter that translates the existing bridge-reported state into the evaluator's enum. The B6 status-bar chip already reads the lock state — the same source can feed Pre-Show.
-- **Audio-device Context plumbing** — needs a CoreAudio adapter that asks `kAudioHardwarePropertyDefaultOutputDevice` whether anything is connected. Cheap if nothing is plugged in — the OS reports a default device.
-- **macOS energy / DND / screensaver / Spotlight checks** — each is a small `IOKit` / `NSWorkspace` / `NSUserNotification` query. Spec §7 lists them as separate rows. Each is independently testable.
-- **Render-path-warmed signal** — operator-facing "the pipeline has rendered first frames since launch" check. The compositor / playback controller can flip a bool when first frame lands.
-- **E2 — Fix actions per row** — every row whose cause is automatable gets a "Fix" button. Examples: relink missing media (file picker), free up disk (open Finder to project bundle), open Privacy & Security → Automation (already shipped on the import-banner; same deep-link can ride the audio/reference rows).
-- **E3+ rest of Phase E** — show log writer, autosave, crash recovery, project lock file, Director View, saved Workspaces, brightness adapt key. Each item is independent.
+- **Pre-show E1+** — macOS energy / DND / screensaver / Spotlight / Time Machine checks. Each is a small `IOKit` / `NSWorkspace` / `NSUserNotification` query. Spec §3.16 lists them as separate rows.
+- **E2 fix-action expansions** — `media.resolution` "Fix" gets a relink-folder picker once C7 (asset library) lands. `output.reference` could fall back to Sound deep-link when DVS isn't installed.
+- **E3 — dropped-frame + late-take** — both events listed in spec §3.16 but require instrumentation in the playback path (compositor / output driver) before they can be logged. Independent of the writer infrastructure already shipped.
+- **E4 — log filtering** — by source / action type / time range. View-side; the model already has the data.
+- **E5 — take history (recent 200) with replay scrub** — a separate surface, not just the log. Replay needs the runtime to accept "fire cue X with the original parameters at this offset."
+- **E6 — autosave every 30 s** — `NSDocument.autosavingDelay` is the API; checkpoint on Show-mode toggle is custom.
+- **E7 — crash recovery** — load the last autosave on launch with a "what changed since last save" summary.
+- **E8 — project lock file** — small. Write `<bundle>/.lock` with PID + hostname on open; warn on duplicate-open if the file exists and the PID is still alive.
+- **E9 — Director View tear-off window** — read-only Program + next 3 + notes. Multi-display.
+- **E10 — Saved Workspaces** — Edit / Rehearsal / Show / Single-Screen. UX-design heavy; product blocker territory.
+- **E11 — Brightness adapt key** — booth-dim key separate from system brightness.
+- **E12 — Phase E summary + manual rehearsal steps** — the cleanup pass at the end of E.
 
 ---
 
 ## Recommended next pick
 
-- **DeckLink lock-state adapter for Pre-Show** — small, tightens the existing E1 rule. Read the bridge state from PlaybackController (the OutputStatusBar already does this), translate to `PreShowCheck.DeckLinkReferenceStatus`, plumb into `preShowCheckContext()`. ~1 commit.
-- **E2 fix actions for media + audio rows** — adds operator-actionable buttons to the highest-impact rows. Audio "Fix" deep-links to Sound preferences; media "Fix" opens a relink picker.
-- **E3 (show log writer)** — independent, no UX questions, ships incrementally.
+- **E8 (project lock file)** — small, no UX blockers, ships in one commit. A clean win on its own.
+- **E6 (autosave)** — `NSDocument.autosavingDelay = 30` plus a checkpoint hook on Show-Mode toggle. 1-2 commits.
+- **More pre-show macOS-condition checks** — DND, screensaver, energy, Spotlight. Each adapter is independent and tests cleanly.
+- **E4 (filter UI on the log)** — the model has all the data; the view needs a small toolbar with source/action picker + a date range. ~1 commit.
+- **C7 (asset library — linked vs managed)** — bigger surface. Foundation for C8 (folder bookmarks), C9 (missing-media UX with a real "Locate…" affordance), C10/C11 (thumbnails). Multi-session item but unlocks a chunk of Phase C.
+- **B7 (DeckLink format negotiation)** — Phase B leftover. Hardware-bound for verification but the API surface is well-defined.
 
-Phase B leftovers (B7, B11, B13, plus the full Phase B summary) and Phase C tail (C7+ asset library / audio engine / subtitles) remain as background work that can be picked off between Phase E iterations.
+Phase B leftovers (B7, B11, B13) and Phase C tail (C7+) remain background work that can be picked off between Phase E iterations.

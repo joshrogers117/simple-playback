@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B8 pure-logic recommendation + inspector hint shipped; B14 partial); Phase C substantially done (C1–C6 + C-banner all in; cancelled transcode/encode partial files now self-clean); **Phase E started** — E1 (pre-show check panel) shipped end-to-end with pure-logic evaluator + sheet UI + toolbar entry; system-signal adapters (DeckLink lock state, audio device) are deferred. E2 (per-row Fix actions) is next.
-- **Last commit**: clean up partial files on transcode/encode cancel (C2/C5c gap)
+- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B8 pure-logic recommendation + inspector hint shipped; B14 partial); Phase C substantially done (C1–C6 + C-banner all in; cancelled transcode/encode partial files now self-clean); **Phase E**: E1 done (pure-logic + sheet + DeckLink/audio/render-path adapters all wired); E2 done (per-row Fix actions); E3 done (show-log writer + ShowController integration + dispatcher integration + read-only viewer + toolbar entry). Remaining E items: E4 (filter UI on the log viewer), E5–E11 (take history, autosave, crash recovery, lock file, Director View, Workspaces, brightness adapt key).
+- **Last commit**: showlog: read-only viewer + Show Log toolbar entry (E3d)
 - **Branch**: `development`
 
 ---
@@ -119,9 +119,9 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Phase E — Reliability
 
-- [~] E1: Pre-show check panel — `Services/PreShowCheck.swift` pure-logic evaluator + `Views/PreShowCheckView.swift` sheet + toolbar "Pre-Show" button. Rules shipped: media resolution (every cue's assetID resolves), FPS conformance (B14 reuse), 10-bit recommendation (B8 reuse), external reference vs DeckLink lock, disk space, audio device. Free disk space sampled live from project bundle (or app-support fallback). **Still deferred**: DeckLink lock-state plumbing into Context (needs PlaybackController adapter), audio-device sampling (needs CoreAudio adapter), macOS energy / DND / screensaver / Spotlight checks (each needs a small system-API adapter), render-path-warmed signal.
-- [ ] E2: "Fix" actions per pre-show row where automatable
-- [ ] E3: Show log writer — append-only, persisted in bundle `Logs/`
+- [x] E1: Pre-show check panel — `Services/PreShowCheck.swift` pure-logic evaluator + `Views/PreShowCheckView.swift` sheet + toolbar "Pre-Show" button. Rules: media resolution, FPS conformance (B14 reuse), 10-bit recommendation (B8 reuse), external-reference vs DeckLink lock (live via `PreShowCheckAdapters.from(_:)`), disk space, audio device (live via `Services/AudioDeviceProbe.swift`), render-path-warmed (live via `PlaybackController.hasRenderedAnyFrame`). **Still deferred**: macOS energy / DND / screensaver / Spotlight checks (each needs a small system-API adapter).
+- [x] E2: "Fix" actions per pre-show row — `PreShowCheckFixHandlers` keyed by row.id; first slice ships handlers for `system.audio` (Sound deep-link), `system.disk` (reveal bundle in Finder), `output.reference` (Blackmagic Desktop Video Setup). `media.resolution` deferred to C7's relink work; `fps.conformance` / `output.tenBit` are project-edit territory and intentionally have no system fix.
+- [~] E3: Show log writer — `Services/ShowLog.swift` model + CSV writer (RFC 4180); `ShowController` integration (every verb logs with default `.operatorButton` source, hotkey/OSC/HTTP/TC paths can override); dispatcher → log routing via `onActionDispatched` with `ShowControlSource → ShowLogEvent.Source` translator (HTTP tokens collapse to last 4 chars); read-only `Views/ShowLogView.swift` viewer with chronological list + Export CSV via `NSSavePanel`; toolbar "Show Log" button. Persistence: `<bundle>/Logs/<yyyy-MM-dd>.log` (untitled documents stay in-memory until first save). **Still deferred**: dropped-frame events, late-take detection.
 - [ ] E4: Show log viewer with filtering (source, action type, time range)
 - [ ] E5: Take history (recent 200) with replay scrub
 - [ ] E6: Autosave every 30 s + checkpoint on Show-mode toggle
