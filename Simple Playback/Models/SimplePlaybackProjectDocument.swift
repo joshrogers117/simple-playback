@@ -10,6 +10,11 @@ enum ProjectBundleLayout {
     /// inside the bundle so the show file remains venue-portable. C3 PDF import writes
     /// per-batch UUID subdirectories under this path.
     static let rendersDirectory = "Cache/Renders"
+
+    /// Per-spec §3.17, ProRes-converted copies of risky media live here. C2 right-click
+    /// transcode writes one `<UUID>.mov` per transcode under this path, sibling to the
+    /// original slide in the asset library.
+    static let transcodedDirectory = "Transcoded"
 }
 
 final class SimplePlaybackProjectDocument: NSDocument {

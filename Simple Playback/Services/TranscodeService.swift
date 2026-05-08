@@ -211,3 +211,84 @@ final class TranscodeJob: ObservableObject, Identifiable {
         stateObserverTask?.cancel()
     }
 }
+
+/// What the coordinator hands back on a successful transcode. The caller (RootView) does
+/// the actual splice into `project.slides`; the coordinator stays free of project-state
+/// knowledge so it can be unit-tested in isolation.
+struct TranscodeOutcome {
+    /// `MediaSlide.id` of the source slide. Used to insert the sibling slide right after
+    /// the original in the asset library — non-destructive A/B per the C2 design note.
+    let sourceSlideID: UUID
+    let preset: TranscodePreset
+    let siblingSlide: MediaSlide
+}
+
+/// Owns the live `TranscodeJob` instances for one window/document. Operators see the
+/// running jobs rendered as a non-modal progress surface (C2c) without freezing the UI.
+@MainActor
+final class TranscodeCoordinator: ObservableObject {
+
+    /// Test seam — the post-transcode re-import that yields the sibling slide. The
+    /// default delegates to `MediaImporter.importSlides(from:)` so the sibling carries
+    /// fresh `nativeFrameRate` + `MediaFlags` (cleared long-GOP / VFR / 10-bit-4:2:0
+    /// flags after a successful ProRes transcode are exactly what the operator wants
+    /// to see in the inspector). Tests substitute a stub that produces a deterministic
+    /// MediaSlide so the wiring is verifiable without re-running AVFoundation.
+    static var siblingImporter: (URL) -> MediaSlide? = { url in
+        MediaImporter.importSlides(from: [url]).first
+    }
+
+    @Published private(set) var jobs: [TranscodeJob] = []
+
+    /// Kicks off a transcode for `slide` against `destinationDirectory`. The slide is
+    /// expected to be a video whose URL resolves; `TranscodeService.canTranscode` is
+    /// the gate the UI uses, but this method returns nil for invariant violations so
+    /// the caller can short-circuit.
+    @discardableResult
+    func transcode(
+        slide: MediaSlide,
+        preset: TranscodePreset,
+        destinationDirectory: URL,
+        completion: @MainActor @escaping (Result<TranscodeOutcome, TranscodeError>) -> Void
+    ) -> TranscodeJob? {
+        guard let source = slide.media.resolvedURL() else {
+            completion(.failure(.sourceNotReadable(slide.media.resolvedURL() ?? URL(fileURLWithPath: ""))))
+            return nil
+        }
+        let dest = destinationDirectory
+            .appendingPathComponent(TranscodeService.destinationFilename(preset: preset), isDirectory: false)
+        let label = TranscodeService.siblingTitle(originalTitle: slide.title, preset: preset)
+        let job = TranscodeJob(sourceURL: source, destinationURL: dest, preset: preset, displayLabel: label)
+        jobs.append(job)
+
+        let sourceID = slide.id
+        job.start { [weak self] result in
+            guard let self else { return }
+            self.jobs.removeAll { $0.id == job.id }
+            switch result {
+            case .success(let url):
+                guard var sibling = TranscodeCoordinator.siblingImporter(url) else {
+                    completion(.failure(.exportFailed("transcoded file did not import as a video slide")))
+                    return
+                }
+                sibling.title = label
+                completion(.success(TranscodeOutcome(
+                    sourceSlideID: sourceID,
+                    preset: preset,
+                    siblingSlide: sibling
+                )))
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+        return job
+    }
+
+    /// Cancels every running job. Used by the document close path so we don't leak
+    /// orphaned export sessions.
+    func cancelAll() {
+        for job in jobs {
+            job.cancel()
+        }
+    }
+}
