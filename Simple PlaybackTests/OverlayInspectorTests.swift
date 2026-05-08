@@ -23,9 +23,10 @@ final class OverlayInspectorTests: XCTestCase {
     }
 
     func testInspectorModeCasesAndLabels() {
-        XCTAssertEqual(InspectorMode.allCases, [.selection, .overlays])
+        XCTAssertEqual(InspectorMode.allCases, [.selection, .overlays, .output])
         XCTAssertEqual(InspectorMode.selection.label, "Selection")
         XCTAssertEqual(InspectorMode.overlays.label, "Overlays")
+        XCTAssertEqual(InspectorMode.output.label, "Output")
     }
 
     @MainActor

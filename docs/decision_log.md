@@ -123,3 +123,37 @@ If operators dislike the discovery cost ("they didn't notice the picker"), the r
 - `RGBAColor(color: SwiftUI.Color)` extension for the inspector's color pickers (sRGB-anchored via `NSColor.usingColorSpace(.sRGB)`).
 - `ShowController.applyCompositorOverlays(_ overlays: CompositorOverlays)` — single forwarder into `PlaybackController.compositorOverlays`. Called by `RootView` on `.onChange` of the first stage's overlays and once at controller configuration.
 
+---
+
+## 2026-05-07 — B6b: project-level REF expectation lives in Output inspector tab (not Stage)
+
+**Decision**: Add a third inspector tab `Output` (alongside `Selection` and `Overlays`) and house the new project-level `expectsExternalReference: Bool` toggle there. The `OutputStatusBar` accepts a new `referenceExpected: Bool` parameter; when true and the active DeckLink reports `unlocked`, a full-width red banner ("REF EXPECTED — Output is free-running") renders **above** the existing chip+status row. The orange chip stays orange (the loud signal moves to the banner), keeping the layered legibility consistent with §3.15 ("color is never the only signal").
+
+**Why**:
+- Per the session prompt, the toggle is *project-level*, not per-Stage. A show file declares one REF expectation that travels between venues alongside resolution and color.
+- The toggle didn't fit cleanly inside the existing `Overlays` inspector — overlays are §3.6 compositor concerns; REF is §3.7 transport hardening. Mashing them together would muddy the operator's mental model and make future B7/B13 additions awkward.
+- Rather than burying the toggle behind a settings sheet (which Show Mode forbids per §3.5 anti-modal rule), surfacing it as a first-class inspector tab keeps it discoverable in both Edit and Show modes and gives B7 (format negotiation), B8 (10-bit YUV), B13 (color pipeline) a home to grow into without further tab sprawl.
+- The banner-vs-chip split means the operator gets two complementary signals: the persistent chip ("REF: Free-run") and the loud above-status-row banner. Either alone could be missed in a dim booth; together they're hard to miss. The runtime cost is two `View`s, no new state.
+- Banner suppression on `idle` and `notSupported` is deliberate — those states are not contradictions of the operator's expectation. `idle` ⇒ no DeckLink running yet, the red banner would be noise. `notSupported` ⇒ user-error message that belongs in pre-show check (E1), not a render-time alarm.
+
+**Alternatives considered**:
+- **Extend the `Overlays` tab with a "Reliability" section.** Rejected: semantic mismatch (§3.6 vs §3.7) and forces a future B13 color section into the same already-overloaded tab.
+- **Settings sheet bound to `PlayoutProject`.** Rejected: modal-ish, conflicts with §3.5 modal-forbidden invariant in Show Mode, and operators editing the project mid-show shouldn't have to summon a sheet to verify REF expectation.
+- **Per-Stage `expectsExternalReference`.** Rejected: prompt explicitly says project-level; multi-stage projects are rare in v1, and a single project-wide flag is simpler to reason about for the venue-portable show-file case (§2.2).
+- **Banner replaces the chip rather than stacks above it.** Rejected: removes the persistent "REF: <state>" hint after the operator dismisses or scrolls past the banner; a chip-only layout was previously informational-only (orange) and the banner's job is escalation, not replacement.
+
+**Reversibility**: easy. The `expectsExternalReference` field is `decodeIfPresent`-defaulted to `false`; the inspector tab's enum case is additive; the banner is a `VStack` row that disappears when the boolean is false. Reverting is a one-commit revert with no data migration.
+
+**What I'd revisit if**: a future operator UX pass shows the banner is too easy to miss while running cues (the operator's eyes are on Program/Preview tiles, not the status bar). At that point the right move is probably a status-bar-anchored toast that fades after 5s rather than a persistent banner — but that's `OutputStatusBar` work, not an `expectsExternalReference` model change. Track in the Operator UX backlog.
+
+**What this does NOT do** (deferred follow-ups for the next session):
+- REF format-mismatch detection vs Stage frame rate. The `IDeckLinkOutput_v15_3_1` interface used by `SPDeckLinkBridge` does not expose REF input timing. A small SDK-API spike (`IDeckLinkProfileAttributes::BMDDeckLinkSupportsReferenceInputTimingOffset`?) is required before scoping, and the ground-truth verification needs real REF generator hardware. Filed as the remaining `[~]` follow-up on B6.
+- Pre-show check (E1) reuse: when E1 lands, the same `expectsExternalReference` flag should drive a pre-show "REF locked?" row, not just a render-time banner.
+
+**Public API impact**:
+- `PlayoutProject.expectsExternalReference: Bool` — codable, defaults to `false` for legacy projects via `decodeIfPresent`.
+- `enum InspectorMode { case selection, overlays, output }` in `Views/RootView.swift`.
+- `OutputInspectorView(project: Binding<PlayoutProject>)` in `Views/OutputInspectorView.swift` — Stage summary + Reliability section housing the toggle.
+- `OutputStatusBar.referenceExpected: Bool` — new parameter (defaults to `false` so existing call sites compile, but `RootView` always passes the live value from the project).
+- `OutputStatusBar.evaluateFreeRunBanner(referenceExpected:referenceState:) -> Bool` — pure helper, exposed for testability without standing up a `PlaybackController`.
+

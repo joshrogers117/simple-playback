@@ -155,7 +155,10 @@ struct RootView: View {
 
                 OutputPreviewView(playback: playback)
 
-                OutputStatusBar(playback: playback)
+                OutputStatusBar(
+                    playback: playback,
+                    referenceExpected: document.project.expectsExternalReference
+                )
 
                 Divider()
 
@@ -189,6 +192,8 @@ struct RootView: View {
             selectionInspector
         case .overlays:
             overlaysInspector
+        case .output:
+            OutputInspectorView(project: $document.project)
         }
     }
 
@@ -398,12 +403,14 @@ private struct InspectorPlaceholder: View {
 enum InspectorMode: String, CaseIterable, Identifiable {
     case selection
     case overlays
+    case output
 
     var id: String { rawValue }
     var label: String {
         switch self {
         case .selection: "Selection"
         case .overlays: "Overlays"
+        case .output: "Output"
         }
     }
 }

@@ -102,6 +102,31 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(legacy.formatVersion, PlayoutProject.currentFormatVersion)
     }
 
+    func testProjectExpectsExternalReferenceDefaultsToFalseForFreshProjects() {
+        let project = PlayoutProject()
+        XCTAssertFalse(project.expectsExternalReference)
+    }
+
+    func testProjectExpectsExternalReferenceDefaultsToFalseWhenAbsentInJSON() throws {
+        let legacyJSON = """
+        {
+          "slides": [],
+          "outputWidth": 1920,
+          "outputHeight": 1080
+        }
+        """
+        let data = try XCTUnwrap(legacyJSON.data(using: .utf8))
+        let project = try JSONDecoder.simplePlayback.decode(PlayoutProject.self, from: data)
+        XCTAssertFalse(project.expectsExternalReference)
+    }
+
+    func testProjectExpectsExternalReferenceRoundTripsThroughJSON() throws {
+        let project = PlayoutProject(expectsExternalReference: true)
+        let data = try JSONEncoder.simplePlayback.encode(project)
+        let decoded = try JSONDecoder.simplePlayback.decode(PlayoutProject.self, from: data)
+        XCTAssertTrue(decoded.expectsExternalReference)
+    }
+
     func testProjectBundleRoundTripsThroughFileWrapper() throws {
         let project = PlayoutProject(
             slides: [],

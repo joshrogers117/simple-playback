@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B in flight (B1–B5, B12 done; B6, B14 partial)
-- **Last commit**: B12f — preview tile keeps composed frame past dissolve + on overlay edit
+- **Active phase**: A and D complete; B in flight (B1–B5, B12 done; B6 mostly done — REF lock chip + project-level REF expectation banner; B14 partial)
+- **Last commit**: B6b (partial) — project-level "expects external reference" toggle + red free-run banner
 - **Branch**: `development`
 
 ---
@@ -44,7 +44,7 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
   - [x] B5b: DeckLinkTransportSink + PreviewTransportSink (drivers reduced to thin shims)
   - [x] B5c: PlaybackController fans frames + audio out to auxiliary TransportSinks
   - [x] B5d: Router/sink unit tests + PlaybackController register/unregister hooks
-- [~] B6: DeckLink REF input handling — surface lock state via `IDeckLinkOutput::GetReferenceStatus`, status-bar REF chip with idle/locked/free-run/not-supported palette. **Deferred to B6b**: project-level "REF expected" toggle that escalates free-run to a red banner; format-mismatch warning vs Stage frame rate (needs incoming-REF frame-rate query, which the v15.3.1 IDeckLinkOutput interface does not expose — likely needs `IDeckLinkProfileAttributes::BMDDeckLinkSupportsReferenceInputTimingOffset` or input-side enumeration).
+- [~] B6: DeckLink REF input handling — surface lock state via `IDeckLinkOutput::GetReferenceStatus`, status-bar REF chip with idle/locked/free-run/not-supported palette (B6 session-2). Project-level `expectsExternalReference` toggle on `PlayoutProject` + Output inspector tab + escalating red "REF EXPECTED — Output is free-running" banner above the status row when the toggle is on and the bridge reports `unlocked` (B6b session-5). **Still deferred**: REF format-mismatch warning vs Stage frame rate (needs incoming-REF frame-rate query, which the v15.3.1 `IDeckLinkOutput` interface does not expose — likely needs `IDeckLinkProfileAttributes::BMDDeckLinkSupportsReferenceInputTimingOffset` or input-side enumeration; small SDK-API spike required before scoping).
 - [ ] B7: DeckLink format negotiation — explicit at start, mid-show change requires re-arm
 - [ ] B8: 10-bit YUV 4:2:2 default when any clip in the project is >8-bit
 - [ ] B9: "Output in use" detection + recovery path

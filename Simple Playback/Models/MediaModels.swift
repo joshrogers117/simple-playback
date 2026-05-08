@@ -475,6 +475,11 @@ struct PlayoutProject: Codable, Hashable {
     var outputHeight: Int = 1080
     var transitionSettings = PlayoutTransitionSettings()
 
+    /// Operator declares this show requires an external reference (genlock). When true and the
+    /// active DeckLink output reports `unlocked` (free-run), the status bar escalates from the
+    /// informational orange chip to a red "REF EXPECTED" banner. Spec §3.7.
+    var expectsExternalReference: Bool = false
+
     static let empty = PlayoutProject()
 
     init(
@@ -488,7 +493,8 @@ struct PlayoutProject: Codable, Hashable {
         selectedModeID: String? = nil,
         outputWidth: Int = 1920,
         outputHeight: Int = 1080,
-        transitionSettings: PlayoutTransitionSettings = PlayoutTransitionSettings()
+        transitionSettings: PlayoutTransitionSettings = PlayoutTransitionSettings(),
+        expectsExternalReference: Bool = false
     ) {
         self.formatVersion = formatVersion
         self.slides = slides
@@ -501,6 +507,7 @@ struct PlayoutProject: Codable, Hashable {
         self.outputWidth = outputWidth
         self.outputHeight = outputHeight
         self.transitionSettings = transitionSettings
+        self.expectsExternalReference = expectsExternalReference
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -515,6 +522,7 @@ struct PlayoutProject: Codable, Hashable {
         case outputWidth
         case outputHeight
         case transitionSettings
+        case expectsExternalReference
     }
 
     init(from decoder: Decoder) throws {
@@ -531,6 +539,7 @@ struct PlayoutProject: Codable, Hashable {
         outputHeight = try container.decodeIfPresent(Int.self, forKey: .outputHeight) ?? 1080
         transitionSettings = try container.decodeIfPresent(PlayoutTransitionSettings.self, forKey: .transitionSettings)
             ?? PlayoutTransitionSettings()
+        expectsExternalReference = try container.decodeIfPresent(Bool.self, forKey: .expectsExternalReference) ?? false
     }
 
     /// Bumps `formatVersion` to the current value, ensures at least one show list exists, and
