@@ -89,10 +89,12 @@
 		D2D87259CFD1B81F53DBC0C8 /* ImageSequenceEncodeCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DE55003A493F69B338D09BA /* ImageSequenceEncodeCoordinatorTests.swift */; };
 		D93CCBEA7AE13AB4FC44F4F3 /* MediaFlagsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF79938EE267D36AF458C582 /* MediaFlagsTests.swift */; };
 		DCABF0FFCC0E6E0596173F64 /* CompositorPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21271656A4CCF6A5AD4E2940 /* CompositorPipelineTests.swift */; };
+		DE5FE0EC53035F43FFA246E0 /* PreShowCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B45DD8149F1F904849FDFC2 /* PreShowCheck.swift */; };
 		DF9D9D2A7D5D102CC20FCD95 /* DeckLinkSDKDispatch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9E8B4217656574F74350F1FF /* DeckLinkSDKDispatch.cpp */; };
 		DFB8E02D46414DBF7C34D646 /* OverlayInspectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD1EB0DEF2FFFA7B96C902D /* OverlayInspectorTests.swift */; };
 		E047E0CE35C78C80772F54ED /* AnimatedImageInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB44C4BE122979080B759770 /* AnimatedImageInspector.swift */; };
 		E5DFE39B8CB8514358205B8E /* SubscriptionPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4A7CF3D1DF29B837A0BF44 /* SubscriptionPump.swift */; };
+		E7E0BCCC5F1B98DD0A582010 /* PreShowCheckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D930FD6914035D4FEAC331A2 /* PreShowCheckTests.swift */; };
 		E9E3C51A99F9323FE1D530DC /* PDFImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45BCD3E72BF9F52C2653862E /* PDFImporter.swift */; };
 		EAA4BC2642696555F131F8BE /* OutputPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0C8298731E2AD4C22B2306 /* OutputPreviewView.swift */; };
 		EDB3E5ED1721A22A5B31024C /* CompositorLayers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6214E79B299E7C7AB111C790 /* CompositorLayers.swift */; };
@@ -153,6 +155,7 @@
 		4FFDD7785740559EEB94F4CA /* SPFrameBlend.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SPFrameBlend.c; sourceTree = "<group>"; };
 		50CF28D157920076A3C82649 /* OutputInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputInspectorView.swift; sourceTree = "<group>"; };
 		569A548ECCAC07CC9E9B92D2 /* MediaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaModels.swift; sourceTree = "<group>"; };
+		5B45DD8149F1F904849FDFC2 /* PreShowCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreShowCheck.swift; sourceTree = "<group>"; };
 		5D0C8298731E2AD4C22B2306 /* OutputPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputPreviewView.swift; sourceTree = "<group>"; };
 		5DE55003A493F69B338D09BA /* ImageSequenceEncodeCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSequenceEncodeCoordinatorTests.swift; sourceTree = "<group>"; };
 		6023F5FCD12A96AE5EAD4313 /* ShowControlStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlStack.swift; sourceTree = "<group>"; };
@@ -206,6 +209,7 @@
 		CF97362F36D6ED17D41359D2 /* DeckLinkDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckLinkDiagnostics.swift; sourceTree = "<group>"; };
 		D2A8691862AC8AE01B87203D /* KeynoteImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeynoteImporter.swift; sourceTree = "<group>"; };
 		D8CA5B1A327E84EEA75F0B9F /* UniformTypeIdentifiers.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UniformTypeIdentifiers.framework; path = System/Library/Frameworks/UniformTypeIdentifiers.framework; sourceTree = SDKROOT; };
+		D930FD6914035D4FEAC331A2 /* PreShowCheckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreShowCheckTests.swift; sourceTree = "<group>"; };
 		DBA2A137EBDAA8855CAA24A2 /* AuthTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthTokenStore.swift; sourceTree = "<group>"; };
 		E1B3AC760F776AC4DDC6B0F9 /* DeckLinkSDK.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DeckLinkSDK.h; sourceTree = "<group>"; };
 		E66F934F6D6C5561905E6550 /* CoreImage.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreImage.framework; path = System/Library/Frameworks/CoreImage.framework; sourceTree = SDKROOT; };
@@ -328,6 +332,7 @@
 				CAD1EB0DEF2FFFA7B96C902D /* OverlayInspectorTests.swift */,
 				B631D588B2455E3C2C9EE89C /* PDFImporterTests.swift */,
 				6084981086D7D70B8E87C69E /* PendingFolderImportTests.swift */,
+				D930FD6914035D4FEAC331A2 /* PreShowCheckTests.swift */,
 				0E47E51BD45087956CCF2905 /* ShowControlIntegrationTests.swift */,
 				237C1358E779CC8F8EBA839E /* ShowControlTests.swift */,
 				633EE3FAB29225F6222E52AB /* TranscodeCoordinatorTests.swift */,
@@ -435,6 +440,7 @@
 				B328F432BC7CCB991A9A8373 /* MediaImporter.swift */,
 				2762065E2D1FE5D3F052F8FF /* MediaImportFailure.swift */,
 				45BCD3E72BF9F52C2653862E /* PDFImporter.swift */,
+				5B45DD8149F1F904849FDFC2 /* PreShowCheck.swift */,
 				BB90370BA34D673675815F69 /* TranscodeService.swift */,
 			);
 			path = Services;
@@ -576,6 +582,7 @@
 				4536CC9B693175B1A31F6425 /* OverlayInspectorView.swift in Sources */,
 				E9E3C51A99F9323FE1D530DC /* PDFImporter.swift in Sources */,
 				28C1335FD15B6AE87DD31AB3 /* PlaybackController.swift in Sources */,
+				DE5FE0EC53035F43FFA246E0 /* PreShowCheck.swift in Sources */,
 				020E6C3D173AD7E05AC7A15A /* RootView.swift in Sources */,
 				4D7E6C165E984434FD9A4BB0 /* SPFrameBlend.c in Sources */,
 				976DD722059E40449CB77621 /* ShowControlActions.swift in Sources */,
@@ -624,6 +631,7 @@
 				DFB8E02D46414DBF7C34D646 /* OverlayInspectorTests.swift in Sources */,
 				446ACE51C8F85BB761074619 /* PDFImporterTests.swift in Sources */,
 				B0198B8CBF5D9D7897AFAF9F /* PendingFolderImportTests.swift in Sources */,
+				E7E0BCCC5F1B98DD0A582010 /* PreShowCheckTests.swift in Sources */,
 				851AE7644559671FB09FD2BD /* ShowControlIntegrationTests.swift in Sources */,
 				00EC3572563AA2E459F2489F /* ShowControlTests.swift in Sources */,
 				66B172846E254E8FCC806D8B /* TranscodeCoordinatorTests.swift in Sources */,
