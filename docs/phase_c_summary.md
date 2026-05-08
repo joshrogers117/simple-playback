@@ -1,6 +1,12 @@
 # Phase C — Media pipeline — Summary
 
-**Status (session 19 — 2026-05-08) — C16 Phase C close-out**. Phase C is declared complete for v1. A code-reviewer pass against the full Phase C diff (`48a8b0a..HEAD`, 17,500+ lines across 100+ files) surfaced six P1 findings; three were addressed in this session as correctness/safety hardening commits, the other three are documented below as "still open, out of scope for v1." 3 commits, 657 → 659 tests (+2). Phase C surface remaining (C8 / C11 / C12-C15) is documented as scoped out for v1.
+**Status (session 19 — 2026-05-08) — C16 Phase C close-out + C11 partial + Path 1 late-take**. Phase C is declared complete for v1. 8 commits this session, 657 → 680 tests (+23). The session bundled three discrete pieces:
+
+1. **C16 close-out (3 commits, +2 tests)** — code-reviewer pass against the full Phase C diff (`48a8b0a..HEAD`, 17,500+ lines across 100+ files) surfaced six P1 findings; three folded in as correctness/safety hardening (compositor sync race, BundleForTravel partial-copy leak, MediaReference bookmark fileExists). Three deferred to a future hardening sweep, documented inline. C16 doc consolidates the Phase C surface and 13-step manual rehearsal checklist.
+2. **E3+ Path 1 callback upgrade (2 commits, +6 tests)** — adds `PlaybackController.onFirstComposedFrameForCue` callback fired exactly once per take when the first composed frame reaches `submitFrame`. ShowController switches its late-take detector source from `playback.$liveSlideID` to the new callback, closing the image-cue limitation in the Path 2 proxy. Documented in `phase_e_summary.md`.
+3. **C11 partial — generator + coordinator (2 commits, +15 tests)** — `FilmstripGenerator` pure-logic sprite-sheet PNG + `FilmstripCoordinator` background-queue state machine. UI / import-hook / scrub-view consumer deferred to a future session that lands the inspector surface alongside.
+
+### C16 — Code-reviewer P1 fixes folded in this session
 
 ### C16 — Code-reviewer P1 fixes folded in this session
 
@@ -86,13 +92,19 @@ Run these on real operator media before promoting Phase C to "production-ready."
 ### C16 — What's scoped out of v1 Phase C
 
 - **C8 — folder-level bookmarks for batch imports.** Today every imported file gets its own security-scoped bookmark; for folder imports (C5c), a 50-clip folder produces 50 bookmark blobs in the project file. The spec implies a folder-level bookmark + per-file relative path. Architectural change — adds a `FolderBookmark` model, modifies `MediaImporter` to opt into folder-mode when the source is a single parent directory, and the resolver gains a fallback rung that joins folder-bookmark + relative path. Bigger than C7d (3-5 commits over 1-2 sessions). Filed.
-- **C11 — filmstrip thumbnail sprite-sheets (background queue).** Pairs naturally with C10. Pre-render N thumbnails sampled across each video's duration for a future scrub UI. The decision (already in `decision_log.md` for C10) is single sprite-sheet PNG per video at `<bundle>/Cache/Filmstrips/<slide.id>.png`. Architecture: `FilmstripGenerator` pure-logic + `FilmstripCoordinator` (mirror `BundleForTravelCoordinator` shape — `@MainActor ObservableObject` state machine, jobs list, cancel, sibling-strip splice). UI deferred until a scrub surface lands. 2-4 commits.
+- **C11 — filmstrip thumbnail sprite-sheets (background queue).** Generator + coordinator landed in session 19 (see C11 section below). Remaining for a future session: import-time auto-enqueue hook in `MediaImporter`, RootView wiring of the bundle-relative output dir (mirroring `thumbnailRootDirectory()`), inspector-bound scrub UI consumer.
 - **C12 — audio engine refactor.** 48 kHz / 32-bit float, 8 internal channels, routing matrix. Substantial; deserves its own sub-phase.
 - **C13 — audio cue types.** Embedded, audio-only cue, background bed.
 - **C14 — per-cue audio.** Volume, mute, fade-in/out, crossfade override, varispeed with pitch correction.
 - **C15 — SRT/WebVTT subtitle sidecar render.** Subtitle layer in compositor.
 
-The audio block (C12-C15) is large enough to be its own pickup. C8 and C11 are autonomy-friendly Phase C tail tasks.
+The audio block (C12-C15) is large enough to be its own pickup. C8 is an autonomy-friendly Phase C tail task. C11 is half-landed and the remaining tail (UI integration) is the natural pickup once a scrub surface design exists.
+
+### C11 — What landed in session 19 (generator + coordinator)
+
+- **C11-1 — `Services/FilmstripGenerator.swift` pure-logic.** `generateSpriteSheet(for:frameCount:columns:frameSize:)` produces a sprite-sheet PNG with `frameCount` evenly-distributed thumbnails across the video duration, composed in a fixed-grid layout. Defaults: 24 frames (6 cols × 4 rows), 160×90 per cell → 960×360 sprite (~50 KB at typical-content compression). Centered sample distribution (`D × (i + 0.5)/N`) avoids decode-at-EOF failures. Pure-logic helpers `sampleTimestamps(durationSeconds:frameCount:)` and `gridPixelSize(frameCount:columns:frameSize:)` exposed for tests. 10 tests including an end-to-end pin against a 30-frame H.264 movie built via AVAssetWriter (mirrors `TranscodeServiceTests` fixture pattern).
+- **C11-2 — `Services/FilmstripCoordinator.swift` background queue.** `@MainActor ObservableObject` mirrors `BundleForTravelCoordinator` / `TranscodeCoordinator` shape. `enqueue(slideID:sourceURL:destinationURL:...)` hops the synchronous extraction loop to `Task.detached`, completes on main with `.completed(URL)` or `.failed(FilmstripGenerator.Failure)`. De-dupe — one job per `slideID`, repeated enqueues while running are no-ops. Cancellation deferred for v1 (typical 24-frame jobs finish under a second). Injectable `generator` + `writer` static seams for test isolation. 5 tests cover success, repeated-enqueue no-op, generator failure passthrough, writer failure as `.encodingFailed`, distinct-slides-run-concurrently.
+- **What's deferred** — auto-enqueue at video import time (a thin `MediaImporter` hook similar to C10's `thumbnailEncoder` seam), RootView's `filmstripRootDirectory()` mirroring `thumbnailRootDirectory()`, and the actual scrub-UI consumer in the cue inspector. The natural pickup ships these together since each requires a clear UI surface decision.
 
 ### C16 — Test inventory at Phase C close
 

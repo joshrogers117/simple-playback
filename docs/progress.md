@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B8 pure-logic recommendation + inspector hint shipped; B14 partial); **Phase C declared complete for v1 in session 19** (C1-C7 + C-banner + C9 + C10 + C16 all in; C8 / C11 / C12-C15 documented as scoped out of v1 in `docs/phase_c_summary.md`); **Phase E**: E1 done + E1+ energy adapter; E2 done; E3 done; E3+ done (DroppedFrameCounter + LateTakeDetector live integration via liveSlideID proxy — Path 1 callback upgrade still possible); E4 done; E5 done (TakeHistory in-memory v1 + viewer sheet — replay scrub deferred); E6 done; E7 done (crash recovery); E8 done. Remaining E items: more E1+ macOS-condition adapters (Spotlight / DND / Time Machine / screensaver — fragile / privacy-blocked); E8 read-only-mode banner option, E9 (Director View), E10 (Workspaces), E11 (brightness adapt key).
-- **Last commit**: asset-library: gate MediaReference bookmark branch on fileExists (C7d hardening)
+- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B8 pure-logic recommendation + inspector hint shipped; B14 partial); **Phase C declared complete for v1 in session 19** (C1-C7 + C-banner + C9 + C10 + C16 all in; C12-C15 audio explicitly out of v1; **C11 generator + coordinator landed in session 19, UI/import-hook deferred** to a future session; C8 still scoped out of v1); **Phase E**: E1 done + E1+ energy adapter; E2 done; E3 done; **E3+ Path 1 callback upgrade landed in session 19** — `PlaybackController.onFirstComposedFrameForCue` replaces the `$liveSlideID` proxy; E4 done; E5 done (TakeHistory in-memory v1 + viewer sheet — replay scrub deferred); E6 done; E7 done (crash recovery); E8 done. Remaining E items: more E1+ macOS-condition adapters (Spotlight / DND / Time Machine / screensaver — fragile / privacy-blocked); E8 read-only-mode banner option, E9 (Director View), E10 (Workspaces), E11 (brightness adapt key).
+- **Last commit**: asset-library: FilmstripCoordinator background queue + state machine (C11-2)
 - **Branch**: `development`
 
 ---
@@ -91,12 +91,12 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 - [~] C9: Missing-media UX — non-modal banner, per-clip Locate, project-level Relink folder, hash-based auto-relink
   - [x] C9 first slice (session 16): `Services/AssetRelinkPlan.swift` pure-logic plan + apply over MediaResolver. RootView Pre-Show fix handler for `media.files` row opens NSOpenPanel and applies the plan to `project.slides` (refreshes fingerprint per relinked file). Empty match surfaces via the import-status banner.
   - [x] C9 second slice (session 16): per-slide Locate context menu in `SlideGridView` (right-click → Locate…) wired through `RootView.relinkSlideViaOpenPanel` for one-shot file picks; rebuilds the slide's `MediaReference` with a refreshed fingerprint.
-  - [ ] Persistent banner above OutputStatusBar that shows offline-count without requiring the operator to open Pre-Show.
+  - [x] C9 third slice (session 17): persistent missing-media banner above OutputStatusBar.
 - [x] C10: Embedded poster-frame thumbnails (palette loads with media offline)
   - [x] C10-1 (session 18): `Services/ThumbnailGenerator.swift` pure-logic — `generateJPEG(for:mediaKind:size:quality:)` produces a 320×180 JPEG (~10 KB at quality 0.75). Image branch via `NSImage(contentsOf:)` + `NSBitmapImageRep`; video branch via `AVAssetImageGenerator` at `.zero` with infinite tolerance.
   - [x] C10-2 (session 18): MediaImportContext gains optional `thumbnailRootDirectory`; `MediaImporter.thumbnailEncoder` static-var seam writes `<dir>/<slide.id>.jpg` for every direct image/video import + every PDF/Keynote rasterized page (`imageSlidesWithThumbnailCache`). Failures silent — thumbnail never blocks an import. `ProjectBundleLayout.thumbnailsDirectory = "Cache/Thumbnails"`.
   - [x] C10-3 (session 18): `RootView.thumbnailRootDirectory()` mirrors `renderRootDirectory()` shape (bundle-relative when saved, App Support per-session for untitled). `SlideGridView.thumbnailCacheDirectory` parameter; `ThumbnailLoader.thumbnail(for:bundleMediaDirectory:thumbnailCacheDirectory:)` tries the live source URL first then falls back to `<dir>/<slide.id>.jpg` so a moved or relinked bundle still renders the palette.
-- [~] C11: Filmstrip thumbnail sprite-sheets (background queue) — **scoped out of v1 in session 19**; design parked in `docs/phase_c_summary.md`
+- [~] C11: Filmstrip thumbnail sprite-sheets (background queue) — **session 19 landed C11-1 (FilmstripGenerator pure-logic sprite-sheet PNG) + C11-2 (FilmstripCoordinator background queue with injectable generator/writer seams).** UI / import-hook / scrub-view consumer deferred to a follow-up session that lands the inspector surface alongside.
 - [~] C12: Audio engine refactor — 48 kHz / 32-bit float, 8 internal channels, routing matrix — **scoped out of v1 (audio sub-phase)**
 - [~] C13: Audio cue types — **scoped out of v1**
 - [~] C14: Per-cue audio — **scoped out of v1**

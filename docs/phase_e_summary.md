@@ -1,5 +1,16 @@
 # Phase E — Reliability — Summary
 
+**Status (session 19 — 2026-05-08) — E3+ Path 1 callback upgrade shipped**. The session-18 Path-2 limitation (image cues always read as on-time because `liveSlideID` flips synchronously inside `take(...)`) is closed. New `PlaybackController.onFirstComposedFrameForCue` callback fires exactly once per `take(...)` when the first composed frame for that take reaches `submitFrame`. ShowController's `wireLateTakeDetector` now subscribes to that callback instead of `playback.$liveSlideID`. Both image and video cues get accurate first-frame-reached-output latency.
+
+Mechanics:
+- `PlaybackController._pendingCueFireSlideID` (lock-protected) is armed in `take(slide:)` next to the `liveSlideID = slide.id` assignment, plus the same arming in the two transition-commit paths (`commitPreparedVideoTransition` / `commitPreparedImageTransition`). `clear()` and `stopOutput()` drop the token before any black-frame submit so a stale arm doesn't masquerade as the cleared cue's first frame.
+- `submitFrame` consumes the token after a successful submit and dispatches `(slideID, Date())` to main via `onFirstComposedFrameForCue`. One-shot — subsequent frames in the same take don't refire.
+- ShowController's bridge entry point `handleLiveSlideTransition(slideID:now:)` is unchanged so the existing `ShowControllerLateTakeLogTests` (6 cases — pinned in the runbook) survive the refactor.
+
+Tests: `PlaybackControllerCueFireTests` (6 new cases — arm + simulate fires once with the right slideID; subsequent simulations on the same take don't refire; no fire when token isn't armed; stopOutput drops the token; clear() drops the token; missing callback leaves the token armed so a late-attached callback still receives its inaugural emission). Test seams `armPendingCueFireSlideIDForTesting`, `peekPendingCueFireSlideIDForTesting`, `simulateFirstComposedFrameForTesting` let the suite drive the contract without going through AVFoundation.
+
+---
+
 **Status (session 18 — 2026-05-08)**: **Late-take live integration (E3+ tail) shipped**. The session-17 pure-logic `LateTakeDetector` is now wired through ShowController:
 
 - `handleCueFired` calls `lateTakeDetector.recordGoFired(cueID:, slideID:, at: Date())` just before `playback.take(...)`. The cue's number-or-title is cached in `pendingLateTakeCueDescriptor` so the eventual log entry can name the cue.

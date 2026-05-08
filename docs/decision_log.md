@@ -775,3 +775,111 @@ The detector returns leftovers in their original drop order so non-sequence file
 - `MediaImporter.thumbnailEncoder: (URL, MediaKind) -> Data?` — static-var test seam.
 - `ProjectBundleLayout.thumbnailsDirectory = "Cache/Thumbnails"`.
 - `ThumbnailLoader.cachedThumbnail(for:in:)` — pure-logic offline fallback for tests.
+
+---
+
+## 2026-05-08 — Synchronize CompositorPipeline.bundleMediaDirectory through cacheLock (C7d hardening)
+
+**Decision**: Make `CompositorPipeline.bundleMediaDirectory` a lock-synchronized property backed by a private `_bundleMediaDirectory: URL?` storage, accessed through the existing `cacheLock` that already guards `bugImageCache`. Setter now swaps the value and clears the cache atomically.
+
+**Why**:
+- **Correctness.** The writer (`PlaybackController.bundleMediaDirectory.didSet` on main) and the reader (`bugImage(for:)` / `resolveImage(_:)` on the playback `outputQueue`) cross threads. Reading a heap-typed `URL?` without synchronization is undefined behavior under Swift's memory model.
+- **Coupled invariant.** The cache key depends on `resolvedURL(bundleMediaDirectory:)`. Mutating the dir without invalidating the cache (or vice versa) opens a window where a reader sees the new dir keyed against the old cache. The existing two-step (set + invalidate) read those as separate writes.
+- **Reuse of an existing lock.** `cacheLock` already serializes the cache; piggybacking on it avoids a second NSLock and keeps the reader path one-acquire.
+
+**Alternatives considered**:
+- **OSAllocatedUnfairLock-wrapped value** (Sendable-friendly) — heavier than necessary for the v1 surface; would require a downstream Sendable refactor of `CompositorOverlays` to land cleanly.
+- **Make CompositorPipeline an actor** — the read path is in submitFrame on outputQueue; making the pipeline an actor would force every drawing call to be async, which is a significant refactor of `submitFrame` and the transition path.
+- **Atomic property wrapper** — would work but adds a dependency / property wrapper for a single property. `cacheLock` is already in scope.
+
+**Reversibility**: easy. The public `bundleMediaDirectory` API is unchanged.
+
+**What I'd revisit if**: Swift 6 strict concurrency lights up additional Sendable diagnostics on `URL?`-typed cross-actor properties; would unify the storage under `OSAllocatedUnfairLock` then.
+
+---
+
+## 2026-05-08 — Late-take detector source: Path 1 callback over Path 2 $liveSlideID proxy (E3+ tail)
+
+**Decision**: Add `PlaybackController.onFirstComposedFrameForCue: ((UUID, Date) -> Void)?` callback that fires exactly once per `take(...)` when the first composed frame for that take reaches `submitFrame`. ShowController's `wireLateTakeDetector` switches its source from `playback.$liveSlideID` to the new callback.
+
+**Why**:
+- **Closes the image-cue blind spot.** Path 2 — observing `liveSlideID` — flipped synchronously inside `take(...)` for image cues, so `recordFrameSubmitted` always saw on-time latency. Operator-visible image-load delays (rare, but real on slow disks / network mounts) were never logged.
+- **Tightens the video measurement too.** Path 2 measured "time until AVPlayerItemVideoOutput preparation completes" — which IS load latency, but a video that prepared quickly then stalled in `submitFrame` (compositor allocation, transport sink contention) wouldn't surface as late. Path 1 measures "time until first frame actually went to the output driver."
+- **Single uniform contract for both media kinds.** Image and video cues converge on `submitFrame`; the callback is a single signal regardless of cue type.
+
+**Alternatives considered**:
+- **Use a Combine `PassthroughSubject`.** Idiomatic match for `$liveSlideID` it replaces, but a callback property is one fewer concept to thread through and avoids the receive-on-main hop (the callback dispatches to main internally).
+- **Hook the video-output renderer's frame callback** instead of `submitFrame`. Would catch transport-driver failures too, but `submitFrame` is the one funnel point all takes share — image cues never hit the video-output renderer.
+- **Add a more general "frame submitted" event sequence.** Overkill for v1; the late-take detector wants exactly one signal per take, not a stream.
+
+**Reversibility**: easy. The Path 2 wiring is one Combine subscription that can be restored if Path 1 reveals a measurement defect.
+
+**What I'd revisit if**:
+- Operators report late-take entries with implausibly high latency (e.g., > 2 s on a healthy machine). Would call for a tighter dispatch — measure `Date()` inside `submitFrame` synchronously rather than on the callback's main-queue hop.
+- The compositor's overlay path significantly slows `submitFrame` (multi-ms render). The callback would conflate compositor cost with media-load cost; a separate "media decoded" callback could disentangle.
+
+**Public API impact**:
+- `PlaybackController.onFirstComposedFrameForCue: ((UUID, Date) -> Void)?` — public property.
+- Test seams `armPendingCueFireSlideIDForTesting`, `peekPendingCueFireSlideIDForTesting`, `simulateFirstComposedFrameForTesting`.
+- ShowController's `liveSlideIDCancellable` removed; `playback.$liveSlideID` no longer subscribed by Show Control.
+- `handleLiveSlideTransition(slideID:now:)` bridge entry point unchanged so the existing `ShowControllerLateTakeLogTests` pin survives.
+
+---
+
+## 2026-05-08 — C11 filmstrip storage: single sprite-sheet PNG per video, not per-frame sidecars
+
+**Decision**: `FilmstripGenerator` produces one PNG per video, written by `FilmstripCoordinator` to `<bundle>/Cache/Filmstrips/<slide.id>.png`. Default 24 frames in a 6×4 grid at 160×90 per cell → 960×360 PNG (~50 KB). Centered-sample timestamps (`D × (i + 0.5)/N`) avoid decode-at-EOF and exact-zero failures.
+
+**Why**:
+- **Access pattern matches sprite-sheet.** A future scrub UI wants ALL frames at once for a drag gesture — one PNG read is cheaper than N file opens. C10's per-slide sidecar serves the inverse pattern (one tile at a time as the operator scrolls the palette).
+- **Single inode per video.** A 200-video project's `Cache/Filmstrips/` has 200 entries with sprite sheets. A per-frame sidecar approach would have 200 × 24 = 4,800 entries — measurable on slower filesystems and a churn tax for `find` / Spotlight indexing.
+- **Compose-once at extract time.** Drawing N CGImages into a single CGContext is one CG state setup; encoding once is one PNG header. Per-frame would re-encode 24 times.
+- **Bundle-for-travel friendly.** Already `<bundle>/Cache/Filmstrips/`; copying the bundle copies the filmstrips. No special-casing.
+
+**Alternatives considered**:
+- **Per-frame JPEG sidecars under `Cache/Filmstrips/<slide.id>/0001.jpg` …** — aligned with C10's sidecar style but inverts the access pattern (N opens for one scrub gesture). Filed as the parallel-to-C10 in the C10 decision; rejected here for filmstrip semantics.
+- **Single sprite-sheet JPEG.** Lossy compression smears mid-frame artefacts; PNG keeps the per-frame edges crisp at acceptable cost (~50 KB vs ~25 KB for JPEG). The cost differential isn't significant on typical bundle sizes.
+- **Store sample timestamps in the sidecar.** A `slide.id.json` alongside the PNG with the timestamp-per-frame. Skipped — the centered-sample formula is deterministic from `(durationSeconds, frameCount)` and the consumer can recompute on the fly.
+
+**Reversibility**: medium. The PNG output format is consumed by the eventual scrub UI; switching to per-frame sidecars later means a one-time re-render pass per project.
+
+**What I'd revisit if**:
+- The scrub UI needs sub-frame precision (more than 24 samples for long videos) — would scale `frameCount` with `durationSeconds` rather than fixing at 24.
+- 50 KB per video bloats `Cache/Filmstrips/` enough to matter on bundle copies (a 1000-video project = 50 MB of cache). The cache is already explicitly OK to delete; not a blocker.
+
+---
+
+## 2026-05-08 — C11 cancellation deferred: synchronous extraction loop is uninterruptible, typical jobs finish under a second
+
+**Decision**: `FilmstripCoordinator` does NOT expose a cancel hook for v1. The `Task.detached` running the extraction completes its work; the result is dropped (not written, not communicated) only via weak-self capture if the coordinator is deallocated.
+
+**Why**:
+- **The hot loop is uninterruptible.** `AVAssetImageGenerator.copyCGImage` is synchronous and there's no tolerance / cancellation hook between extractions. Adding cancellation would require either (a) checking a per-job cancel flag between frames (saves the latter half of an extraction but not the active frame), or (b) refactoring to the modern `generateCGImageAsynchronouslyForTime` API.
+- **Typical jobs are fast.** A 24-frame extraction against a multi-GB H.264 source is ~200-500 ms on a modern host. Cancellation latency from "operator hits cancel" to "task actually stops" would be of similar magnitude — no operator-meaningful difference.
+- **Document close already handles the runtime concern.** When the coordinator is deallocated, the in-flight task's `await MainActor.run { [weak self] in }` becomes a no-op; the result is harmlessly discarded.
+
+**Alternatives considered**:
+- **Per-frame cancel-flag check.** Would save the latter half of an extraction but the API surface (cancel(slideID:)) implies more responsiveness than we'd deliver.
+- **Migrate to `generateCGImageAsynchronouslyForTime`.** The modern async API supports `Task` cancellation natively. Scoped out for v1 because the deprecation warning we already eat (in ThumbnailGenerator and elsewhere) is a follow-up sweep, not a blocker. Filed for the modernization pass.
+
+**Reversibility**: easy. Adding cancel later is a non-breaking API addition.
+
+**What I'd revisit if**: operators report stuck progress or wedge UI on a single misbehaving source (e.g., DRM-protected H.264 that takes 60 seconds per frame). At that point cancellation becomes a UX blocker, not a polish.
+
+---
+
+## 2026-05-08 — MediaReference bookmark branch returns nil when resolved file is missing (C7d hardening)
+
+**Decision**: Gate the bookmark-resolution branch in `MediaReference.resolvedURL(bundleMediaDirectory:)` on `FileManager.default.fileExists(atPath: url.path)`. A stale bookmark resolving to a deleted file now falls through to the `originalPath` fallback (which already gated on `fileExists`).
+
+**Why**:
+- **Consistency with the rest of the resolver.** The bundle-Media branch and the originalPath fallback both check `fileExists`. The bookmark branch was the lone outlier returning a non-nil URL pointing nowhere.
+- **Downstream consumers trusted non-nil as "online."** `TranscodeService.canTranscode` only checked `resolvedURL(...) != nil` — a stale bookmark would enable a misleading "Transcode to ProRes" right-click that then fails in `AVAssetExportSession`.
+- **`AssetLibraryProbe.liveIsOnline` re-stats the URL anyway** so its classification was correct. The fix mostly removes the redundancy and tightens consumers that don't re-stat.
+
+**Alternatives considered**:
+- **Keep the contract loose ("URL might point nowhere") and force every consumer to re-stat.** Too easy to forget; this is the third such consumer found in code review. Centralizing the gate at `resolvedURL` is the contract simplification.
+
+**Reversibility**: easy. Reverting is a one-line change.
+
+**What I'd revisit if**: a real consumer needs the URL even when the file is gone (e.g., to display the operator-visible last-known path). Such a consumer would call into the bookmark resolver directly rather than through `resolvedURL`.
