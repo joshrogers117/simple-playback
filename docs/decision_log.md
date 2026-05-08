@@ -67,3 +67,27 @@ The decisions captured in `docs/runbook.md` §1 are recorded there as the starti
 - `struct TransportSinkStage` — Stage parameters as a sink needs them; init from `Stage`.
 - `final class TransportSinkRouter` — fan-out + per-sink error capture.
 - `PlaybackController.register(sink:)` / `unregister(sink:)` — register an aux sink; auto-starts if output is already running.
+
+---
+
+## 2026-05-07 — B12: cache base frame, not composed frame
+
+**Decision**: `PlaybackController.submitFrame` runs the input frame through `CompositorPipeline.compose(...)` before handing off to driver/router, but the cached `currentFrame` (which seeds the *start* of the next crossfade) is the **base** frame, never the composed one. The composed frame is also what's published to `transitionPreviewImage`.
+
+**Why**: Bug/message overlays are persistent across takes — they need to render on every frame at submit time. If the cache held the composed frame, the next crossfade would (a) blend "previous-with-overlay" against "next-base", and (b) re-composite the overlay on top of the result, double-baking the bug. By caching the base, every transition blends base→base, and the overlay is applied exactly once at submit.
+
+This also means the overlay "snaps in" instantly when toggled on (the cached base is overlay-free, so the next submit composites on the live overlays). That matches operator expectations more than the alternative (waiting until the next take to see overlays appear).
+
+**Alternatives considered**:
+- **Cache composed, skip composite when serving cached frames**. Adds branching in `submitFrame` and breaks down for blended transitions where the source is *partially* cached. Rejected.
+- **Move the composite step to a higher layer (between renderer and submit)**. Would force every code path that calls `submitFrame` (clear, still-transition, video-frame, outgoing-handoff, prepared-image-commit) to remember to composite. The single composite point inside `submitFrame` is the choke point that catches all of them.
+
+**Reversibility**: easy. The composite call lives in one method; reverting is one edit.
+
+**What I'd revisit if**: Phase B13 (color pipeline) needs to see the *base* frame in linear-light before overlays land — at that point the composite step likely splits into "color → media+bug → text" and the cache decision moves accordingly.
+
+**Public API impact**:
+- `struct CompositorOverlays`, `struct BugOverlay`, `struct MessageOverlay`, `enum BugCorner`, `enum MessagePosition`, `struct RGBAColor` in `Models/CompositorLayers.swift`.
+- `Stage.compositorOverlays` (codable, defaults to `.empty` for legacy projects).
+- `final class CompositorPipeline` in `Playback/CompositorPipeline.swift` — `compose(baseFrame:overlays:canvasSize:nowDate:)`, `formatCountdown`, `renderedMessageText(overlay:nowDate:)`, `invalidateBugImageCache()`.
+- `PlaybackController.compositorOverlays: CompositorOverlays` — mutable, `didSet` flushes the bug image cache on media change.

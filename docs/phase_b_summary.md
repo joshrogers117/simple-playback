@@ -2,6 +2,7 @@
 
 **Status (session 1)**: Data model shipped (B1-B4).
 **Status (session 2 — 2026-05-07)**: TransportSink fan-out shipped (B5). DeckLink REF status surfaced (B6 partial). 161 tests, all green.
+**Status (session 3 — 2026-05-07)**: Compositor pipeline shipped (B12 model + pipeline + integration; UI deferred to B12d). 193 tests, all green.
 
 The hot path (compositor → driver → device) now goes through a `TransportSinkRouter` that fans every composed frame and audio block out to N sinks. The primary user-selected output (DeckLink or software preview) still flows through the original `VideoOutputDriver` for backward compatibility, but the driver's concrete classes are now thin shims around `DeckLinkTransportSink` / `PreviewTransportSink`. Future B-phase sub-tasks (B11 NDI, second DeckLink port, file-record sink) register additional `TransportSink`s on `PlaybackController` and pick up frames automatically.
 
@@ -55,6 +56,54 @@ These need another session of work; the rendering refactor scaffolding is now in
 4. On a card without an external reference input (e.g. UltraStudio Mini Recorder), the chip should be **gray / "REF: Not supported"**.
 5. Stop output → REF chip disappears. Restart → chip re-appears at the new state.
 6. Verify the existing crossfade and take semantics are unchanged (B5 was meant to preserve behavior); a quick smoke-rehearsal of two video cues with crossfade enabled confirms the router did not regress the rendering hot path.
+
+---
+
+## What shipped in session 3 (B12 partial)
+
+### B12a — Compositor overlay data model
+
+- **`CompositorOverlays`** (`Models/CompositorLayers.swift`) — `bug: BugOverlay` + `message: MessageOverlay`, `isInert` accessor for short-circuit.
+- **`BugOverlay`** — `enabled`, `media: MediaReference?`, `corner: BugCorner` (4 cases), `marginPercent`, `sizePercent`, `opacity`. `isVisible` requires enabled + media + opacity > 0 + size > 0.
+- **`MessageOverlay`** — `enabled`, `text`, `position: MessagePosition` (top / lowerThird / center), `fontSizePercent`, `textColor`, optional `backgroundColor`, `opacity`, optional `countdownTo: Date`. `isVisible` requires enabled + opacity > 0 + (text or countdown).
+- **`RGBAColor`** — Codable RGBA with `cgColor` accessor.
+- **`Stage.compositorOverlays`** — persistent overlay state on Stage (codable, defaults to `.empty` for legacy projects). Round-trip + legacy-decode tests.
+
+### B12b — `CompositorPipeline` (pure logic)
+
+- **`Playback/CompositorPipeline.swift`** — composes the three layers (media → bug → message) onto a base BGRA `RenderedFrame`. Inert overlays short-circuit and return the input frame unchanged (zero allocations). Buffer convention matches `FrameRenderer` (BGRA premultiplied-first, byteOrder32Little, row 0 at visual top of image).
+- Bug rendering: 4-corner placement with margin/size as fractions of canvas; cached image resolver (invalidated on `BugOverlay.media` change).
+- Message rendering: top / lower-third / center positions, optional dark-translucent background pad behind text, Core Text drawing with flipped textMatrix to render upright in the y-flipped context.
+- Static helpers: `formatCountdown(_:)` (`M:SS` under 1h, `H:MM:SS` past 1h, clamps negative to `0:00`), `renderedMessageText(overlay:nowDate:)` (substitutes `{time_left}` token).
+- 13 new tests in `CompositorPipelineTests.swift` cover inert short-circuit, bug placement (pixel probes for top-left and bottom-right), missing-media graceful fallback, cache invalidation, format/substitution edge cases, and composed-frame format invariants.
+
+### B12c — `PlaybackController` integration
+
+- **`PlaybackController.compositorOverlays: CompositorOverlays`** — mutable; `didSet` flushes the pipeline's bug image cache when `bug.media` changes.
+- **`submitFrame` runs every frame through `CompositorPipeline.compose(...)` before driver / auxiliary-sink hand-off.** Cached `currentFrame` is the *base* (pre-overlay) frame so transitions don't double-bake the overlay (see decision log "B12: cache base frame, not composed frame").
+- 2 new controller-level tests: defaults-to-empty + accepts updates.
+
+## Still deferred (session 4+)
+
+- **B12d** — UI inspector for overlays. Operator-facing controls to enable/disable, pick a bug image, choose corner/size/margin, set message text & countdown target, etc. Requires product decisions on inspector layout, default keyboard shortcuts ("STAND BY" overlay quick-toggle?), and where in the existing inspector hierarchy these controls live. Stop-and-ask territory.
+- **B12e** — Bridge from `ShowController` / `PlayoutProject.stages.first.compositorOverlays` into `PlaybackController.compositorOverlays`. Mechanical wiring (single Combine sink) but no UI to drive changes through yet, so deferred until B12d ships.
+- **B12f** — Render overlays into the in-app preview surface. Today the preview shows raw `NSImage` / `AVPlayer` content, so overlays appear on output but not in the operator's preview tile. The preview view should reuse `CompositorPipeline.compose(...)` against a thumbnail-sized base frame.
+- **B6b / B7 / B8** — DeckLink hardening commit train (REF policy, format negotiation, 10-bit YUV).
+- **B11** — NDI Full sender as a `TransportSink`.
+- **B13** — Color pipeline (sits on top of B5+B12).
+- **B9 / B15 / B10** — long tail.
+- **B16** — final Phase B summary + DeckLink mock layer for tests.
+
+## Manual verification needed (session 3 deltas)
+
+The session-3 work is pure-logic and operator-invisible until B12d/e ships UI controls — there is no operator-visible pathway to enable the overlays today. So no new manual rehearsal steps. When B12d/e/f land:
+
+1. Toggle bug overlay on with a PNG logo. Verify the bug renders in all 4 corners (top-left, top-right, bottom-left, bottom-right).
+2. Set bug `sizePercent` to 0.10 vs 0.25 vs 0.40 → bug scales proportionally.
+3. Set bug `opacity` to 0.5 → underlying media bleeds through.
+4. Toggle message overlay on with text "STAND BY" → renders at lower-third with translucent background.
+5. Set countdown target 60s in the future, text "Doors in {time_left}" → live-updating countdown.
+6. Crossfade between two video cues while overlays are enabled → bug + message persist crisply through the crossfade (no double-bake, no popping).
 
 ---
 

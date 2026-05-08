@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B in flight (B1–B5 done; B6, B14 partial)
-- **Last commit**: B14 — frame-rate conformance warning at clip-into-show time
+- **Active phase**: A and D complete; B in flight (B1–B5 done; B6, B12, B14 partial)
+- **Last commit**: B12c — PlaybackController routes every submit through `CompositorPipeline`
 - **Branch**: `development`
 
 ---
@@ -50,7 +50,7 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 - [ ] B9: "Output in use" detection + recovery path
 - [ ] B10: Audio embed over SDI with channel-pair routing
 - [ ] B11: NDI Full sender as a transport binding
-- [ ] B12: Compositor — three layers (media, bug/logo, message/timer)
+- [~] B12: Compositor — three layers (media, bug/logo, message/timer). Pipeline scaffolding shipped: `CompositorOverlays`/`BugOverlay`/`MessageOverlay` data model on `Stage` (B12a), `CompositorPipeline` with corner-bug + lower-third/top/center text + `{time_left}` countdown substitution (B12b), and `PlaybackController.submitFrame` runs every output through the pipeline with overlays default-`.empty` (B12c). **Deferred to B12d**: UI inspector to toggle/edit overlays + ShowController bridge that flows `project.stages.first.compositorOverlays` into `PlaybackController.compositorOverlays`. **Deferred to B12e**: bug+message rendering into the operator preview surface (today preview shows the raw NSImage/AVPlayer, so overlays show on output but not in the in-app preview).
 - [ ] B13: Color pipeline — per-Screen range/space; visible color chain in inspector; NCLC/ICC respect with overrides; gamma-aware crossfade
 - [~] B14: Frame-rate conformance warning surfaced in CueInspectorView when a video cue's native frame rate differs from the active Stage. `MediaSlide.nativeFrameRate` populated at import via AVAsset. Pure-logic `FrameRateConformance` evaluator with 0.1 fps tolerance (catches the four canonical fractional/integer pairs as matches). **Pre-show check (E1) reuse pending.**
 - [ ] B15: Hot-unplug handling (UltraStudio Thunderbolt)
