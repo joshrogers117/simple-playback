@@ -141,6 +141,142 @@ final class AssetRelinkPlanTests: XCTestCase {
         XCTAssertEqual(result, slides)
     }
 
+    // MARK: - kind inference (bundle-aware)
+
+    func testInferKindReturnsExistingWhenBundleDirectoryNil() {
+        // Untitled documents pass nil — preserving the existing kind is the
+        // only safe behavior when the bundle URL is unknown.
+        XCTAssertEqual(
+            AssetRelinkPlan.inferKind(
+                existing: .managed,
+                newURL: URL(fileURLWithPath: "/anywhere/clip.mov"),
+                bundleMediaDirectory: nil
+            ),
+            .managed
+        )
+        XCTAssertEqual(
+            AssetRelinkPlan.inferKind(
+                existing: .linked,
+                newURL: URL(fileURLWithPath: "/Bundle/Media/clip.mov"),
+                bundleMediaDirectory: nil
+            ),
+            .linked
+        )
+    }
+
+    func testInferKindFlipsToManagedWhenURLIsInsideBundleMedia() {
+        let bundleMedia = URL(fileURLWithPath: "/Show.spb/Media")
+        let newURL = URL(fileURLWithPath: "/Show.spb/Media/intro.mov")
+        XCTAssertEqual(
+            AssetRelinkPlan.inferKind(
+                existing: .linked,
+                newURL: newURL,
+                bundleMediaDirectory: bundleMedia
+            ),
+            .managed
+        )
+    }
+
+    func testInferKindFlipsToLinkedWhenURLIsOutsideBundleMedia() {
+        // A `.managed` slide relinked to a file outside the bundle must flip
+        // to `.linked`. Pre-fix, the kind stayed `.managed` and rung 0 of
+        // MediaResolver silently failed to find the file.
+        let bundleMedia = URL(fileURLWithPath: "/Show.spb/Media")
+        let newURL = URL(fileURLWithPath: "/Footage/intro.mov")
+        XCTAssertEqual(
+            AssetRelinkPlan.inferKind(
+                existing: .managed,
+                newURL: newURL,
+                bundleMediaDirectory: bundleMedia
+            ),
+            .linked
+        )
+    }
+
+    func testInferKindHandlesSiblingDirectoryWithSharedPrefix() {
+        // /Show.spb/MediaCache vs /Show.spb/Media — string-prefix logic
+        // would falsely accept the first as inside the second. Path-component
+        // comparison must reject it.
+        let bundleMedia = URL(fileURLWithPath: "/Show.spb/Media")
+        let newURL = URL(fileURLWithPath: "/Show.spb/MediaCache/intro.mov")
+        XCTAssertEqual(
+            AssetRelinkPlan.inferKind(
+                existing: .managed,
+                newURL: newURL,
+                bundleMediaDirectory: bundleMedia
+            ),
+            .linked
+        )
+    }
+
+    func testInferKindRejectsURLEqualToBundleDirectoryItself() {
+        // Edge case: newURL exactly equals the bundle Media directory. Not a
+        // descendant — must classify as linked rather than managed.
+        let bundleMedia = URL(fileURLWithPath: "/Show.spb/Media")
+        XCTAssertEqual(
+            AssetRelinkPlan.inferKind(
+                existing: .managed,
+                newURL: bundleMedia,
+                bundleMediaDirectory: bundleMedia
+            ),
+            .linked
+        )
+    }
+
+    func testApplyFlipsKindToManagedWhenRelinkLandsInsideBundle() {
+        var slide = makeSlide(title: "linked-asset")
+        slide.media = MediaReference(
+            url: URL(fileURLWithPath: "/tmp/old.mov"),
+            fingerprint: nil,
+            kind: .linked
+        )
+
+        let bundleMedia = URL(fileURLWithPath: "/Show.spb/Media")
+        let newURL = bundleMedia.appendingPathComponent("relinked.mov")
+
+        let plan = AssetRelinkPlanReport(
+            updates: [AssetRelinkUpdate(slideID: slide.id, newURL: newURL, step: .nameAndSize)],
+            stillOfflineSlideIDs: [],
+            unchangedOnlineSlideIDs: []
+        )
+
+        let updated = AssetRelinkPlan.apply(
+            plan: plan,
+            to: [slide],
+            bundleMediaDirectory: bundleMedia,
+            fingerprint: { _ in nil }
+        )
+        XCTAssertEqual(updated[0].media.kind, .managed,
+                       "Relinking inside the bundle Media directory should flip to .managed.")
+    }
+
+    func testApplyFlipsKindToLinkedWhenManagedRelinkLandsOutsideBundle() {
+        var slide = makeSlide(title: "managed-asset")
+        slide.media = MediaReference(
+            url: URL(fileURLWithPath: "/Show.spb/Media/managed.mov"),
+            fingerprint: nil,
+            kind: .managed
+        )
+
+        let bundleMedia = URL(fileURLWithPath: "/Show.spb/Media")
+        let newURL = URL(fileURLWithPath: "/Footage/managed.mov")
+
+        let plan = AssetRelinkPlanReport(
+            updates: [AssetRelinkUpdate(slideID: slide.id, newURL: newURL, step: .contentHash)],
+            stillOfflineSlideIDs: [],
+            unchangedOnlineSlideIDs: []
+        )
+
+        let updated = AssetRelinkPlan.apply(
+            plan: plan,
+            to: [slide],
+            bundleMediaDirectory: bundleMedia,
+            fingerprint: { _ in nil }
+        )
+        XCTAssertEqual(updated[0].media.kind, .linked,
+                       "A managed slide relinked outside the bundle must flip to .linked.")
+    }
+
     func testApplyPreservesMediaReferenceKind() {
         var slide = makeSlide(title: "managed-asset")
         slide.media = MediaReference(

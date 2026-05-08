@@ -95,9 +95,18 @@ enum AssetRelinkPlan {
     /// stored fingerprint reflects the *new* file (the relink target may be a
     /// different revision of the same asset, so re-hashing is the correct
     /// default). Slides not in the plan are returned unchanged.
+    ///
+    /// `bundleMediaDirectory` drives kind inference (see `inferKind`):
+    /// - `nil` (caller doesn't know the bundle URL — typically untitled
+    ///   documents) → existing kind preserved verbatim.
+    /// - non-nil → kind flips to `.managed` if the relink target lives under
+    ///   the bundle's `Media/` directory, `.linked` otherwise. Closes the
+    ///   "managed asset relinked outside the bundle still says managed" gap
+    ///   where rung 0 of `MediaResolver` silently failed and the kind lied.
     static func apply(
         plan: AssetRelinkPlanReport,
         to slides: [MediaSlide],
+        bundleMediaDirectory: URL? = nil,
         fingerprint: (URL) -> MediaAssetFingerprint? = liveFingerprint
     ) -> [MediaSlide] {
         guard !plan.updates.isEmpty else { return slides }
@@ -105,12 +114,49 @@ enum AssetRelinkPlan {
         return slides.map { slide -> MediaSlide in
             guard let update = updateMap[slide.id] else { return slide }
             var copy = slide
+            let kind = inferKind(
+                existing: copy.media.kind,
+                newURL: update.newURL,
+                bundleMediaDirectory: bundleMediaDirectory
+            )
             copy.media = MediaReference(
                 url: update.newURL,
                 fingerprint: fingerprint(update.newURL),
-                kind: copy.media.kind
+                kind: kind
             )
             return copy
         }
+    }
+
+    /// Pure-logic kind inference for a single relink. Exposed so the
+    /// per-slide Locate context-menu path (which doesn't go through
+    /// `apply(plan:to:)`) can use the same rule.
+    ///
+    /// - When `bundleMediaDirectory` is nil, returns `existing` unchanged —
+    ///   callers that don't know the bundle URL must not silently
+    ///   misclassify.
+    /// - When non-nil:
+    ///   - `newURL` is a descendant of `bundleMediaDirectory` → `.managed`.
+    ///   - `newURL` lives anywhere else → `.linked`. The reverse case
+    ///     (a `.linked` slide relinked into the bundle) also flips, which
+    ///     is the right thing — the file is now bundle-managed and rung 0
+    ///     of the resolver should pick it up.
+    static func inferKind(
+        existing: MediaReferenceKind,
+        newURL: URL,
+        bundleMediaDirectory: URL?
+    ) -> MediaReferenceKind {
+        guard let bundleMediaDirectory else { return existing }
+        return urlIsDescendant(newURL, of: bundleMediaDirectory) ? .managed : .linked
+    }
+
+    /// True iff `child` lives anywhere under `parent`. Compares
+    /// standardized path components so trailing slashes, `.`, `..`, and
+    /// symlinks don't trip up the check.
+    private static func urlIsDescendant(_ child: URL, of parent: URL) -> Bool {
+        let childComponents = child.standardizedFileURL.resolvingSymlinksInPath().pathComponents
+        let parentComponents = parent.standardizedFileURL.resolvingSymlinksInPath().pathComponents
+        guard childComponents.count > parentComponents.count else { return false }
+        return Array(childComponents.prefix(parentComponents.count)) == parentComponents
     }
 }

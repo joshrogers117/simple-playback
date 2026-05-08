@@ -801,10 +801,15 @@ struct RootView: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         guard let index = document.project.slides.firstIndex(where: { $0.id == slide.id }) else { return }
         var updated = document.project.slides[index]
+        let inferredKind = AssetRelinkPlan.inferKind(
+            existing: updated.media.kind,
+            newURL: url,
+            bundleMediaDirectory: bundleMediaDirectory()
+        )
         updated.media = MediaReference(
             url: url,
             fingerprint: try? AssetFingerprinter.fingerprint(url: url),
-            kind: updated.media.kind
+            kind: inferredKind
         )
         document.project.slides[index] = updated
     }
@@ -841,7 +846,11 @@ struct RootView: View {
             ])
             return
         }
-        let updated = AssetRelinkPlan.apply(plan: report, to: document.project.slides)
+        let updated = AssetRelinkPlan.apply(
+            plan: report,
+            to: document.project.slides,
+            bundleMediaDirectory: bundleMediaDirectory()
+        )
         document.project.slides = updated
     }
 
