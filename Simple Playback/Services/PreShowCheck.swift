@@ -49,6 +49,13 @@ enum PreShowCheck {
         /// not yet sampled). Spec §3.16 calls out energy / never-sleep among the
         /// macOS conditions a pre-show panel should verify.
         var systemPreventsIdleSleep: Bool?
+
+        /// C7c — asset-library snapshot the host samples by walking the project's
+        /// slide list and verifying each `MediaReference` resolves to a real file
+        /// on disk. `nil` skips the row. Empty libraries (`totalSlideCount == 0`)
+        /// render as an info row so the operator notices when a fresh project
+        /// hasn't had any media imported yet.
+        var assetLibraryStatus: AssetLibraryStatus?
     }
 
     enum DeckLinkReferenceStatus: Equatable {
@@ -110,6 +117,9 @@ enum PreShowCheck {
         }
         if let energy = evaluateEnergy(context: context) {
             rows.append(energy)
+        }
+        if let library = evaluateAssetLibrary(context: context) {
+            rows.append(library)
         }
         // Stable order: severity-major (errors first), title-tiebreak.
         return rows.sorted { lhs, rhs in
@@ -343,6 +353,42 @@ enum PreShowCheck {
             severity: .warning,
             title: "Energy",
             summary: "macOS could idle-sleep mid-show — Show Mode engages a no-idle-sleep assertion."
+        )
+    }
+
+    /// Asset-library row — every MediaSlide whose underlying file isn't on disk shows
+    /// up here as an error. The cue-level "media.resolution" row above checks logical
+    /// cue→slide pointer integrity; this row checks the on-disk file existence one
+    /// rung deeper. They're independent: a project can pass one and fail the other.
+    /// nil context skips the row entirely. The summary leads with the count and
+    /// names the first three offline slides for operator-facing context.
+    static func evaluateAssetLibrary(context: Context) -> Row? {
+        guard let status = context.assetLibraryStatus else { return nil }
+        if status.totalSlideCount == 0 {
+            return Row(
+                id: "media.files",
+                severity: .info,
+                title: "Files",
+                summary: "No media in the asset library."
+            )
+        }
+        if status.offlineSlideCount == 0 {
+            return Row(
+                id: "media.files",
+                severity: .ok,
+                title: "Files",
+                summary: "All \(status.totalSlideCount) media file(s) resolve."
+            )
+        }
+        let preview = status.offlineSlideTitles.joined(separator: ", ")
+        let extra = status.offlineSlideCount > status.offlineSlideTitles.count
+            ? " (+\(status.offlineSlideCount - status.offlineSlideTitles.count) more)"
+            : ""
+        return Row(
+            id: "media.files",
+            severity: .error,
+            title: "Files",
+            summary: "\(status.offlineSlideCount) of \(status.totalSlideCount) media file(s) offline: \(preview)\(extra)."
         )
     }
 

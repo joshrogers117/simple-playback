@@ -558,6 +558,7 @@ struct RootView: View {
         ctx.audioDeviceAvailable = AudioDeviceProbe.isDefaultOutputDeviceAvailable()
         ctx.renderPathWarmed = playback.hasRenderedAnyFrame
         ctx.systemPreventsIdleSleep = energyAssertion.isHeld
+        ctx.assetLibraryStatus = AssetLibraryProbe.evaluate(slides: document.project.slides)
         return ctx
     }
 
