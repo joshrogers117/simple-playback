@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B not started
-- **Last commit**: D17 — ShowControlStack + Hub wired into app
+- **Active phase**: A and D complete; B in flight (B1–B5 done)
+- **Last commit**: B5d — TransportSink router fan-out tests
 - **Branch**: `development`
 
 ---
@@ -39,7 +39,11 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 - [x] B2: Screen abstraction with typed roles (Program, Confidence, Multiviewer, Mirror, Auxiliary, StreamOut)
 - [x] B3: Transport binding layer — DeckLink, OS Display, NDI Full, Syphon, Operator-Mac window, file-record
 - [x] B4: Per-machine local config mapping role → device (`OutputBindingProfile` — schema only; UI defers)
-- [ ] B5: Refactor `VideoOutput.swift` and `DeckLinkBridge` against the new abstraction
+- [x] B5: Refactor `VideoOutput.swift` and `DeckLinkBridge` against the new abstraction
+  - [x] B5a: TransportSink protocol + TransportSinkRouter + TransportSinkStage
+  - [x] B5b: DeckLinkTransportSink + PreviewTransportSink (drivers reduced to thin shims)
+  - [x] B5c: PlaybackController fans frames + audio out to auxiliary TransportSinks
+  - [x] B5d: Router/sink unit tests + PlaybackController register/unregister hooks
 - [ ] B6: DeckLink REF input handling — surface lock state, refuse silent free-run when expected, warn on format mismatch
 - [ ] B7: DeckLink format negotiation — explicit at start, mid-show change requires re-arm
 - [ ] B8: 10-bit YUV 4:2:2 default when any clip in the project is >8-bit
