@@ -23,6 +23,7 @@
 		28C1335FD15B6AE87DD31AB3 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A5E1B676CDA189E4C8C26CB /* PlaybackController.swift */; };
 		2AE84FFB58E06C9A60B6C982 /* TransportSinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63903ACF2604D9E2128B0F6C /* TransportSinks.swift */; };
 		2E94C7044EE3CF2C00F39C69 /* ShowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87395AF6ACFB3496B47EFFB3 /* ShowController.swift */; };
+		2EA37A6EB9345C916205962D /* ImageSequenceEncoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A94FE5F5AA25EE58FF77A3 /* ImageSequenceEncoderTests.swift */; };
 		3E21186036951CC387B69F2E /* SlideGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B620D6408556D32380C918 /* SlideGridView.swift */; };
 		42289D3F33304D521AADB51B /* ImageSequenceDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FD2EFC1C287DD9480AF2D2F /* ImageSequenceDetector.swift */; };
 		446ACE51C8F85BB761074619 /* PDFImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B631D588B2455E3C2C9EE89C /* PDFImporterTests.swift */; };
@@ -75,6 +76,7 @@
 		BFE5FEA90AEA11BD597BEC0C /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EB3CFD9074943CC8F73C637C /* AVFoundation.framework */; };
 		C02D1DDF70B419255097C42E /* InspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC0B853C12B46AB64798C9D /* InspectorView.swift */; };
 		C120F1AED083BE5B83E60533 /* InternalTimecodeGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2109CBF6D66866EB07681F /* InternalTimecodeGenerator.swift */; };
+		C243D56CE0D5D5610E8F2ECE /* ImageSequenceEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D06F636A6229A0C418EE285 /* ImageSequenceEncoder.swift */; };
 		C7A4EDB0BDB83897190B4A25 /* OSCQueryServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96F3960B5C5F817DFB3377D4 /* OSCQueryServer.swift */; };
 		C9842DF5C4DF8FAA50B74011 /* DeckLinkBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = B637A693F1741DD785724AAE /* DeckLinkBridge.mm */; };
 		CC37F2E5CFC466A33AA98F58 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773B6424E99EBEA84CB2027B /* ModelTests.swift */; };
@@ -110,6 +112,7 @@
 /* Begin PBXFileReference section */
 		00712F270D3EB78020694E87 /* OSCAddressMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCAddressMap.swift; sourceTree = "<group>"; };
 		01C17ADD674250609276D8A4 /* HTTPRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRoutes.swift; sourceTree = "<group>"; };
+		06A94FE5F5AA25EE58FF77A3 /* ImageSequenceEncoderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSequenceEncoderTests.swift; sourceTree = "<group>"; };
 		0A0971F0E4FF56FD74F21EC0 /* OutputStatusBarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputStatusBarTests.swift; sourceTree = "<group>"; };
 		0AAABB8C041A4E6DF8BE8685 /* LTCDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LTCDecoder.swift; sourceTree = "<group>"; };
 		0ACFD5B151F32CFDFFECCB68 /* BonjourPublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BonjourPublisher.swift; sourceTree = "<group>"; };
@@ -127,6 +130,7 @@
 		2762065E2D1FE5D3F052F8FF /* MediaImportFailure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImportFailure.swift; sourceTree = "<group>"; };
 		29F9DCDACFB1E27A47F7D0DE /* SimplePlaybackDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackDocument.swift; sourceTree = "<group>"; };
 		2B85E5A857820D320657302C /* OverlayInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayInspectorView.swift; sourceTree = "<group>"; };
+		2D06F636A6229A0C418EE285 /* ImageSequenceEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSequenceEncoder.swift; sourceTree = "<group>"; };
 		364D651E1585BC12FAC85DC1 /* SimplePlayback.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SimplePlayback.entitlements; sourceTree = "<group>"; };
 		38F7D1388C31CB5FF57645DA /* KeynoteImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeynoteImporterTests.swift; sourceTree = "<group>"; };
 		3901F80946826E57A5B02934 /* CompositorPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositorPipeline.swift; sourceTree = "<group>"; };
@@ -299,6 +303,7 @@
 				21271656A4CCF6A5AD4E2940 /* CompositorPipelineTests.swift */,
 				22C8342BEF86901A52B41C81 /* FrameRateConformanceTests.swift */,
 				48D597C7D54010FC1E62D378 /* ImageSequenceDetectorTests.swift */,
+				06A94FE5F5AA25EE58FF77A3 /* ImageSequenceEncoderTests.swift */,
 				B133348CF010D337CDA988A0 /* ImportStatusBannerTests.swift */,
 				38F7D1388C31CB5FF57645DA /* KeynoteImporterTests.swift */,
 				FF79938EE267D36AF458C582 /* MediaFlagsTests.swift */,
@@ -409,6 +414,7 @@
 			children = (
 				AB44C4BE122979080B759770 /* AnimatedImageInspector.swift */,
 				6FD2EFC1C287DD9480AF2D2F /* ImageSequenceDetector.swift */,
+				2D06F636A6229A0C418EE285 /* ImageSequenceEncoder.swift */,
 				D2A8691862AC8AE01B87203D /* KeynoteImporter.swift */,
 				BD3490C4BA5C4A09BDBF9415 /* MediaFlagsInspector.swift */,
 				B328F432BC7CCB991A9A8373 /* MediaImporter.swift */,
@@ -530,6 +536,7 @@
 				91592F7DACBD58D4C6BBE0F2 /* HTTPRoutes.swift in Sources */,
 				7D6E9D5D91681AA09335F8F9 /* HTTPServer.swift in Sources */,
 				42289D3F33304D521AADB51B /* ImageSequenceDetector.swift in Sources */,
+				C243D56CE0D5D5610E8F2ECE /* ImageSequenceEncoder.swift in Sources */,
 				873129B7192207BD8E22D111 /* ImportStatusBanner.swift in Sources */,
 				C02D1DDF70B419255097C42E /* InspectorView.swift in Sources */,
 				C120F1AED083BE5B83E60533 /* InternalTimecodeGenerator.swift in Sources */,
@@ -586,6 +593,7 @@
 				DCABF0FFCC0E6E0596173F64 /* CompositorPipelineTests.swift in Sources */,
 				4C060BE294B7C9A97DBA4FBE /* FrameRateConformanceTests.swift in Sources */,
 				EE3870434C944DFB877D89F7 /* ImageSequenceDetectorTests.swift in Sources */,
+				2EA37A6EB9345C916205962D /* ImageSequenceEncoderTests.swift in Sources */,
 				46F067BBC06E93A8F2D556E9 /* ImportStatusBannerTests.swift in Sources */,
 				92C91C709C683B4675395127 /* KeynoteImporterTests.swift in Sources */,
 				D93CCBEA7AE13AB4FC44F4F3 /* MediaFlagsTests.swift in Sources */,
