@@ -349,4 +349,78 @@ final class ShowControlTests: XCTestCase {
         XCTAssertEqual(pub.configuration.httpPort, 53001)
         XCTAssertFalse(pub.isRunning)
     }
+
+    // MARK: - Auth and capabilities (D6)
+
+    func testDispatcherRejectsActionWithoutCapability() {
+        let runtime = makeShowControlRuntime()
+        let state = ShowControlState()
+        let d = ShowControlDispatcher(runtime: runtime, state: state)
+        let result = d.dispatch(.go(target: nil), source: .test, capabilities: [.read])
+        guard case let .rejected(reason) = result else {
+            XCTFail("expected rejection"); return
+        }
+        XCTAssertTrue(reason.contains("missing_capability"))
+    }
+
+    func testDispatcherAllowsActionWithCapability() {
+        let runtime = makeShowControlRuntime()
+        let state = ShowControlState()
+        let d = ShowControlDispatcher(runtime: runtime, state: state)
+        let result = d.dispatch(.previous, source: .test, capabilities: [.read, .fire])
+        guard case .ok = result else { XCTFail("expected ok: \(result)"); return }
+    }
+
+    func testShowModeStripsEditCapability() {
+        let runtime = makeShowControlRuntime()
+        let state = ShowControlState()
+        state.updateShowMode(true)
+        let d = ShowControlDispatcher(runtime: runtime, state: state)
+        let result = d.dispatch(
+            .cueLoop(cueNumber: "INTRO", enabled: true),
+            source: .test,
+            capabilities: [.read, .fire, .edit]
+        )
+        guard case let .rejected(reason) = result else {
+            XCTFail("expected rejection due to show mode"); return
+        }
+        XCTAssertEqual(reason, "missing_capability:edit")
+    }
+
+    func testIdempotencyLockoutSuppressesRapidRetrigger() {
+        var clockNow: TimeInterval = 0
+        let runtime = makeShowControlRuntime()
+        let state = ShowControlState()
+        let d = ShowControlDispatcher(runtime: runtime, state: state, clock: { clockNow })
+        d.retriggerLockout = 0.05
+        let first = d.dispatch(.previous, source: .test, capabilities: [.read, .fire])
+        guard case .ok = first else { XCTFail("expected ok"); return }
+        clockNow += 0.01
+        let second = d.dispatch(.previous, source: .test, capabilities: [.read, .fire])
+        guard case let .rejected(reason) = second else {
+            XCTFail("expected rejection"); return
+        }
+        XCTAssertEqual(reason, "retrigger_lockout")
+        clockNow += 0.10
+        let third = d.dispatch(.previous, source: .test, capabilities: [.read, .fire])
+        guard case .ok = third else { XCTFail("expected ok after lockout window"); return }
+    }
+
+    func testRequiredCapabilityForActions() {
+        XCTAssertEqual(ShowControlAction.go(target: nil).requiredCapability, .fire)
+        XCTAssertEqual(ShowControlAction.ping.requiredCapability, .read)
+        XCTAssertEqual(ShowControlAction.cueLoop(cueNumber: "x", enabled: true).requiredCapability, .edit)
+        XCTAssertEqual(ShowControlAction.cueNotes(cueNumber: "x", text: "n").requiredCapability, .edit)
+    }
+
+    // MARK: - Test helpers
+
+    /// Builds a CueRuntime with a single cue named "INTRO" so dispatch tests
+    /// have something to act on.
+    func makeShowControlRuntime() -> CueRuntime {
+        var list = ShowList()
+        let cue = Cue(number: "INTRO", title: "Intro", assetID: UUID())
+        try? list.append(cue)
+        return CueRuntime(showList: list)
+    }
 }
