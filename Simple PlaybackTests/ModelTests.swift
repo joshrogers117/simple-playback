@@ -1334,6 +1334,63 @@ final class ModelTests: XCTestCase {
             throw error
         }
     }
+
+    // MARK: - B8: 10-bit YUV output recommendation
+
+    func testRecommendsTenBitOutputFalseOnEmptyProject() {
+        let project = PlayoutProject()
+        XCTAssertFalse(project.recommendsTenBitOutput)
+    }
+
+    func testRecommendsTenBitOutputFalseWhenAllVideoIs8Bit() {
+        var project = PlayoutProject()
+        project.slides = [
+            MediaSlide(
+                url: URL(fileURLWithPath: "/tmp/eight.mov"),
+                mediaKind: .video,
+                flags: MediaFlags(longGOP: true, tenBitYUV420: false)
+            ),
+            MediaSlide(
+                url: URL(fileURLWithPath: "/tmp/clean.mov"),
+                mediaKind: .video,
+                flags: .none
+            )
+        ]
+        XCTAssertFalse(project.recommendsTenBitOutput)
+    }
+
+    func testRecommendsTenBitOutputTrueWhenAnyVideoIsTenBit() {
+        var project = PlayoutProject()
+        project.slides = [
+            MediaSlide(
+                url: URL(fileURLWithPath: "/tmp/eight.mov"),
+                mediaKind: .video,
+                flags: .none
+            ),
+            MediaSlide(
+                url: URL(fileURLWithPath: "/tmp/main10.mov"),
+                mediaKind: .video,
+                flags: MediaFlags(tenBitYUV420: true)
+            )
+        ]
+        XCTAssertTrue(project.recommendsTenBitOutput)
+    }
+
+    /// 10-bit flag on an `.image` (or anything non-`.video`) doesn't argue for 10-bit
+    /// output — the C1 inspector populates `tenBitYUV420` only for video sources, and the
+    /// recommendation should ignore unrelated kinds. Defensive: if a future schema change
+    /// surfaces the flag on images, the recommendation still requires `mediaKind == .video`.
+    func testRecommendsTenBitOutputIgnoresNonVideoSlides() {
+        var project = PlayoutProject()
+        project.slides = [
+            MediaSlide(
+                url: URL(fileURLWithPath: "/tmp/anim.png"),
+                mediaKind: .image,
+                flags: MediaFlags(tenBitYUV420: true)
+            )
+        ]
+        XCTAssertFalse(project.recommendsTenBitOutput)
+    }
 }
 
 // MARK: - Test helpers

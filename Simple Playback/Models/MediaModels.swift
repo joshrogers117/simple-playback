@@ -487,6 +487,19 @@ struct PlayoutProject: Codable, Hashable {
     /// informational orange chip to a red "REF EXPECTED" banner. Spec §3.7.
     var expectsExternalReference: Bool = false
 
+    /// Spec §3.10 / Phase B8 — "10-bit YUV 4:2:2 default when any clip in the project is
+    /// >8-bit." True iff any video slide in the asset library has the C1 inspector flag
+    /// `flags.tenBitYUV420` set, which the C1 adapter populates for HEVC Main-10 sources at
+    /// import time. Pure-logic — no AVFoundation / SDK calls. The Output inspector renders
+    /// an informational hint when this is true and (eventually) the DeckLink binding
+    /// constructor will use this as its initial `tenBit` value. Hardware verification (10-bit
+    /// negotiation against a real card) is still operator-driven.
+    var recommendsTenBitOutput: Bool {
+        slides.contains { slide in
+            slide.mediaKind == .video && slide.flags.tenBitYUV420
+        }
+    }
+
     static let empty = PlayoutProject()
 
     init(

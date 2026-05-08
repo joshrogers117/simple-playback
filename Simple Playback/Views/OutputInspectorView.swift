@@ -21,8 +21,42 @@ struct OutputInspectorView: View {
                 Divider()
 
                 referenceSection
+
+                if project.recommendsTenBitOutput {
+                    Divider()
+                    tenBitRecommendationSection
+                }
             }
             .padding(16)
+        }
+    }
+
+    /// Phase B8 hint. Surfaces when any video slide in the project is flagged 10-bit (C1's
+    /// `flags.tenBitYUV420`). Informational only — no auto-toggle, since changing the
+    /// DeckLink output format mid-show is a deliberate re-arm action that belongs to B7.
+    @ViewBuilder
+    private var tenBitRecommendationSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Pixel format")
+                .font(.subheadline.bold())
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "info.circle.fill")
+                    .foregroundStyle(.yellow)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("10-bit content detected")
+                        .font(.callout)
+                    Text("At least one video in this project is 10-bit. Configure the DeckLink output as 10-bit YUV 4:2:2 to preserve quality (spec §3.10).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.yellow.opacity(0.10))
+            )
         }
     }
 
