@@ -19,6 +19,15 @@ enum ProjectBundleLayout {
 
 final class SimplePlaybackProjectDocument: NSDocument {
     private var playbackDocument = SimplePlaybackDocument()
+    /// E8 — per-document lock controller. Acquires/releases `<bundle>/.lock`
+    /// across the document lifecycle. Lifetime is tied to the NSDocument so
+    /// the lock is dropped when the user closes the window even if SwiftUI
+    /// teardown ordering would otherwise leak it.
+    private let lockController = ProjectLockController()
+    /// Tracks `NSDocument.fileURL` changes — fires on the initial open path
+    /// (set after `read(from:)` completes) and on Save-As (operator picks a
+    /// new destination). Each change triggers a lock re-evaluation.
+    private var fileURLObservation: NSKeyValueObservation?
 
     override class var autosavesInPlace: Bool {
         true
@@ -27,13 +36,20 @@ final class SimplePlaybackProjectDocument: NSDocument {
     override init() {
         super.init()
         hasUndoManager = true
+        fileURLObservation = observe(\.fileURL, options: [.initial, .new]) { [weak self] doc, _ in
+            let url = doc.fileURL
+            Task { @MainActor [weak self] in
+                self?.lockController.evaluate(bundleURL: url)
+            }
+        }
     }
 
     override func makeWindowControllers() {
         let rootView = RootView(
             document: documentBinding,
             outputSettings: OutputSettingsStore.shared,
-            projectBundleURLProvider: { [weak self] in self?.fileURL }
+            projectBundleURLProvider: { [weak self] in self?.fileURL },
+            lockController: lockController
         )
         let hostingController = NSHostingController(rootView: rootView)
         let window = NSWindow(contentViewController: hostingController)
@@ -68,6 +84,15 @@ final class SimplePlaybackProjectDocument: NSDocument {
 
     override func fileNameExtension(forType typeName: String, saveOperation: SaveOperationType) -> String? {
         "spb"
+    }
+
+    /// Release the per-document lock when the window closes. NSDocument calls
+    /// `close` on the main thread for the user-initiated close path; we
+    /// release before chaining to `super` so a re-open in the same session
+    /// (e.g. revert) sees a clean slate.
+    override func close() {
+        lockController.release()
+        super.close()
     }
 
     /// Extracts the project JSON payload from either a v2 directory bundle or a legacy flat file.

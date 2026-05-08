@@ -15,6 +15,10 @@ struct RootView: View {
     /// records to the journal. Persistence destination is set in
     /// `bindShowLogFile()` once the document has a bundle URL.
     @StateObject private var showLog = ShowLog()
+    /// E8 — project lock controller. Owned by the NSDocument (so the lock is
+    /// released even if SwiftUI teardown beats us to it); RootView observes
+    /// the published banner state to surface the warning.
+    @ObservedObject private var lockController: ProjectLockController
     @State private var selectedSlideID: UUID?
     @State private var selectedCueID: UUID?
     @State private var dropTargeted = false
@@ -41,11 +45,13 @@ struct RootView: View {
     init(
         document: Binding<SimplePlaybackDocument>,
         outputSettings: OutputSettingsStore,
-        projectBundleURLProvider: @escaping () -> URL? = { nil }
+        projectBundleURLProvider: @escaping () -> URL? = { nil },
+        lockController: ProjectLockController
     ) {
         self._document = document
         self.outputSettings = outputSettings
         self.projectBundleURLProvider = projectBundleURLProvider
+        self.lockController = lockController
         _showController = StateObject(wrappedValue: ShowControllerHolder())
     }
 
@@ -142,6 +148,7 @@ struct RootView: View {
             applyOutputDefaults()
             ensureProjectHasShowList()
             configureShowController()
+            lockController.evaluate(bundleURL: projectBundleURLProvider())
         }
         .onChange(of: playback.devices) {
             applyOutputDefaults()
@@ -258,6 +265,8 @@ struct RootView: View {
                 OutputPreviewView(playback: playback)
 
                 ImportStatusBannerView(banner: importStatus)
+
+                ProjectLockBannerView(controller: lockController)
 
                 OutputStatusBar(
                     playback: playback,
