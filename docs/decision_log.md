@@ -335,3 +335,84 @@ The detector returns leftovers in their original drop order so non-sequence file
 **Reversibility**: easy. The detector is pure-logic with no on-disk artifacts.
 
 **What I'd revisit if**: a real-world sequence ships with a 5-digit counter or a sub-frame fractional counter (`name.001.5.png`). Today the latter would parse as a 1-digit counter on `name.001` and reject it — that's the right behavior for the autonomous era; encoders that emit those use cases would need explicit operator opt-in.
+
+---
+
+## 2026-05-08 — E8: project lock file shape, banner UX, Read-Only deferral
+
+**Decision**: `.lock` is JSON `{ pid, hostname, timestamp, applicationVersion }`, not a sentinel-style empty file. Liveness has five states (ours / localLive / localStale / foreignLive / foreignStale); the foreign-staleness window is 1 hour. The banner ships with two operator actions ("Open Anyway" / "Dismiss") rather than the spec's three ("Open Anyway" / "Read Only" / "Cancel"). Lock acquisition is silent for ours/stale; foreign-live blocks acquisition until the operator picks Open Anyway. Lock release happens in `NSDocument.close`.
+
+**Why**:
+- **JSON over sentinel** because the operator-debugging value of "who has it open and when" outweighs the marginal cost of a 200-byte JSON file. Spec §3.16 specifies the warning content, not the lock format; surfacing the locker's identity is what makes the warning actionable.
+- **Five-state liveness** rather than a binary "live vs stale" because cross-host vs local has different staleness semantics. Same-host PID liveness is ground-truth via `kill(pid, 0)`; cross-host PID liveness is unknowable, so we fall back to a timestamp window.
+- **1-hour foreign window** is a conservative compromise: too short and a peer briefly disconnected from a NAS sees us steal their lock; too long and a real crash leaves the lock blocked for hours. 1 hour matches typical show-rehearsal cadence.
+- **"Read Only" deferred** to a separate v1 follow-up because it's not just a banner button — it requires document-wide read-only enforcement (palette / show-list / inspector / drop targets all gated, OSC/HTTP capabilities dropped to read+fire, autosave suppressed, etc.). Bundling that into the duplicate-open warning would conflate two unrelated v1 surfaces. Today's two-button banner closes the warning requirement; the read-only-mode requirement gets its own iteration.
+- **Dismiss does not claim ownership** by design: an operator who knows the foreign owner is themselves on a different machine (e.g., laptop+booth-mac dual-up) can dismiss without contesting the lock. The foreign owner stays the lock holder; edits happen anyway. That's a pragmatic v1 default; if real-show usage shows operators surprised by "I dismissed and edited and we both saved," the right next move is escalating to the Read-Only mode rather than enforcing exclusive locks.
+- **Release in NSDocument.close** (not RootView .onDisappear) because SwiftUI teardown ordering can vary; tying the release to the Cocoa document lifecycle is more deterministic.
+
+**Alternatives considered**:
+- **PID-only sentinel** — rejected; loses the "who" + "when" info that makes the warning actionable.
+- **Mandatory cancel-on-foreign** — rejected; operators sometimes need to recover when a peer crashed and the timestamp says < 1h. Open Anyway is the escape hatch.
+- **Auto-release on idle** — rejected for v1; an operator AFK for an hour during rehearsal shouldn't see their lock evaporate. The 1-hour foreign-staleness window is for *peers* observing us, not for self-release.
+
+**Reversibility**: easy. The lock is informational and additive — projects opened pre-E8 just don't have a `.lock` yet, and projects opened post-E8 have one ignored by older versions.
+
+**What I'd revisit if**:
+- Real NAS rehearsals show 1 hour is wrong (probably too long if operators frequently re-cycle through a project; too short if they hold a project open for an entire show day).
+- Operators want a "Read Only" path. Build it as a separate v1 follow-up with document-wide enforcement, not a banner button.
+
+**Public API impact**:
+- `struct ProjectLockFile`, `enum ProjectLockFileIO`, `struct ProjectLockFileSignals` in `Services/ProjectLockFile.swift`.
+- `final class ProjectLockController: ObservableObject` in `Views/ProjectLockBannerView.swift` (companion view defined alongside).
+- `RootView.init(..., lockController:)` — required parameter.
+- `SimplePlaybackProjectDocument` owns `lockController`; KVO-observes `\.fileURL`; overrides `close`.
+
+---
+
+## 2026-05-08 — E6: split rolling autosave from event-driven checkpoint
+
+**Decision**: NSDocument's autosave-in-place machinery handles the 30s rolling autosave (set `NSDocumentController.autosavingDelay = 30` once at app launch). Independently, `Services/AutosaveCheckpointer.swift` writes event-driven *checkpoints* to `<bundle>/Autosave/<timestamp>__<reason>.json`. Show-Mode toggle is the v1 trigger; `manual` reason is reserved. Retention 20.
+
+**Why**:
+- **Two separate mechanisms** because the spec calls out two separate things — "every 30 s of edit activity" (rolling) and "checkpoint on every Show-mode toggle" (pinned moment). Trying to unify them would either force the rolling autosave through the checkpointer (paying 20-deep retention on every 30 s tick) or force checkpoints through autosave-in-place (which writes back to the bundle URL, losing the snapshot semantic).
+- **Checkpoints are reason-tagged in the filename** so a future "Restore from checkpoint" UI can show operator-readable labels ("Show Mode On — 14:32:08") without parsing the file body.
+- **POSIX-UTC timestamp + no colons** in the filename so the bundle round-trips through SMB / exFAT / a tar to a Linux box without rename surprises.
+- **Filename round-trip is symmetric** so prune doesn't trust filesystem mtime — networked volumes routinely drift mtime, and the autosave directory is exactly the kind of directory operators sync via Dropbox / iCloud / a NAS share.
+- **Retention 20 at write time** rather than periodic GC so the disk footprint is bounded immediately. The cost (one directory list per checkpoint) is negligible compared to the Show Mode toggle's other side effects.
+- **Initial nil → false load is suppressed** in the RootView .onChange hook so opening a project doesn't write a spurious `show_mode_off` snapshot. The energy-assertion hook does NOT suppress that load (different rationale — see E1+).
+
+**Alternatives considered**:
+- **Custom autosave directory** (override `NSDocument.autosavedContentsFileURL`) — rejected; it diverts the rolling-autosave path away from the bundle URL itself, which breaks `autosavesInPlace` and complicates operator mental model ("which file is the project?").
+- **Single mechanism** for both rolling and checkpoint — see "Two separate mechanisms" above.
+- **Periodic GC** instead of write-time prune — rejected; complicates disk-footprint reasoning.
+
+**Reversibility**: easy. Both mechanisms are additive; deleting `Services/AutosaveCheckpointer.swift` + the RootView .onChange hook + the AppDelegate one-liner reverts cleanly. Existing `<bundle>/Autosave/` directories from a deployed E6 build become inert (unread by older binaries).
+
+**What I'd revisit if**:
+- Operators want a "Restore from checkpoint" UI. Build it as a separate sheet that lists the parsed filenames + timestamps + reasons; load via the existing `JSONDecoder.simplePlayback`.
+- 20-deep retention is wrong (too few for multi-day rehearsals; too many for a small disk). Make `retentionLimit` per-project or surface it in preferences.
+
+---
+
+## 2026-05-08 — E1+: hold a no-idle-sleep IOPM assertion in Show Mode (action, not just check)
+
+**Decision**: While Show Mode is on, hold an `IOPMAssertionTypeNoIdleSleep` assertion via `IOPMAssertionCreateWithName`. Release on Show Mode off. Pre-show check rule reads `EnergyAssertion.isHeld` rather than introspecting the kernel's assertion table.
+
+**Why**:
+- **Act, don't just check.** A pre-show panel that warns "the system might idle-sleep" is less valuable than a Show-Mode toggle that *prevents* idle-sleep. Operators who flip Show Mode on get the protection regardless of whether they remembered to look at Pre-Show first.
+- **Hold from operator-flip, not from app launch.** The assertion is heavy-handed — battery-on laptops can't sleep. Tying it to Show Mode means it's only active when the operator is committed to a live run.
+- **Read our own state** in the pre-show check rather than `IOPMCopyAssertionsByProcess`. We know better than IOKit whether *we* hold the assertion; querying IOKit is unnecessarily indirect.
+- **Initial nil → false IS NOT suppressed** in the showMode .onChange hook (unlike the autosave checkpoint). If the operator's first interaction with Show Mode is to flip it on, the assertion needs to land on press one. Suppression would mean "first toggle does nothing" — surprising for a safety feature.
+
+**Alternatives considered**:
+- **`IOPMAssertionTypePreventUserIdleSystemSleep`** — similar but explicitly tied to *user* idle. NoIdleSleep is the broader version that also blocks lid-close on supported hardware in some configs.
+- **NSProcessInfo `beginActivity(.userInitiated)`** — coarser; ties to a different power-management subsystem and doesn't show up in `pmset -g assertions` with our app name.
+- **Always-on while document is open** — rejected; battery laptops can't sleep at all, and operators editing for hours don't need the protection.
+- **Check via `IOPMCopyAssertionsByProcess`** — works but requires parsing CFArrays back; no actual benefit over reading our own `isHeld`.
+
+**Reversibility**: easy. Drop `Services/EnergyAssertion.swift` + the RootView hook + the PreShowCheck rule + the Context field; behavior reverts to "macOS handles power management normally."
+
+**What I'd revisit if**:
+- Real laptop rehearsals show the system not sleeping when Show Mode is on (what we want) but also not sleeping when Show Mode is off (because the assertion didn't release). Diagnose via `pmset -g assertions` — if our assertion is still listed without Show Mode, the release path didn't fire.
+- Operators want to keep the system awake without committing to Show Mode (e.g., a long rehearsal where they're tweaking cues). Add a separate "Keep awake" toggle alongside Show Mode that drives the assertion independently.
+

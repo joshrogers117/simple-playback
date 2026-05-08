@@ -1,88 +1,99 @@
 # Phase E — Reliability — Summary
 
-**Status (session 13 — 2026-05-08)**: **Phase E meaningfully advanced**. E1 (pre-show check) is now end-to-end with live system signals — DeckLink lock state, audio device, and render-path-warmed are all sampled and feed into the evaluator. E2 (per-row Fix actions) shipped the first slice of system-deep-link handlers. E3 (show log) shipped end-to-end: append-only CSV writer, ShowController integration for every verb (GO / PREVIOUS / PANIC / CLEAR / BLACKOUT / Show-Mode / missing-media), dispatcher integration so OSC / HTTP / TC actions are recorded with their source attribution, and a read-only viewer with CSV export. Tests: 383 → 430 (+47 across 9 commits this session).
+**Status (session 14 — 2026-05-08)**: **Phase E broadly landed**. Sessions 12 / 13 / 14 together took Phase E from "started E1" to "E1+ / E2 / E3 / E3-filter / E6 / E8 all green, plus E1+ energy assertion." 6 commits this session, 430 → 498 tests (+68).
 
-The Pre-Show panel now reads as live data on a real machine, not a hand-supplied Context — the operator opens it and sees actual disk space, an actual audio-device check, an actual DeckLink REF state if armed, and an actual render-path-warm/cold signal. The Show Log panel now records every operator action with source attribution (local UI / OSC ip:port / HTTP token suffix / TC) for replay and forensics.
-
----
-
-## What shipped in session 13
-
-### E1+ — system-signal adapters
-
-**`Services/PreShowCheckAdapters.swift`** — `PreShowCheck.DeckLinkReferenceStatus.from(_:)` translates `DeckLinkTransportSink.ReferenceState` into the pure-logic enum. RootView's `preShowCheckContext()` plumbs `playback.deckLinkReferenceState` (the same source the B6 status-bar chip reads) through the adapter. Reference rows escalate from `.info` ("not yet sampled") to live data once the DeckLink is armed.
-
-**`Services/AudioDeviceProbe.swift`** — `AudioDeviceProbe.isDefaultOutputDeviceAvailable()` wraps `kAudioHardwarePropertyDefaultOutputDevice` behind an injectable provider. Production reads the system answer; tests pin both branches without mutating host audio.
-
-**`PlaybackController.hasRenderedAnyFrame`** — Published bool that flips true on the first successful `submitFrame` and clears on `stopOutput()`. Plumbed into `PreShowCheck.Context.renderPathWarmed`; new `evaluateRenderPath` rule emits OK when warm, warning when cold.
-
-### E2 — fix actions per row
-
-**`Services/PreShowCheckFixHandlers.swift`** — `PreShowCheckFixHandlers` is a dictionary keyed by `PreShowCheck.Row.id`. Pre-Show view renders a "Fix" button only for rows the host has registered something for; rules without a sensible automatable resolution stay read-only. RootView wires three handlers:
-
-- `system.audio` → `x-apple.systempreferences:com.apple.preference.sound`
-- `system.disk` → `NSWorkspace.shared.activateFileViewerSelecting([bundleURL])` (suppressed for untitled documents)
-- `output.reference` → opens `/Applications/Blackmagic Desktop Video Setup.app` if installed (suppressed otherwise — the operator path is hardware-side at that point)
-
-`media.resolution` deliberately has no Fix handler this iteration; the relink path belongs to C7 (asset library). `fps.conformance` and `output.tenBit` are project-edit territory the operator addresses inside the app.
-
-### E3 — show log
-
-**`Services/ShowLog.swift`** — `ShowLogEvent` (timestamp + optional chase TC + action + source + optional detail) and `ShowLog` ObservableObject. Source attribution is first-class: every event records *who* fired it (local hotkey / operator UI button / OSC `host:port` / HTTP token-suffix-only / TC / system). RFC 4180 CSV serialization; `ShowLog` seeds a header row when binding to a fresh URL and appends one CSV line per event. File-writer is injectable for testability — production uses a FileHandle append; failed writes drop the URL but keep the in-memory log alive (a transient I/O error doesn't lose events).
-
-**`ShowController` integration** — Each verb method now records a corresponding event. Default source `.operatorButton` keeps existing UI call sites compiling unchanged; hotkey / OSC / HTTP / TC sites can override. `handleCueFired` missing-asset path logs a `.missingMedia` event with `.system` attribution. `weak var showLog: ShowLog?` is set by RootView after configuration; tests construct an isolated log directly.
-
-**Dispatcher integration** — `ShowControlSource.toShowLogSource()` extension translates the dispatcher's source enum (HTTP tokens collapse to their last 4 characters so a leaked log file can't be replayed). ShowController sets `ShowControlHub.shared.stack.dispatcher.onActionDispatched = { ... }` to its own `recordDispatchedAction`; verbs map onto the matching `ShowLog` action; non-verb cue / output / TC / workspace actions collapse onto a generic `.oscAction` row with a short human-readable name. Diagnostic chatter (ping / subscribe) deliberately never logs.
-
-**`Views/ShowLogView.swift`** — Read-only viewer rendering the per-document log as a chronological list (timestamp / TC / action / source / detail). High-signal actions get colour: PANIC + MISSING_MEDIA red, CLEAR + BLACKOUT orange, GO/PREVIOUS primary, Show-Mode accent, OSC chatter secondary. Empty state renders a `ContentUnavailableView`. Export CSV button funnels `ShowLog.exportCSV()` into an `NSSavePanel`; the action is swappable for tests.
-
-**RootView wiring** — Per-document `@StateObject ShowLog` instance; bound to `<bundle>/Logs/<yyyy-MM-dd>.log` once the document has a fileURL on disk. Untitled documents keep events in memory until the first save. Toolbar "Show Log" button (`list.bullet.rectangle`) opens the viewer sheet.
+The pre-show panel now reads as live data, records every operator + remote action with source attribution, persists checkpoints at meaningful operator moments, prevents the show machine from idle-sleeping, and warns on duplicate-open of NAS-shared show files. The remaining Phase E pickups are the deferred long-tail (dropped-frame instrumentation, take history, crash recovery, Director View, Workspaces, brightness adapt key) and a handful of fragile / privacy-blocked macOS-condition adapters.
 
 ---
 
-## Tests added (session 13)
+## What shipped in session 14
 
-| Test file | Test | What it covers |
+### E8 — project lock file (spec §3.16 duplicate-open warning)
+
+**`Services/ProjectLockFile.swift`** — pure-logic + IO seams. The lock at `<bundle>/.lock` is JSON: `{ pid, hostname, timestamp, applicationVersion }`. `liveness(now:currentPID:currentHostname:isPIDAlive:)` covers all five branches:
+
+- `.ours` — same PID + hostname (idempotent reopen).
+- `.localLive` — same hostname, different PID, `kill(pid, 0) == 0`.
+- `.localStale` — same hostname, different PID, PID dead.
+- `.foreignLive` — different hostname, timestamp within `foreignStaleAfter` (1 hour default).
+- `.foreignStale` — different hostname, timestamp past the window.
+
+`ProjectLockFileIO` (read / write / remove) takes injectable file-IO closures. `ProjectLockFileSignals.current()` reads `getpid()` + `gethostname()` + the bundle short-version string.
+
+**`ProjectLockController`** is the per-document state machine over those primitives. `evaluate(bundleURL:)` reads → categorizes → either acquires (ours / stale) or surfaces a `foreignBanner` (live). `openAnyway()` overwrites the foreign lock with ours; `dismissBanner()` keeps editing without claiming. `release()` removes the lock and clears state.
+
+**`Views/ProjectLockBannerView.swift`** mounts above `OutputStatusBar` with the foreign-lock summary (`Opened on <hostname> (PID N) at <date>`), an Open Anyway button, and a dismiss control.
+
+**`SimplePlaybackProjectDocument`** owns the controller, KVO-observes `fileURL` so initial-open and Save-As both trigger `evaluate`, and `release()`s on `close`.
+
+**Spec follow-up deferred**: the third "Read Only" option from spec §3.16 needs document-wide read-only enforcement (no edits → palette / show-list / inspector all gated). That's a substantial separate feature; today's two-button banner closes the duplicate-open *warning* requirement, not the read-only-mode requirement.
+
+### E6 — autosave + Show-Mode checkpoint
+
+`NSDocumentController.shared.autosavingDelay = 30` set in `AppDelegate.applicationDidFinishLaunching`. Combined with `SimplePlaybackProjectDocument.autosavesInPlace = true`, NSDocument's autosave-in-place writes the bundle every 30 s of pending edits.
+
+**`Services/AutosaveCheckpointer.swift`** is the *checkpoint* side — a separate snapshot pinned to operator moments rather than time intervals. `writeCheckpoint(projectData:bundleURL:reason:)` writes `<bundle>/Autosave/<timestamp>__<reason>.json`. Filename is POSIX-UTC, no colons (SMB / exFAT-safe), reason-suffixed (`show_mode_on` / `show_mode_off` / `manual`). After every write, the directory is listed and the oldest items past the 20-item retention limit are pruned. Filename round-trip is symmetric so prune doesn't trust filesystem mtime (which drifts on networked volumes).
+
+`SimplePlaybackProjectDocument.writeAutosaveCheckpoint(reason:)` encodes the project + calls the checkpointer; `RootView.handleShowModeChange` drives it via the existing `.onChange(of: showController.controller?.showMode)` hook. Initial nil → false (controller becoming available on document load) is suppressed by tracking `lastShowMode` in `@State`.
+
+### E4 — show-log filter UI
+
+`ShowLog.SourceFilter` (All/Local/OSC/HTTP/TC/System — Local groups `localHotkey + operatorButton`) and `ActionFilter` (All/Show verbs/Remote API/System) are pure-logic predicates with one `matches(_:)` case per source/action variant. `ShowLog.filteredEvents(source:action:since:)` ANDs them with an optional `since` cutoff for "events after this Date" filtering.
+
+`ShowLogView` mounts a top toolbar with three menu pickers + a Reset button (visible when any filter is active). The header label switches from `N events` to `N of M events` when filtered. Empty filtered result renders a distinct `ContentUnavailableView` so an empty filter doesn't read as an empty log.
+
+### E1+ — no-idle-sleep IOPM assertion
+
+**`Services/EnergyAssertion.swift`** wraps `IOPMAssertionCreateWithName(kIOPMAssertionTypeNoIdleSleep)` + `IOPMAssertionRelease` behind injectable `assertor` / `releaser` closures so unit tests can pin the state machine without engaging the kernel. Acquire + release are idempotent. The assertion name `Simple Playback — Show Mode` is what operators see in `pmset -g assertions`.
+
+`RootView.handleShowModeChange` engages the assertion on Show Mode → on, releases on Show Mode → off. Unlike the autosave checkpoint, the assertion does NOT suppress the initial nil → false load — Show Mode flipping true on the first observation should land the assertion immediately.
+
+`PreShowCheck.evaluateEnergy(context:)` is a new optional row driven by `Context.systemPreventsIdleSleep` — `RootView.preShowCheckContext` samples `energyAssertion.isHeld` into the field. Pre-show panel reads OK when Show Mode is on, warning when off.
+
+---
+
+## Tests added (session 14)
+
+| Test file | Tests | What it covers |
 |---|---|---|
-| `PreShowCheckTests` | `testDeckLinkAdapterMaps{Idle,NotSupported,Unlocked,Locked}` | Adapter mapping pinned per-case. |
-| `PreShowCheckTests` | `testRenderPathRow{Suppressed,OKWhenWarmed,WarningWhenCold}` | Render-path rule's three states. |
-| `AudioDeviceProbeTests` | 4 tests | Probe-level branches + real-CoreAudio smoke. |
-| `PreShowCheckFixHandlersTests` | 7 tests | Dispatch behaviour + URL contracts (Sound deep-link, DVS path). |
-| `ShowLogTests` | 12 tests | CSV shape, source labels, in-memory append, file-writer hook (header on first write, append after, failure suppression). |
-| `ShowControllerLogTests` | 14 tests | Verb-level logging (8) + source translation (5) + dispatcher integration (5) + missing-media. |
+| `ProjectLockFileTests` | 17 | Liveness branches (5) + IO seams + banner copy + signals smoke |
+| `ProjectLockControllerTests` | 13 | State machine: acquire / refresh / openAnyway / dismiss / release / URL change |
+| `AutosaveCheckpointerTests` | 13 | Filename round-trip + prune (limit / 1-keeps-latest / malformed-ignored) + writer plumbing |
+| `ShowLogFilterTests` | 15 | Source / Action / combined / since predicates |
+| `EnergyAssertionTests` | 7 | Acquire idempotent + release idempotent + failure path + reacquire + assertion-name pin |
+| `PreShowCheckTests` (extended) | 3 | Energy row suppressed / OK / warning |
 
-Total: **430 tests, all green** (was 383 at session start; +47).
-
----
-
-## Manual verification needed (session-13 deltas)
-
-1. **Pre-Show DeckLink rows** — open Pre-Show with a DeckLink armed and `expectsExternalReference == true`; the reference row should escalate from `.info` ("not yet sampled") to live data (locked → `.ok`, unlocked → `.error`, notSupported → `.warning`).
-2. **Pre-Show audio row** — open Pre-Show on a host with built-in speakers; the audio row should read `.ok`. Disconnect every audio device (rare in practice — virtual machines or headless minis) and the row should read `.error`.
-3. **Pre-Show render-path row** — open Pre-Show on a fresh document with output armed but no cues fired yet; row reads `.warning`. Fire a cue, reopen Pre-Show; row reads `.ok`. Stop output; row goes back to `.warning` on next open (since `hasRenderedAnyFrame` clears on stopOutput).
-4. **E2 Fix actions**:
-   - Click "Fix" on the audio row when it's `.error` — System Settings → Sound should open.
-   - Click "Fix" on the disk row when the document is saved — Finder should reveal the project bundle.
-   - Click "Fix" on the reference row with Blackmagic Desktop Video Setup installed — DVS should launch.
-   - Untitled document: the disk row's Fix button should not appear.
-   - Without Blackmagic Desktop Video Setup installed: the reference row's Fix button should not appear.
-5. **Show Log viewer** — open the viewer toolbar button. With no events, empty-state renders. Fire a cue; the GO row appears. Hit Escape (panic); a PANIC row appears in red. Toggle Show Mode twice; the SHOW_MODE_ON / SHOW_MODE_OFF rows appear.
-6. **Show Log CSV export** — click "Export CSV…" with events present. Save to a `.csv` file. Open in any spreadsheet; verify the header row + one row per event with the five-column shape.
-7. **Show Log on-disk persistence** — save a project. Fire a cue. Inspect `<bundle>/Logs/<today>.log` — the file should contain the CSV header + the GO row. Quit and reopen the project; old events are not re-loaded into the in-memory list (the file is the source of truth for past sessions; the view is the source of truth for the current session). The next event appended writes to the same file (today) or a fresh dated file (next day).
-8. **OSC source attribution** — fire a cue via OSC from a remote IP. The event in the log should read `osc <host>:<port>` for source. Same path via HTTP should read `http …<last4>`.
+Total: **498 tests, all green** (was 430 at session start; +68).
 
 ---
 
-## Still deferred (session 14+)
+## Manual verification needed (session-14 deltas)
 
-- **Pre-show E1+** — macOS energy / DND / screensaver / Spotlight / Time Machine checks. Each is a small `IOKit` / `NSWorkspace` / `NSUserNotification` query. Spec §3.16 lists them as separate rows.
-- **E2 fix-action expansions** — `media.resolution` "Fix" gets a relink-folder picker once C7 (asset library) lands. `output.reference` could fall back to Sound deep-link when DVS isn't installed.
-- **E3 — dropped-frame + late-take** — both events listed in spec §3.16 but require instrumentation in the playback path (compositor / output driver) before they can be logged. Independent of the writer infrastructure already shipped.
-- **E4 — log filtering** — by source / action type / time range. View-side; the model already has the data.
-- **E5 — take history (recent 200) with replay scrub** — a separate surface, not just the log. Replay needs the runtime to accept "fire cue X with the original parameters at this offset."
-- **E6 — autosave every 30 s** — `NSDocument.autosavingDelay` is the API; checkpoint on Show-mode toggle is custom.
-- **E7 — crash recovery** — load the last autosave on launch with a "what changed since last save" summary.
-- **E8 — project lock file** — small. Write `<bundle>/.lock` with PID + hostname on open; warn on duplicate-open if the file exists and the PID is still alive.
+1. **Project lock file — same-host duplicate open**: open a saved `.spb` project. Verify `<bundle>/.lock` exists and contains your pid + hostname. Open the same project a second time (e.g., Cmd-O on the file). The banner reads "This show is open elsewhere — Opened on <hostname> (PID <N>) at <date>". Click Open Anyway; the lock is overwritten with the new instance's pid (verify via `cat <bundle>/.lock`). Close the second window; the lock is removed. Reopen the first window's project; lock returns.
+2. **Project lock file — close releases**: open a project. Quit the app. Verify `<bundle>/.lock` is gone after quit.
+3. **Project lock file — stale local PID**: write a synthetic lock with `pid: 99999, hostname: <yours>` (use a small Swift test or `echo` JSON). Open the project. Banner should NOT appear (PID is dead → stale → silently overwritten with our lock). Verify the lock now has our pid.
+4. **Project lock file — foreign-host live**: write a synthetic lock with `hostname: someotherhost.local, timestamp: <now>`. Open the project; banner appears. Click Dismiss; the foreign lock stays in place (verify via `cat`). Click Open Anyway; the lock now reads our hostname.
+5. **Autosave — 30 s rolling**: open a project, edit a slide title, idle 35 s. Verify the bundle's `Show.json` mtime advanced. (NSDocument writes back to the bundle URL once `autosavingDelay` elapses with pending edits.)
+6. **Autosave — Show-Mode checkpoint**: open a project. Toggle Show Mode on. Verify `<bundle>/Autosave/<timestamp>__show_mode_on.json` was created. Toggle off; verify `<timestamp>__show_mode_off.json`. Repeat 21 times; verify only the newest 20 remain.
+7. **Show-log filter — narrow live show**: open a project, fire a few cues via the local UI, fire a few via OSC (`oscsend localhost 53000 /sp/go ,s "Q1"`). Open the show log viewer. Pick Source = OSC; only the OSC rows render and the header reads "N of M events". Reset; full log returns.
+8. **Show-log filter — Since window**: open a project, fire a cue, wait 90 s, fire another. Pick Since = "Last minute"; only the second cue renders.
+9. **Energy assertion — pmset visibility**: open a project, toggle Show Mode on. Run `pmset -g assertions` in Terminal. Look for a `NoIdleSleep` assertion named `Simple Playback — Show Mode`. Toggle Show Mode off; the assertion drops. Verify on a laptop on battery: with Show Mode on, the system should not idle-sleep even after the configured idle timeout elapses.
+10. **Pre-show energy row**: open Pre-Show. With Show Mode off the row reads `.warning` ("macOS could idle-sleep mid-show — Show Mode engages a no-idle-sleep assertion"). Toggle Show Mode on, reopen Pre-Show; row reads `.ok`.
+
+---
+
+## Still deferred (session 15+)
+
+- **Pre-show E1+ macOS-condition tail** — DND, screensaver, Spotlight, Time Machine. Each is fragile or privacy-blocked on modern macOS:
+  - DND / Focus: privacy-restricted; requires private API or Apple Events to System Events.
+  - Screensaver: `defaults read com.apple.screensaver askForPassword` reads user defaults, not active state.
+  - Spotlight: `mdutil -s <volume>` via Process; output parsing is brittle.
+  - Time Machine: `tmutil status` similarly Process-spawned + parsed.
+  - Recommendation: ship these as a pack only after picking one fragile-but-acceptable strategy, and only if real-rehearsal shows operators want them.
+- **E3+ — dropped-frame + late-take instrumentation** — both events listed in spec §3.16 but require instrumentation in `PlaybackController` (compositor frame timing, dropped-frame counter — A9 dropped-frame counter is currently deferred too) and `CueRuntime` (late-take: GO arrived but cue didn't fire within N ms). Independent of the writer infrastructure already shipped.
+- **E5 — take history (recent 200) with replay scrub** — separate surface from the show log. Replay needs the runtime to accept "fire cue X with the original parameters at this offset."
+- **E7 — crash recovery on next launch** — load the last autosave with a "what changed since last save" summary. Today no UI surface for that.
+- **E8 read-only-mode** — third banner option from spec §3.16. Needs document-wide read-only enforcement (palette + show list + inspector + drop-targets all gated; show control over OSC/HTTP also drops to read+fire). Substantial standalone feature.
 - **E9 — Director View tear-off window** — read-only Program + next 3 + notes. Multi-display.
 - **E10 — Saved Workspaces** — Edit / Rehearsal / Show / Single-Screen. UX-design heavy; product blocker territory.
 - **E11 — Brightness adapt key** — booth-dim key separate from system brightness.
@@ -92,11 +103,19 @@ Total: **430 tests, all green** (was 383 at session start; +47).
 
 ## Recommended next pick
 
-- **E8 (project lock file)** — small, no UX blockers, ships in one commit. A clean win on its own.
-- **E6 (autosave)** — `NSDocument.autosavingDelay = 30` plus a checkpoint hook on Show-Mode toggle. 1-2 commits.
-- **More pre-show macOS-condition checks** — DND, screensaver, energy, Spotlight. Each adapter is independent and tests cleanly.
-- **E4 (filter UI on the log)** — the model has all the data; the view needs a small toolbar with source/action picker + a date range. ~1 commit.
-- **C7 (asset library — linked vs managed)** — bigger surface. Foundation for C8 (folder bookmarks), C9 (missing-media UX with a real "Locate…" affordance), C10/C11 (thumbnails). Multi-session item but unlocks a chunk of Phase C.
-- **B7 (DeckLink format negotiation)** — Phase B leftover. Hardware-bound for verification but the API surface is well-defined.
+- **E3+ dropped-frame counter (A9 too)** — the show log can now record a `.droppedFrame` event, but `PlaybackController` doesn't emit one yet. Wiring a Published `droppedFrameCount` + a status-bar chip is a contained Phase B/E intersection. ~2 commits.
+- **E5 take history (in-memory v1)** — a circular buffer of the last 200 cue fires with timestamp + cue id + duration. Replay scrub deferred. ~1–2 commits.
+- **C7 (asset library — linked vs managed media + security-scoped bookmarks)** — Phase C tail. Foundation for C8 / C9 / C10 / C11 and the deferred E2 `media.resolution` Fix handler.
+- **B7 (DeckLink format negotiation)** — Phase B leftover, hardware-bound.
 
 Phase B leftovers (B7, B11, B13) and Phase C tail (C7+) remain background work that can be picked off between Phase E iterations.
+
+---
+
+## Session 13 deltas (recap — see git log f4474bb for full text)
+
+Session 13 shipped E1+ live system-signal adapters (DeckLink lock state, audio device, render-path-warmed), E2 per-row Fix actions (audio Sound deep-link, disk Finder reveal, reference DVS launch), and E3 end-to-end (CSV writer + ShowController + dispatcher integration + read-only viewer + toolbar entry). 9 commits, 383 → 430 tests (+47).
+
+## Session 12 deltas (recap)
+
+Session 12 shipped C5c (Add Folder folder-drop UX), Option B (Show-Mode gate on inline transcode), Option E (Apple-events deep-link on import banner), E1 first slice (PreShowCheck pure-logic + sheet UI + toolbar entry), and a cancel-cleanup partial-file fix. 11 commits, 372 → 383 tests.
