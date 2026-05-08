@@ -66,7 +66,7 @@ enum AssetRelinkPlan {
         for slide in slides {
             let result = resolve(slide.media, searchRoots)
             switch result.step {
-            case .original:
+            case .bundleMedia, .original:
                 unchanged.append(slide.id)
             case .contentHash, .nameAndSize:
                 if let url = result.url {

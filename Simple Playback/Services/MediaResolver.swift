@@ -4,6 +4,11 @@ import Foundation
 /// (deferred) will surface this to the operator so a successful auto-relink reads
 /// "found via content hash in <folder>" rather than silently swapping the path.
 enum MediaResolutionStep: Equatable {
+    /// `kind == .managed` reference resolved inside `<bundle>/Media/`. Authoritative —
+    /// the file is bundled with the project. C7d Bundle for Travel produces references
+    /// in this state. Tried first for managed assets so a bundle moved to a new
+    /// machine still resolves even when the bookmark + absolute path are stale.
+    case bundleMedia
     /// Found at `reference.originalPath` (or via the security-scoped bookmark — both
     /// resolve to the same location from the operator's POV).
     case original
@@ -30,6 +35,10 @@ struct MediaResolutionResult: Equatable {
 /// bookmark + absolute-path resolution; the resolver below handles the *missing-file*
 /// fallback ladder per spec §3.10:
 ///
+/// 0. **Bundle Media (managed only)** — for `.managed` references when the caller
+///    supplies a `bundleMediaDirectory`, try `<bundleMediaDirectory>/<basename>` first.
+///    A bundle moved to a new machine still resolves even when the absolute-path /
+///    security-scoped-bookmark recorded at C7d apply time are stale.
 /// 1. **Original location** — bookmark or absolute path. Cheap and authoritative.
 /// 2. **Content-hash search** — walk each `searchRoots` URL and fingerprint files
 ///    whose size matches the reference's stored size. The first content-hash match
@@ -91,6 +100,10 @@ enum MediaResolver {
     ///   - searchRoots: directories to walk for hash / name+size matches. Order
     ///     matters: the first matching root wins. Callers typically pass `[bundle
     ///     Media/, project-relink folder]`.
+    ///   - bundleMediaDirectory: the active project's `<bundle>/Media/` URL, if known.
+    ///     Drives rung 0 for `.managed` references so a bundle moved across machines
+    ///     still resolves. Pass `nil` for untitled documents or when the caller
+    ///     intentionally wants only the original-path waterfall.
     ///   - fileExists: returns `true` iff the file exists at the URL.
     ///   - listFiles: enumerates every regular file under a directory.
     ///   - fileSize: cheap size lookup used to pre-filter hash candidates.
@@ -98,11 +111,26 @@ enum MediaResolver {
     static func resolve(
         reference: MediaReference,
         searchRoots: [URL],
+        bundleMediaDirectory: URL? = nil,
         fileExists: (URL) -> Bool = liveFileExists,
         listFiles: (URL) -> [URL] = liveListFiles,
         fileSize: (URL) -> Int64? = liveFileSize,
         fingerprintAt: (URL) -> MediaAssetFingerprint? = liveFingerprint
     ) -> MediaResolutionResult {
+        // Rung 0 — bundle Media. Only consulted for `.managed` references when the
+        // caller has supplied the bundle's Media/ directory. The destination filename
+        // is the basename of `originalPath` because C7d apply writes
+        // `<bundle>/Media/<basename>` as the new originalPath (so on the same machine
+        // this short-circuits to the same URL as rung 1; on a moved bundle it
+        // recovers when the absolute path no longer matches).
+        if reference.kind == .managed, let bundleMediaDirectory {
+            let candidate = bundleMediaDirectory
+                .appendingPathComponent(URL(fileURLWithPath: reference.originalPath).lastPathComponent)
+            if fileExists(candidate) {
+                return MediaResolutionResult(url: candidate, step: .bundleMedia)
+            }
+        }
+
         // Rung 1 — original location. Try the security-scoped bookmark first (it
         // survives renames at the source); fall back to `originalPath`. We use the
         // injected `fileExists` so unit tests can drive without a real filesystem.

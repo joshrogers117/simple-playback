@@ -263,6 +263,106 @@ final class MediaResolverTests: XCTestCase {
         XCTAssertEqual(result, .offline)
     }
 
+    // MARK: - Rung 0 — bundle Media (managed assets)
+
+    func testManagedReferenceResolvesViaBundleMediaDirectory() {
+        // C7d managed asset that traveled to a new machine: absolute path is
+        // wrong, but the file is at <bundle>/Media/<basename>. The resolver
+        // must short-circuit to that location before the original-path check.
+        let bundleMedia = URL(fileURLWithPath: "/NewMachine/MyShow.spb/Media")
+        let originalPath = "/OldMachine/MyShow.spb/Media/intro.mov"
+        let reference = MediaReference(
+            url: URL(fileURLWithPath: originalPath),
+            fingerprint: nil,
+            kind: .managed
+        )
+
+        var seenURLs: [String] = []
+        let result = MediaResolver.resolve(
+            reference: reference,
+            searchRoots: [],
+            bundleMediaDirectory: bundleMedia,
+            fileExists: { url in
+                seenURLs.append(url.path)
+                return url.path == "/NewMachine/MyShow.spb/Media/intro.mov"
+            },
+            listFiles: { _ in [] },
+            fileSize: { _ in nil },
+            fingerprintAt: { _ in nil }
+        )
+
+        XCTAssertEqual(result.step, .bundleMedia)
+        XCTAssertEqual(result.url?.path, "/NewMachine/MyShow.spb/Media/intro.mov")
+    }
+
+    func testManagedReferenceFallsThroughWhenBundleMediaMisses() {
+        // If the bundle Media/ candidate doesn't exist, the resolver continues
+        // to the original-path waterfall. Ensures we don't shortcut to offline
+        // when the bundle is unexpectedly empty.
+        let originalPath = "/Local/intro.mov"
+        let reference = MediaReference(
+            url: URL(fileURLWithPath: originalPath),
+            fingerprint: nil,
+            kind: .managed
+        )
+
+        let result = MediaResolver.resolve(
+            reference: reference,
+            searchRoots: [],
+            bundleMediaDirectory: URL(fileURLWithPath: "/EmptyBundle/Media"),
+            fileExists: { url in url.path == originalPath },
+            listFiles: { _ in [] },
+            fileSize: { _ in nil },
+            fingerprintAt: { _ in nil }
+        )
+
+        XCTAssertEqual(result.step, .original)
+        XCTAssertEqual(result.url?.path, originalPath)
+    }
+
+    func testLinkedReferenceIgnoresBundleMediaDirectory() {
+        // Linked references should never short-circuit to the bundle Media/
+        // location even if a file with the same basename lives there. Rung 0
+        // is gated on `kind == .managed`.
+        let reference = MediaReference(url: URL(fileURLWithPath: "/Footage/intro.mov"))
+
+        let result = MediaResolver.resolve(
+            reference: reference,
+            searchRoots: [],
+            bundleMediaDirectory: URL(fileURLWithPath: "/Bundle/Media"),
+            fileExists: { url in url.path == "/Footage/intro.mov" },
+            listFiles: { _ in [] },
+            fileSize: { _ in nil },
+            fingerprintAt: { _ in nil }
+        )
+
+        XCTAssertEqual(result.step, .original,
+                       "Linked references must never use rung 0.")
+    }
+
+    func testManagedReferenceWithoutBundleMediaDirectoryUsesOriginalPath() {
+        // Calling code that doesn't know the bundle URL (e.g. an untitled
+        // document) passes `bundleMediaDirectory: nil`. Managed references
+        // should still resolve via the standard waterfall in that case.
+        let reference = MediaReference(
+            url: URL(fileURLWithPath: "/Local/intro.mov"),
+            fingerprint: nil,
+            kind: .managed
+        )
+
+        let result = MediaResolver.resolve(
+            reference: reference,
+            searchRoots: [],
+            bundleMediaDirectory: nil,
+            fileExists: { url in url.path == "/Local/intro.mov" },
+            listFiles: { _ in [] },
+            fileSize: { _ in nil },
+            fingerprintAt: { _ in nil }
+        )
+
+        XCTAssertEqual(result.step, .original)
+    }
+
     // MARK: - Live integration (real file)
 
     func testResolvesAtOriginalLocationOnRealFilesystem() throws {
