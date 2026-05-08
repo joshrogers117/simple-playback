@@ -39,6 +39,7 @@
 		4C060BE294B7C9A97DBA4FBE /* FrameRateConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C8342BEF86901A52B41C81 /* FrameRateConformanceTests.swift */; };
 		4D7E6C165E984434FD9A4BB0 /* SPFrameBlend.c in Sources */ = {isa = PBXBuildFile; fileRef = 4FFDD7785740559EEB94F4CA /* SPFrameBlend.c */; };
 		51CA5DA530C6B560FA1A7989 /* SimplePlaybackProjectDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB740EFC960FD945A655941 /* SimplePlaybackProjectDocument.swift */; };
+		521136DC8B0B2D5FFF8C7474 /* PreShowCheckAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0781CD54E510EE56EFE80A9D /* PreShowCheckAdapters.swift */; };
 		54A9764CA77C6FE799CDDC71 /* WebSocketFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93727D6450DEE3ED3934DA97 /* WebSocketFrame.swift */; };
 		54CEA8F876D2A59653C1D8EE /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 4213C51E238E88088B4700FC /* Sparkle */; };
 		54E5A1988F51C1AE8DE5B42A /* StateSnapshotEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13557C5F98007D62499B140 /* StateSnapshotEncoder.swift */; };
@@ -121,6 +122,7 @@
 		00712F270D3EB78020694E87 /* OSCAddressMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCAddressMap.swift; sourceTree = "<group>"; };
 		01C17ADD674250609276D8A4 /* HTTPRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRoutes.swift; sourceTree = "<group>"; };
 		06A94FE5F5AA25EE58FF77A3 /* ImageSequenceEncoderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSequenceEncoderTests.swift; sourceTree = "<group>"; };
+		0781CD54E510EE56EFE80A9D /* PreShowCheckAdapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreShowCheckAdapters.swift; sourceTree = "<group>"; };
 		0989D3568265E79CF99893F5 /* AddFolderImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddFolderImporterTests.swift; sourceTree = "<group>"; };
 		0A0971F0E4FF56FD74F21EC0 /* OutputStatusBarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputStatusBarTests.swift; sourceTree = "<group>"; };
 		0AAABB8C041A4E6DF8BE8685 /* LTCDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LTCDecoder.swift; sourceTree = "<group>"; };
@@ -444,6 +446,7 @@
 				2762065E2D1FE5D3F052F8FF /* MediaImportFailure.swift */,
 				45BCD3E72BF9F52C2653862E /* PDFImporter.swift */,
 				5B45DD8149F1F904849FDFC2 /* PreShowCheck.swift */,
+				0781CD54E510EE56EFE80A9D /* PreShowCheckAdapters.swift */,
 				BB90370BA34D673675815F69 /* TranscodeService.swift */,
 			);
 			path = Services;
@@ -586,6 +589,7 @@
 				E9E3C51A99F9323FE1D530DC /* PDFImporter.swift in Sources */,
 				28C1335FD15B6AE87DD31AB3 /* PlaybackController.swift in Sources */,
 				DE5FE0EC53035F43FFA246E0 /* PreShowCheck.swift in Sources */,
+				521136DC8B0B2D5FFF8C7474 /* PreShowCheckAdapters.swift in Sources */,
 				DE590B021826D8B2C652636D /* PreShowCheckView.swift in Sources */,
 				020E6C3D173AD7E05AC7A15A /* RootView.swift in Sources */,
 				4D7E6C165E984434FD9A4BB0 /* SPFrameBlend.c in Sources */,

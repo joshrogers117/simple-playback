@@ -213,4 +213,25 @@ final class PreShowCheckTests: XCTestCase {
         // First non-OK row should be the error.
         XCTAssertEqual(rows.first?.severity, .error)
     }
+
+    // MARK: - DeckLink adapter
+
+    /// The bridge state → PreShowCheck enum mapping is the single seam between the
+    /// live DeckLink output and the pre-show evaluator. Pin every case so a future
+    /// renaming on either side trips a test.
+    func testDeckLinkAdapterMapsIdleToNotRequired() {
+        XCTAssertEqual(PreShowCheck.DeckLinkReferenceStatus.from(.idle), .notRequired)
+    }
+
+    func testDeckLinkAdapterMapsNotSupportedDirectly() {
+        XCTAssertEqual(PreShowCheck.DeckLinkReferenceStatus.from(.notSupported), .notSupported)
+    }
+
+    func testDeckLinkAdapterMapsUnlockedDirectly() {
+        XCTAssertEqual(PreShowCheck.DeckLinkReferenceStatus.from(.unlocked), .unlocked)
+    }
+
+    func testDeckLinkAdapterMapsLockedDirectly() {
+        XCTAssertEqual(PreShowCheck.DeckLinkReferenceStatus.from(.locked), .locked)
+    }
 }

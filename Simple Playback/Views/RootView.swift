@@ -431,15 +431,19 @@ struct RootView: View {
 
     /// Builds the pre-show check Context with whatever signals the host can sample
     /// synchronously without blocking the UI. Today: free disk space at the project
-    /// bundle's enclosing volume (or the app-support fallback for untitled documents).
-    /// DeckLink lock state and audio-device availability are deferred — they need
-    /// adapters into PlaybackController / CoreAudio that aren't built yet.
+    /// bundle's enclosing volume (or the app-support fallback for untitled documents),
+    /// plus the DeckLink reference state that PlaybackController already exposes for
+    /// the B6/B6b status-bar chip. Audio-device availability is still deferred until
+    /// a CoreAudio adapter lands.
     private func preShowCheckContext() -> PreShowCheck.Context {
         var ctx = PreShowCheck.Context()
         let probeURL = projectBundleURLProvider() ?? RootView.untitledRenderRoot
         if let values = try? probeURL.resourceValues(forKeys: [.volumeAvailableCapacityKey]),
            let bytes = values.volumeAvailableCapacity {
             ctx.availableDiskBytes = Int64(bytes)
+        }
+        if let live = playback.deckLinkReferenceState {
+            ctx.deckLinkReferenceStatus = .from(live)
         }
         return ctx
     }
