@@ -56,8 +56,79 @@ final class ShowController: ObservableObject {
         self.outputBindingLookup = outputBinding
         wireRuntime()
         // Hand this document's runtime to the process-wide show-control hub so
-        // OSC/HTTP/Companion route GO/PANIC/etc. to this show list.
+        // OSC/HTTP/Companion route GO/PANIC/etc. to this show list. Also pipe
+        // the dispatcher's `onActionDispatched` callback into our show log so
+        // every remote-driven action lands with its source attribution (host,
+        // port, transport, etc.).
         ShowControlHub.shared.bind(runtime: runtime)
+        ShowControlHub.shared.stack.dispatcher.onActionDispatched = { [weak self] action, source, _ in
+            self?.recordDispatchedAction(action, source: source)
+        }
+    }
+
+    /// Translate a dispatcher-level `ShowControlAction` + `ShowControlSource`
+    /// into a `ShowLogEvent`. Verbs map directly; per-cue / output / TC /
+    /// workspace actions collapse onto a generic `.oscAction` row with a
+    /// short name for the action — operators get a single chronological log
+    /// without it ballooning into one row per OSC address.
+    private func recordDispatchedAction(_ action: ShowControlAction, source: ShowControlSource) {
+        let logSource = source.toShowLogSource()
+        switch action {
+        case .go(let target):
+            showLog?.appendNow(action: .go, source: logSource, detail: target)
+        case .previous:
+            showLog?.appendNow(action: .previous, source: logSource)
+        case .panic(let fade):
+            let detail = fade.map { "fade=\(String(format: "%.2f", $0))s" }
+            showLog?.appendNow(action: .panic, source: logSource, detail: detail)
+        case .clear:
+            showLog?.appendNow(action: .clear, source: logSource)
+        case .outputBlackout(let enabled):
+            showLog?.appendNow(action: .blackout, source: logSource, detail: enabled ? "on" : "off")
+        case .showMode(let enabled):
+            showLog?.appendNow(
+                action: enabled ? .showModeOn : .showModeOff,
+                source: logSource
+            )
+        case .ping, .subscribe, .unsubscribe:
+            // Diagnostic chatter — never logs. Subscriptions in particular fire
+            // every time a control surface reconnects; logging them would drown
+            // the operator-relevant verbs.
+            return
+        default:
+            showLog?.appendNow(
+                action: .oscAction,
+                source: logSource,
+                detail: shortActionName(action)
+            )
+        }
+    }
+
+    private func shortActionName(_ action: ShowControlAction) -> String {
+        switch action {
+        case .movePlayhead(let n): return "movePlayhead \(n)"
+        case .load(let n): return "load \(n)"
+        case .cuePlay(let n): return "cuePlay \(n)"
+        case .cueStop(let n, _): return "cueStop \(n)"
+        case .cueScrubNormalized(let n, _): return "cueScrub \(n)"
+        case .cueScrubSeconds(let n, _): return "cueScrubSec \(n)"
+        case .cueOpacity(let n, _): return "cueOpacity \(n)"
+        case .cueAudioLevel(let n, _): return "cueAudio \(n)"
+        case .cueInPoint(let n, _): return "cueIn \(n)"
+        case .cueOutPoint(let n, _): return "cueOut \(n)"
+        case .cueLoop(let n, _): return "cueLoop \(n)"
+        case .cueGoto(let n, _): return "cueGoto \(n)"
+        case .cuePreload(let n): return "cuePreload \(n)"
+        case .cueNotes(let n, _): return "cueNotes \(n)"
+        case .outputFreeze(let on): return "outputFreeze \(on)"
+        case .lookRecall(let name): return "lookRecall \(name)"
+        case .timecodeSource(let s): return "tcSource \(s)"
+        case .timecodeEngaged(let on): return "tcEngaged \(on)"
+        case .timecodeOffset(let s): return "tcOffset \(s)"
+        case .workspaceSave: return "workspaceSave"
+        case .workspaceReload: return "workspaceReload"
+        default: return ""
+        }
     }
 
     // MARK: - Verb facade

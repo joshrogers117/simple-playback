@@ -88,6 +88,89 @@ final class ShowControllerLogTests: XCTestCase {
         XCTAssertEqual(log.events.last?.action, .showModeOff)
     }
 
+    // MARK: - OSC / dispatched-action attribution (E3c)
+
+    /// Pin the `ShowControlSource` → `ShowLogEvent.Source` mapping. This is
+    /// the seam between the OSC/HTTP dispatcher and the show log; tests fix
+    /// the per-case translation so renaming on either side trips the test.
+    func testOSCSourceTranslationCarriesHostAndPort() {
+        let src = ShowControlSource.osc(host: "10.0.1.7", port: 53000, transport: .udp)
+        XCTAssertEqual(src.toShowLogSource(), .osc(host: "10.0.1.7", port: 53000))
+    }
+
+    func testHTTPSourceTranslationCollapsesTokenToLastFour() {
+        let src = ShowControlSource.http(token: "abcdef1234", host: "operator-mac.lan")
+        XCTAssertEqual(src.toShowLogSource(), .http(tokenSuffix: "1234"))
+    }
+
+    func testHTTPSourceTranslationKeepsShortTokensVerbatim() {
+        let src = ShowControlSource.http(token: "ab", host: "host")
+        XCTAssertEqual(src.toShowLogSource(), .http(tokenSuffix: "ab"))
+    }
+
+    func testTimecodeSourceTranslation() {
+        XCTAssertEqual(ShowControlSource.timecode.toShowLogSource(), .timecode)
+    }
+
+    func testLocalSourceTranslatesToOperatorButton() {
+        XCTAssertEqual(ShowControlSource.local.toShowLogSource(), .operatorButton)
+    }
+
+    // MARK: - Dispatcher → show-log integration
+
+    func testDispatchedGOLogsViaShowLog() {
+        let (cue, slide) = cueWithSlide()
+        let list = ShowList(name: "Show", cues: [cue])
+        let (controller, log) = makeController(showList: list, assetLookup: { _ in slide })
+        // ShowController's init has already wired itself to the hub's
+        // dispatcher. Simulate an OSC GO landing on the dispatcher.
+        let source = ShowControlSource.osc(host: "192.168.1.10", port: 53000, transport: .udp)
+        ShowControlHub.shared.stack.dispatcher.onActionDispatched?(
+            .go(target: nil),
+            source,
+            .ok(data: [:])
+        )
+        // Drain main runloop in case any async chain follows.
+        let exp = expectation(description: "main runloop tick")
+        DispatchQueue.main.async { exp.fulfill() }
+        wait(for: [exp], timeout: 1.0)
+
+        XCTAssertTrue(log.events.contains { $0.action == .go && $0.source == .osc(host: "192.168.1.10", port: 53000) },
+                      "Dispatched GO must land in the show log with OSC attribution.")
+        _ = controller // keep alive
+    }
+
+    func testDispatchedShowModeMapsToOnOrOffEvent() {
+        let (controller, log) = makeController()
+        let source = ShowControlSource.osc(host: "h", port: 1, transport: .tcp)
+        ShowControlHub.shared.stack.dispatcher.onActionDispatched?(
+            .showMode(enabled: true), source, .ok(data: [:]))
+        XCTAssertEqual(log.events.last?.action, .showModeOn)
+        ShowControlHub.shared.stack.dispatcher.onActionDispatched?(
+            .showMode(enabled: false), source, .ok(data: [:]))
+        XCTAssertEqual(log.events.last?.action, .showModeOff)
+        _ = controller
+    }
+
+    func testDispatchedPingDoesNotLog() {
+        let (controller, log) = makeController()
+        let source = ShowControlSource.osc(host: "h", port: 1, transport: .udp)
+        ShowControlHub.shared.stack.dispatcher.onActionDispatched?(.ping, source, .ok(data: [:]))
+        XCTAssertFalse(log.events.contains { $0.action == .oscAction },
+                       "Diagnostic chatter (ping/subscribe) must not flood the operator log.")
+        _ = controller
+    }
+
+    func testDispatchedNonVerbActionLogsAsOSCAction() {
+        let (controller, log) = makeController()
+        let source = ShowControlSource.osc(host: "h", port: 1, transport: .udp)
+        ShowControlHub.shared.stack.dispatcher.onActionDispatched?(
+            .cuePlay(cueNumber: "5"), source, .ok(data: [:]))
+        XCTAssertEqual(log.events.last?.action, .oscAction)
+        XCTAssertTrue(log.events.last?.detail?.contains("cuePlay 5") ?? false)
+        _ = controller
+    }
+
     func testGOWithMissingAssetLogsMissingMediaSystemEvent() {
         let cue = Cue(number: "9", title: "Orphan", assetID: UUID())
         let list = ShowList(name: "Show", cues: [cue])

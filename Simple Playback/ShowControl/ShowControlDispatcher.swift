@@ -35,6 +35,27 @@ enum OSCTransportKind: String, Equatable {
     case tcp
 }
 
+extension ShowControlSource {
+    /// Translate the dispatcher's source attribution into the show-log shape.
+    /// HTTP tokens collapse to their last 4 characters so a leaked log file
+    /// can't be replayed against the API.
+    func toShowLogSource() -> ShowLogEvent.Source {
+        switch self {
+        case .local:
+            return .operatorButton
+        case let .osc(host, port, _):
+            return .osc(host: host, port: Int(port))
+        case let .http(token, _):
+            let suffix = token.count > 4 ? String(token.suffix(4)) : token
+            return .http(tokenSuffix: suffix)
+        case .timecode:
+            return .timecode
+        case .test:
+            return .system
+        }
+    }
+}
+
 /// Dispatcher: turns `ShowControlAction` values into calls on `CueRuntime` and
 /// other show-mode-aware sinks, and produces a structured reply.
 ///
