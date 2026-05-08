@@ -10,6 +10,11 @@ struct RootView: View {
     @StateObject private var transcodeCoordinator = TranscodeCoordinator()
     @StateObject private var encodeCoordinator = ImageSequenceEncodeCoordinator()
     @StateObject private var importStatus = ImportStatusBanner()
+    /// E3 — append-only show log for this document. Wired into ShowController
+    /// after configuration so every verb (GO/PANIC/CLEAR/BLACKOUT/Show-Mode)
+    /// records to the journal. Persistence destination is set in
+    /// `bindShowLogFile()` once the document has a bundle URL.
+    @StateObject private var showLog = ShowLog()
     @State private var selectedSlideID: UUID?
     @State private var selectedCueID: UUID?
     @State private var dropTargeted = false
@@ -364,8 +369,23 @@ struct RootView: View {
                     (outputSettings.selectedDeviceID, outputSettings.selectedModeID)
                 }
             )
+            showController.controller?.showLog = showLog
+            bindShowLogFile()
         }
         syncCompositorOverlays()
+    }
+
+    /// Bind the show-log writer to a path inside the project bundle when one
+    /// exists. Untitled documents have no bundle on disk yet — events stay
+    /// in memory until the operator saves. Idempotent.
+    private func bindShowLogFile() {
+        guard let bundleURL = projectBundleURLProvider() else { return }
+        let logsURL = bundleURL.appendingPathComponent("Logs", isDirectory: true)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let stamped = formatter.string(from: Date())
+        let logFileURL = logsURL.appendingPathComponent("\(stamped).log")
+        showLog.setFileURL(logFileURL)
     }
 
     private func syncActiveShowList() {

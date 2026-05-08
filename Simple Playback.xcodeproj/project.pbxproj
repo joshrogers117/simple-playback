@@ -63,6 +63,7 @@
 		851AE7644559671FB09FD2BD /* ShowControlIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E47E51BD45087956CCF2905 /* ShowControlIntegrationTests.swift */; };
 		873129B7192207BD8E22D111 /* ImportStatusBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41F6421D7CBD102AC8875CC6 /* ImportStatusBanner.swift */; };
 		875D909F07AAF19E396A7C69 /* AddFolderImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB7AC40249EC7B2A4951E24 /* AddFolderImportSheet.swift */; };
+		8BD2A352FC9B61303CA55D19 /* ShowControllerLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBE4B045C1C58A97ED08C4B9 /* ShowControllerLogTests.swift */; };
 		8E0250619812CB053444052C /* OSCServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBA363D1C04A7119011031E /* OSCServer.swift */; };
 		91592F7DACBD58D4C6BBE0F2 /* HTTPRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01C17ADD674250609276D8A4 /* HTTPRoutes.swift */; };
 		9293FC94ADE051275861BFE8 /* AVKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 92D6FAD99797FC3C21DA725E /* AVKit.framework */; };
@@ -226,6 +227,7 @@
 		D8CA5B1A327E84EEA75F0B9F /* UniformTypeIdentifiers.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UniformTypeIdentifiers.framework; path = System/Library/Frameworks/UniformTypeIdentifiers.framework; sourceTree = SDKROOT; };
 		D930FD6914035D4FEAC331A2 /* PreShowCheckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreShowCheckTests.swift; sourceTree = "<group>"; };
 		DBA2A137EBDAA8855CAA24A2 /* AuthTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthTokenStore.swift; sourceTree = "<group>"; };
+		DBE4B045C1C58A97ED08C4B9 /* ShowControllerLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControllerLogTests.swift; sourceTree = "<group>"; };
 		E1B3AC760F776AC4DDC6B0F9 /* DeckLinkSDK.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DeckLinkSDK.h; sourceTree = "<group>"; };
 		E66F934F6D6C5561905E6550 /* CoreImage.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreImage.framework; path = System/Library/Frameworks/CoreImage.framework; sourceTree = SDKROOT; };
 		E9305D229FBA3B8EC6854577 /* StageScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageScreen.swift; sourceTree = "<group>"; };
@@ -353,6 +355,7 @@
 				F69D8058E585303C53CD3E3F /* PreShowCheckFixHandlersTests.swift */,
 				D930FD6914035D4FEAC331A2 /* PreShowCheckTests.swift */,
 				0E47E51BD45087956CCF2905 /* ShowControlIntegrationTests.swift */,
+				DBE4B045C1C58A97ED08C4B9 /* ShowControllerLogTests.swift */,
 				237C1358E779CC8F8EBA839E /* ShowControlTests.swift */,
 				BB5E45F95D97440E499B624D /* ShowLogTests.swift */,
 				633EE3FAB29225F6222E52AB /* TranscodeCoordinatorTests.swift */,
@@ -665,6 +668,7 @@
 				E7E0BCCC5F1B98DD0A582010 /* PreShowCheckTests.swift in Sources */,
 				851AE7644559671FB09FD2BD /* ShowControlIntegrationTests.swift in Sources */,
 				00EC3572563AA2E459F2489F /* ShowControlTests.swift in Sources */,
+				8BD2A352FC9B61303CA55D19 /* ShowControllerLogTests.swift in Sources */,
 				B36D00350C08A8A28FF15181 /* ShowLogTests.swift in Sources */,
 				66B172846E254E8FCC806D8B /* TranscodeCoordinatorTests.swift in Sources */,
 				4552EA56AF59686AE3373E66 /* TranscodeServiceTests.swift in Sources */,

@@ -30,6 +30,12 @@ final class ShowController: ObservableObject {
     /// operators see why nothing happened.
     @Published private(set) var lastGoRejection: CueRuntimeRejection?
 
+    /// E3 — append-only show log. Each verb method records a corresponding
+    /// `ShowLogEvent`. Optional so headless tests + early app boot don't need a
+    /// log instance; production sets it from `RootView` after the controller
+    /// is wired up.
+    weak var showLog: ShowLog?
+
     private let playback: PlaybackController
     private let assetLookup: (UUID) -> MediaSlide?
     private let transitionSettingsLookup: () -> PlayoutTransitionSettings
@@ -57,26 +63,30 @@ final class ShowController: ObservableObject {
     // MARK: - Verb facade
 
     /// Fires the playhead cue. UI hotkey: Space.
-    func go() {
-        runtime.go()
+    func go(source: ShowLogEvent.Source = .operatorButton) {
+        let fired = runtime.go()
+        showLog?.appendNow(action: .go, source: source, detail: detailString(for: fired))
     }
 
     /// Jumps to and fires a cue by its operator-visible number.
-    func go(targetNumber: String) {
-        runtime.go(targetNumber: targetNumber)
+    func go(targetNumber: String, source: ShowLogEvent.Source = .operatorButton) {
+        let fired = runtime.go(targetNumber: targetNumber)
+        showLog?.appendNow(action: .go, source: source, detail: detailString(for: fired) ?? "→\(targetNumber)")
     }
 
     /// Steps the playhead one cue back without firing.
-    func previous() {
+    func previous(source: ShowLogEvent.Source = .operatorButton) {
         runtime.previous()
+        showLog?.appendNow(action: .previous, source: source)
     }
 
     /// Soft panic — fade everything out, lock GO, then resolve after the fade completes.
     /// UI hotkey: Esc.
-    func panic(fade: TimeInterval? = nil) {
+    func panic(fade: TimeInterval? = nil, source: ShowLogEvent.Source = .operatorButton) {
         let fadeDuration = max(0, fade ?? runtime.defaultPanicFade)
         runtime.panic(fade: fadeDuration)
         playback.clear()
+        showLog?.appendNow(action: .panic, source: source, detail: "fade=\(String(format: "%.2f", fadeDuration))s")
 
         // Schedule auto-completion of the panic after the fade window. The scheduler-driven
         // panic state is the runtime's responsibility, but we drive completion here because
@@ -91,21 +101,35 @@ final class ShowController: ObservableObject {
     }
 
     /// Hard kill — instant black + audio mute. UI hotkey: Cmd-Esc (planned).
-    func clear() {
+    func clear(source: ShowLogEvent.Source = .operatorButton) {
         panicCompletionTask?.cancel()
         panicCompletionTask = nil
         runtime.clear()
         playback.clear()
+        showLog?.appendNow(action: .clear, source: source)
     }
 
     /// Toggles the latching blackout flag. UI hotkey: B.
-    func toggleBlackout() {
+    func toggleBlackout(source: ShowLogEvent.Source = .operatorButton) {
         runtime.toggleBlackout()
+        showLog?.appendNow(action: .blackout, source: source)
     }
 
     /// Toggles Show Mode. UI hotkey: Cmd-Shift-L. Confirm dialog handled by the calling view.
-    func toggleShowMode() {
+    func toggleShowMode(source: ShowLogEvent.Source = .operatorButton) {
         showMode.toggle()
+        showLog?.appendNow(
+            action: showMode ? .showModeOn : .showModeOff,
+            source: source
+        )
+    }
+
+    /// Build a CSV-friendly detail string from a fired cue. Empty for nil
+    /// (GO rejected — the runtime separately publishes lastGoRejection).
+    private func detailString(for cue: Cue?) -> String? {
+        guard let cue else { return nil }
+        let id = cue.number.isEmpty ? cue.title : cue.number
+        return id
     }
 
     // MARK: - Compositor overlays bridge (B12e)
@@ -206,6 +230,8 @@ final class ShowController: ObservableObject {
             // exists in the library. Phase C will treat this as a non-blocking warning and
             // surface it in the inspector. For now, end the cue immediately so the runtime
             // returns to idle and chains can advance.
+            let detail = cue.number.isEmpty ? cue.title : cue.number
+            showLog?.appendNow(action: .missingMedia, source: .system, detail: detail)
             runtime.cueDidEnd(cueID: cue.id)
             return
         }
