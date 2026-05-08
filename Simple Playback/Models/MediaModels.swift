@@ -58,6 +58,95 @@ enum MediaReferenceKind: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// C8 — security-scoped bookmark for a parent directory that contains one or more
+/// imported assets. When the operator imports via Add Folder / a folder-drop in
+/// `RootView`, the importer captures **one** bookmark for the source directory and
+/// stamps every per-asset `MediaReference` with this bookmark's `id` plus the path
+/// relative to the folder. On resolution, `MediaResolver` falls back to
+/// `bookmark → directory + relativePath` when the per-file bookmark/path no longer
+/// resolves — so a clip moved within its imported folder still resolves without
+/// the operator running the relink waterfall.
+///
+/// Why a project-level registry instead of inline-per-MediaReference: a 50-clip
+/// folder produces ONE 1–2 KB security-scoped bookmark blob shared across every
+/// slide instead of fifty copies. Spec §3.10's "folder-level bookmark + per-file
+/// relative path" is what this implements.
+///
+/// `originalPath` is the absolute path at import time and is used as a hint for
+/// the operator on relink failure (the C9 banner can show "couldn't find folder
+/// X"). The bookmark itself is the authoritative resolution route.
+struct FolderBookmark: Codable, Hashable, Identifiable {
+    var id: UUID = UUID()
+    /// Operator-visible label. Defaults to the folder's last-path-component.
+    var label: String
+    /// Absolute path of the folder at import time. Hint-only; resolution goes
+    /// through `bookmarkData` first.
+    var originalPath: String
+    /// Security-scoped bookmark over the folder. `nil` is allowed for tests +
+    /// for legacy entries that decode without a bookmark.
+    var bookmarkData: Data?
+
+    init(id: UUID = UUID(), label: String, originalPath: String, bookmarkData: Data? = nil) {
+        self.id = id
+        self.label = label
+        self.originalPath = originalPath
+        self.bookmarkData = bookmarkData
+    }
+
+    /// Convenience initializer that captures a security-scoped bookmark for
+    /// `folderURL` at construction time. Returns `nil` bookmarkData if the
+    /// system declines to vend one (sandboxed access not granted, etc.); the
+    /// resolution waterfall will then fall back to `originalPath`.
+    init(folderURL: URL, label: String? = nil) {
+        self.id = UUID()
+        self.label = label ?? folderURL.lastPathComponent
+        self.originalPath = folderURL.path
+        self.bookmarkData = try? folderURL.bookmarkData(
+            options: [.withSecurityScope],
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case originalPath
+        case bookmarkData
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
+        originalPath = try c.decode(String.self, forKey: .originalPath)
+        bookmarkData = try c.decodeIfPresent(Data.self, forKey: .bookmarkData)
+    }
+
+    /// Resolves the folder bookmark to an on-disk directory URL, or `nil` if
+    /// neither the bookmark nor `originalPath` points at an existing directory.
+    /// Mirrors the per-file `MediaReference.resolvedURL` shape: bookmark first,
+    /// originalPath fallback, fileExists gate so a stale-bookmarked deleted
+    /// directory doesn't masquerade as resolved.
+    func resolvedDirectory(
+        fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> URL? {
+        if let bookmarkData {
+            var stale = false
+            if let url = try? URL(
+                resolvingBookmarkData: bookmarkData,
+                options: [.withSecurityScope],
+                relativeTo: nil,
+                bookmarkDataIsStale: &stale
+            ), fileExists(url) {
+                return url
+            }
+        }
+        let fallback = URL(fileURLWithPath: originalPath, isDirectory: true)
+        return fileExists(fallback) ? fallback : nil
+    }
+}
+
 struct MediaReference: Codable, Hashable {
     var originalPath: String
     var bookmarkData: Data?
@@ -68,11 +157,23 @@ struct MediaReference: Codable, Hashable {
     /// references created before C7 (the field decodes-if-present and the relink
     /// waterfall recomputes it on first successful resolve in a future iteration).
     var fingerprint: MediaAssetFingerprint?
+    /// C8 — id of a `FolderBookmark` registered on the owning `PlayoutProject`.
+    /// Set by the Add-Folder / folder-drop importer when the source assets all
+    /// share a common parent directory. The folder-bookmark fallback rung in
+    /// `MediaResolver` joins the bookmark's resolved directory with
+    /// `folderRelativePath` when the per-file bookmark / absolute path is dead.
+    /// `nil` for slides imported one-at-a-time (no shared parent).
+    var folderBookmarkID: UUID?
+    /// C8 — path relative to the FolderBookmark's directory (POSIX
+    /// separators, no leading slash). Always paired with `folderBookmarkID`.
+    var folderRelativePath: String?
 
     init(
         url: URL,
         fingerprint: MediaAssetFingerprint? = nil,
-        kind: MediaReferenceKind = .linked
+        kind: MediaReferenceKind = .linked,
+        folderBookmarkID: UUID? = nil,
+        folderRelativePath: String? = nil
     ) {
         originalPath = url.path
         bookmarkData = try? url.bookmarkData(
@@ -82,6 +183,8 @@ struct MediaReference: Codable, Hashable {
         )
         self.fingerprint = fingerprint
         self.kind = kind
+        self.folderBookmarkID = folderBookmarkID
+        self.folderRelativePath = folderRelativePath
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -89,6 +192,8 @@ struct MediaReference: Codable, Hashable {
         case bookmarkData
         case kind
         case fingerprint
+        case folderBookmarkID
+        case folderRelativePath
     }
 
     init(from decoder: Decoder) throws {
@@ -97,6 +202,8 @@ struct MediaReference: Codable, Hashable {
         bookmarkData = try c.decodeIfPresent(Data.self, forKey: .bookmarkData)
         kind = try c.decodeIfPresent(MediaReferenceKind.self, forKey: .kind) ?? .linked
         fingerprint = try c.decodeIfPresent(MediaAssetFingerprint.self, forKey: .fingerprint)
+        folderBookmarkID = try c.decodeIfPresent(UUID.self, forKey: .folderBookmarkID)
+        folderRelativePath = try c.decodeIfPresent(String.self, forKey: .folderRelativePath)
     }
 
     func resolvedURL() -> URL? {
@@ -556,6 +663,16 @@ struct PlayoutProject: Codable, Hashable {
     /// informational orange chip to a red "REF EXPECTED" banner. Spec §3.7.
     var expectsExternalReference: Bool = false
 
+    /// C8 — security-scoped bookmarks for parent directories that the
+    /// folder-import path captured at import time. Each `MediaReference`
+    /// imported via Add Folder / folder-drop with a shared parent stamps its
+    /// id into `MediaReference.folderBookmarkID` and stores its in-folder
+    /// relative path in `folderRelativePath`. `MediaResolver` consults this
+    /// list as a fallback rung when the per-file bookmark / absolute path no
+    /// longer resolves; the folder bookmark + relative path will recover a
+    /// clip moved within its imported folder without a relink walk.
+    var folderBookmarks: [FolderBookmark] = []
+
     /// Spec §3.10 / Phase B8 — "10-bit YUV 4:2:2 default when any clip in the project is
     /// >8-bit." True iff any video slide in the asset library has the C1 inspector flag
     /// `flags.tenBitYUV420` set, which the C1 adapter populates for HEVC Main-10 sources at
@@ -612,6 +729,7 @@ struct PlayoutProject: Codable, Hashable {
         case outputHeight
         case transitionSettings
         case expectsExternalReference
+        case folderBookmarks
     }
 
     init(from decoder: Decoder) throws {
@@ -629,6 +747,7 @@ struct PlayoutProject: Codable, Hashable {
         transitionSettings = try container.decodeIfPresent(PlayoutTransitionSettings.self, forKey: .transitionSettings)
             ?? PlayoutTransitionSettings()
         expectsExternalReference = try container.decodeIfPresent(Bool.self, forKey: .expectsExternalReference) ?? false
+        folderBookmarks = try container.decodeIfPresent([FolderBookmark].self, forKey: .folderBookmarks) ?? []
     }
 
     /// Bumps `formatVersion` to the current value, ensures at least one show list exists, and

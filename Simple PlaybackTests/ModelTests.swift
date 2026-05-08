@@ -151,6 +151,46 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(decoded.transitionSettings.crossfadeEnabled)
     }
 
+    // MARK: - C8 folderBookmarks
+
+    func testProjectRoundTripPreservesFolderBookmarks() throws {
+        let folderID = UUID()
+        let bookmark = FolderBookmark(
+            id: folderID,
+            label: "Show Footage",
+            originalPath: "/Volumes/Show/Footage",
+            bookmarkData: Data([0xAB, 0xCD, 0xEF])
+        )
+        var project = PlayoutProject()
+        project.folderBookmarks = [bookmark]
+
+        let encoded = try JSONEncoder.simplePlayback.encode(project)
+        let decoded = try JSONDecoder.simplePlayback.decode(PlayoutProject.self, from: encoded)
+
+        XCTAssertEqual(decoded.folderBookmarks.count, 1)
+        XCTAssertEqual(decoded.folderBookmarks.first?.id, folderID)
+        XCTAssertEqual(decoded.folderBookmarks.first?.label, "Show Footage")
+        XCTAssertEqual(decoded.folderBookmarks.first?.bookmarkData, Data([0xAB, 0xCD, 0xEF]))
+    }
+
+    func testLegacyProjectDecodesWithoutFolderBookmarks() throws {
+        // Pre-C8 projects encoded PlayoutProject without folderBookmarks.
+        // Loading those projects must continue to work and the field must
+        // default to an empty array.
+        let legacyJSON = """
+        {
+          "slides": [],
+          "selectedDeviceID": "legacy:device",
+          "outputWidth": 1280,
+          "outputHeight": 720
+        }
+        """
+        let data = try XCTUnwrap(legacyJSON.data(using: .utf8))
+        let decoded = try JSONDecoder.simplePlayback.decode(PlayoutProject.self, from: data)
+
+        XCTAssertEqual(decoded.folderBookmarks, [])
+    }
+
     func testProjectReaderAcceptsLegacyFlatFileWrapper() throws {
         let legacyJSON = """
         {

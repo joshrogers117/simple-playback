@@ -90,4 +90,61 @@ final class MediaReferenceTests: XCTestCase {
     func testMediaReferenceKindAllCasesCoversLinkedAndManaged() {
         XCTAssertEqual(Set(MediaReferenceKind.allCases), [.linked, .managed])
     }
+
+    // MARK: - C8 folderBookmarkID + folderRelativePath
+
+    func testInitDefaultsFolderBookmarkFieldsToNil() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(UUID().uuidString).bin")
+        let ref = MediaReference(url: url)
+        XCTAssertNil(ref.folderBookmarkID)
+        XCTAssertNil(ref.folderRelativePath)
+    }
+
+    func testInitAcceptsFolderBookmarkFields() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(UUID().uuidString).bin")
+        let folderID = UUID()
+        let ref = MediaReference(
+            url: url,
+            folderBookmarkID: folderID,
+            folderRelativePath: "subfolder/clip.mov"
+        )
+        XCTAssertEqual(ref.folderBookmarkID, folderID)
+        XCTAssertEqual(ref.folderRelativePath, "subfolder/clip.mov")
+    }
+
+    func testRoundTripPreservesFolderBookmarkFields() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(UUID().uuidString).bin")
+        let folderID = UUID()
+        let ref = MediaReference(
+            url: url,
+            folderBookmarkID: folderID,
+            folderRelativePath: "scene/clip-01.mov"
+        )
+
+        let data = try JSONEncoder.simplePlayback.encode(ref)
+        let decoded = try JSONDecoder.simplePlayback.decode(MediaReference.self, from: data)
+
+        XCTAssertEqual(decoded.folderBookmarkID, folderID)
+        XCTAssertEqual(decoded.folderRelativePath, "scene/clip-01.mov")
+    }
+
+    func testLegacyDecodeDefaultsFolderBookmarkFieldsToNil() throws {
+        // Pre-C8 projects encoded MediaReference without folderBookmarkID +
+        // folderRelativePath. Loading those projects must continue to work;
+        // the new fields default to nil.
+        let legacyJSON = """
+        {
+          "originalPath": "/Users/op/Movies/intro.mov",
+          "kind": "linked"
+        }
+        """
+        let data = try XCTUnwrap(legacyJSON.data(using: .utf8))
+        let decoded = try JSONDecoder.simplePlayback.decode(MediaReference.self, from: data)
+
+        XCTAssertNil(decoded.folderBookmarkID)
+        XCTAssertNil(decoded.folderRelativePath)
+    }
 }
