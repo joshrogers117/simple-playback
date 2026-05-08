@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B14 partial); Phase C started — C1a shipped (codec inspector pure-logic flags + evaluator).
-- **Last commit**: C1c — flag chips visible in `CueInspectorView` below the FPS warning
+- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B14 partial); Phase C in progress — C1 (codec inspector flags) and C3 (PDF rasterize-on-import) shipped end-to-end.
+- **Last commit**: C3c — RootView routes PDFs through `Cache/Renders/` with the active Stage's size × 2 raster target
 - **Branch**: `development`
 
 ---
@@ -63,7 +63,10 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
   - [x] C1b: `MediaFlagsInspector.inspect(url:)` populates `MediaSlide.flags` at import; `decodeIfPresent` for legacy projects
   - [x] C1c: `MediaFlagWarningChip` renders each active flag below the FPS conformance warning in `CueInspectorView`
 - [ ] C2: Right-click "Transcode to ProRes 422" action; writes to project-relative `Transcoded/`
-- [ ] C3: PDF import via PDFKit → bitmap-per-page at output × 2
+- [x] C3: PDF import via PDFKit → bitmap-per-page at output × 2
+  - [x] C3a: `Services/PDFImporter.swift` rasterize service + 8 tests (PDFKit pure logic)
+  - [x] C3b: `MediaImporter.importSlides(from:context:)` routes PDFs via `MediaImportContext` + 4 tests
+  - [x] C3c: `RootView` drop / open-panel build the context (Stage × 2 raster; bundle `Cache/Renders/` or app-support fallback for untitled docs); `ProjectBundleLayout.rendersDirectory` pinned
 - [ ] C4: Animated GIF / APNG detect → offer convert-to-ProRes-4444
 - [ ] C5: Image-sequence detect (`name.0001.png`) → offer encode-to-ProRes-4444 via `AVAssetWriter`
 - [ ] C6: Keynote import — AppleScript-driven `.key` → PDF → bitmaps; "Keynote not installed" diagnostic

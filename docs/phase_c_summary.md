@@ -1,10 +1,70 @@
 # Phase C — Media pipeline — Summary
 
+**Status (session 7 — 2026-05-08)**: C3 shipped end-to-end (PDF rasterize-on-import). 243 tests, all green (was 233 at session start). 3 new commits on `development` (C3a / C3b / C3c).
+
 **Status (session 6 — 2026-05-08)**: C1 shipped end-to-end (codec inspector flags). 233 tests, all green (was 202 at session start). 3 commits on `development`.
 
 Phase C is just starting. The codec inspector (C1) is the first piece because it has zero hardware dependency and unblocks B8 (10-bit YUV default once any clip is >8-bit) — the `MediaSlide.flags.tenBitYUV420` boolean is now the project-wide signal B8 will key off of.
 
 The remaining Phase C items (C2 transcode action, C3 PDF import, C4 GIF/APNG detect-and-convert, C5 image-sequence detect-and-encode, C6 Keynote import, C7+ asset library / audio / subtitles) are all autonomy-friendly with no hardware exposure — Phase C should be the workhorse phase for autonomous-build cycles.
+
+---
+
+## What shipped in session 7 (C3)
+
+### C3a — `PDFImporter.rasterize(...)`
+
+- **`Services/PDFImporter.swift`** — `rasterize(pdfURL:rasterSize:destinationDirectory:) throws -> [URL]`. PDFKit-backed; opens a `PDFDocument`, walks pages, scales each page's mediaBox to fit within the caller's `rasterSize` while preserving aspect, draws into a `CGContext`-backed bitmap, writes a PNG sidecar per page. The destination directory is created on demand; per-page filenames are zero-padded (`page_001.png`, `page_012.png`, ...) so lexicographic sort matches page order at any future "Asset Library" listing.
+- **Pixel target convention**: the output PNG dimensions are the *scaled-to-fit* size, not literal `rasterSize`. For a Letter PDF (612×792) at 1920×1080 raster, the PNG comes out ~834×1080 — height-limited at 1080, aspect-preserved. For a 16:9 PDF (1600×900) at 3840×2160 raster, it lands at exactly 3840×2160. The compositor still applies `ScaleMode.fit/fill/stretch` on top per cue.
+- **Why scale-to-fit not scale-to-fill**: PDF page aspect varies (Letter portrait, A4 portrait, 16:9 export, 4:3 export). Stretching would distort PowerPoint→PDF→PNG decks; cropping (fill) would silently lose content. The compositor downstream is the right place to express scaling intent per cue.
+- **Errors**: `PDFImportError.unreadable(URL)` for a corrupt or non-existent PDF, `.noPages(URL)` for an empty PDF, `.writeFailed(URL, underlying:)` for filesystem errors. Per-page render failures (`makeImage()` returning nil) are silently skipped — better to import 11 of 12 pages than throw mid-batch.
+- 8 tests cover happy path (file count, leading-zero naming, fit aspect preserved, output × 2 pixel target on a matched-aspect page, missing-directory creation) and the `.unreadable` error.
+
+### C3b — `MediaImporter.importSlides(from:context:)`
+
+- **`Services/MediaImporter.swift`** — new `MediaImportContext { rasterSize: CGSize, renderRootDirectory: URL }`, new `importSlides(from urls: [URL], context: MediaImportContext?) -> [MediaSlide]` overload. PDFs route through `PDFImporter.rasterize`; non-PDFs go through the existing `mediaKind` path unchanged. Each PDF batch lands in `<renderRootDirectory>/<UUID>/page_NNN.png` so concurrent imports don't collide.
+- **Backwards-compat**: `importSlides(from:)` (no context) still exists and silently drops PDFs (no place to write rasters without a context). Callers that need PDF support pass the context-aware overload. This keeps existing tests immutable and gives non-UI callers (future automation, CLI) a path that works without UI plumbing.
+- **Public `MediaImporter.isPDF(_:)`** — UTType-aware PDF detection (content type → extension → fallback to lowercased extension match). Used by the importer; testable in isolation.
+- 4 tests pin the contract: PDF + context → N image slides with resolvable URLs, PDF without context → empty array, non-PDF inputs unchanged across both overloads, `isPDF` recognizes `.pdf` / `.PDF` and rejects `.png` / `.mov`.
+
+### C3c — RootView wiring
+
+- **`Views/RootView.swift`** — drop handler and Add Media open panel both call `currentMediaImportContext()`, which builds:
+  - `rasterSize = (Stage.first.width, Stage.first.height) × 2` (spec §3.10's "output × 2"); falls back to `outputWidth`/`outputHeight` if no Stage is configured.
+  - `renderRootDirectory = projectBundle/Cache/Renders` when the document has a `fileURL`, else `Application Support/Simple Playback/Renders/<sessionUUID>` for untitled documents (the `sessionUUID` is `@State`-stable per window so concurrent untitled windows don't collide).
+- **`ProjectBundleLayout.rendersDirectory = "Cache/Renders"`** — pinned to spec §3.17 layout.
+- **`SimplePlaybackProjectDocument.makeWindowControllers`** — passes a `[weak self] in self?.fileURL` closure as `projectBundleURLProvider`. RootView reads the bundle URL on every import, so the path stays current after first-save (where `fileURL` flips from nil to the saved bundle path). Existing untitled-doc imports in the app-support fallback continue to resolve via their absolute paths in `MediaSlide.media`; a future "Bundle for Travel" command (§3.17) would migrate them into the bundle.
+- **Open panel** — `.allowedContentTypes` now includes `.pdf` alongside `.image` / `.movie` / `.video`.
+
+---
+
+## Tests added (session 7)
+
+| Test | What it covers |
+|---|---|
+| `PDFImporterTests.testRasterizeWritesOnePNGPerPage` | 3-page PDF → 3 PNG files exist on disk. |
+| `PDFImporterTests.testRasterizeNamesPagesInOrderWithLeadingZeros` | `page_001.png` … `page_012.png` — zero-padded so lexicographic sort matches page order. |
+| `PDFImporterTests.testRasterizeFitsWithinRasterSizePreservingAspect` | Letter (612×792) at 1920×1080 raster → height-limited at 1080, aspect ≈ 612/792 within 0.005. |
+| `PDFImporterTests.testRasterizeAtOutputTimesTwoProducesExpectedPixelTarget` | 16:9 page at 3840×2160 raster lands exactly 3840×2160. |
+| `PDFImporterTests.testRasterizeCreatesDestinationDirectoryIfMissing` | Two-deep target directory created on demand. |
+| `PDFImporterTests.testRasterizeThrowsOnUnreadablePDF` | Bogus URL → `.unreadable` error. |
+| `MediaImporterPDFTests.testRoutesPDFThroughContextAndProducesImageSlides` | 4-page PDF → 4 `.image` MediaSlides whose URLs resolve to written PNGs; titles include page numbers. |
+| `MediaImporterPDFTests.testReturnsEmptyForPDFWhenContextIsAbsent` | No-context overload silently drops PDFs (back-compat for legacy callers). |
+| `MediaImporterPDFTests.testNonPDFInputsAreUnaffectedByContextSignature` | Stills work the same with or without a context. |
+| `MediaImporterPDFTests.testIsPDFRecognizesByExtensionAndUTType` | `.pdf` / `.PDF` recognized, `.png` / `.mov` rejected. |
+
+Total: 243 tests, all green (was 233 at session start).
+
+---
+
+## Manual verification needed (session 7 deltas)
+
+1. Save a fresh project to disk (so it has a `fileURL`). Drag a multi-page PDF into the asset library palette. The asset library should show one image slide per page, titled `<filename> — page N`. Browse into `<project.spb>/Cache/Renders/<UUID>/` in Finder; the PNGs should be there.
+2. Drop a PDF into an untitled (unsaved) document. Slides appear; PNGs land in `~/Library/Application Support/Simple Playback/Renders/<sessionUUID>/<batchUUID>/`. Save the project, restart the app, reopen — slides resolve via absolute path. (Future "Bundle for Travel" task would copy them into the bundle.)
+3. Use **Add Media…** (toolbar) to pick a PDF. Same result as drop.
+4. Drop a Letter portrait PDF and a 16:9 landscape PDF. Each renders at the largest size that fits within Stage × 2 with aspect preserved. The compositor's `ScaleMode.fit` (default) presents them centered with bars when the Stage aspect differs from the PDF page aspect.
+5. Drop a corrupt or zero-page PDF. Nothing imports; the app does not crash. (Operator feedback for failed-import is deferred to a future "import status banner" task — see C2 transcode toast pattern.)
+6. Drop a PDF whose pages mix orientations (some portrait, some landscape). Each page is independently fit-into the raster; mixed-orientation decks browse correctly.
 
 ---
 
@@ -94,11 +154,16 @@ These need human eyeballs — autonomous tests don't drive SwiftUI inspectors.
 - **B16** — final Phase B summary + DeckLink mock layer for tests.
 
 **Phase C remaining** (autonomy-friendly):
-- **C2** — Right-click "Transcode to ProRes 422" action. Uses `AVAssetExportSession` with `.proRes422` preset. Open product question: does transcode replace the original slide or add a sibling? (Default to sibling — non-destructive, lets the operator A/B.) Needs a non-modal progress surface.
-- **C3** — PDF import via PDFKit → bitmap-per-page at output × 2. Needs a decision on where the rendered PNGs live (project bundle vs sidecar vs temp). Recommend project-bundle (`Bundle/Imports/<assetID>/page_*.png`) for venue portability.
+- **C2** — Right-click "Transcode to ProRes 422" action. Uses `AVAssetExportSession` with `.proRes422` preset. Open product question: does transcode replace the original slide or add a sibling? (Default to sibling — non-destructive, lets the operator A/B.) Needs a non-modal progress surface. Sibling folder location now has precedent: `<bundle>/Transcoded/` matching `<bundle>/Cache/Renders/` pattern.
 - **C4** — Animated GIF / APNG detect → offer convert-to-ProRes-4444. AVFoundation can't decode animated GIFs natively, so detection forces a conversion path. Decompose: "detect" first (an `animatedGIF` flag on MediaFlags? or a `MediaSlide.requiresConversion` enum?), then a separate "offer convert" UX.
 - **C5** — Image-sequence detect (`name.0001.png`) → offer encode-to-ProRes-4444 via `AVAssetWriter`. Pure import-time logic + AVAssetWriter wrapper.
-- **C6** — Keynote import via AppleScript → PDF → bitmaps. Needs the C3 PDF-rasterize path first.
+- **C6** — Keynote import via AppleScript → PDF → bitmaps. **Now unblocked by C3** — Keynote import is a thin shell around AppleScript that exports `.key` to PDF, then calls `PDFImporter.rasterize` with the same `MediaImportContext`. Needs the "Keynote not installed" diagnostic branch and AppleScript permission UX.
 - **C7+** — Asset library, audio engine, subtitles, etc. Larger.
 
-**Recommended next pick**: **C2 (transcode action)** is the natural follow-up to C1 — the inspector chips today direct operators to a right-click action that doesn't exist yet. Or **C3 (PDF import)** if you want a wholly contained slice of work that doesn't have the "where do transcoded files live?" decision.
+**Recommended next pick**: **C6 (Keynote import)** is the natural follow-up to C3 — the rasterize plumbing is in place and Keynote import collapses to AppleScript + reuse. Or **C2 (transcode action)** to close the C1 inspector-chip → action loop. C4/C5 also fit cleanly.
+
+### Known gaps in the C3 import path
+
+- **No operator feedback on failed imports.** A corrupt or zero-page PDF imports zero slides silently. A future "import status banner" (see C2's transcode toast pattern) should expose `PDFImportError` and per-batch counts.
+- **Untitled-document portability.** Untitled docs render PDFs to `~/Library/Application Support/Simple Playback/Renders/<sessionUUID>/`. After Save As, the slides resolve via absolute path but live outside the bundle. A future "Bundle for Travel" command (spec §3.17) is what migrates them in.
+- **No re-rasterize on Stage resize.** If the operator changes the Stage from 1080p to 2160p mid-project, previously-imported PDFs stay at the old 1080p × 2 raster. A future "Re-rasterize PDF imports" action (or automatic re-render on Stage change) would close the loop.

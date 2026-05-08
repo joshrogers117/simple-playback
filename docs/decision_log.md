@@ -157,3 +157,43 @@ If operators dislike the discovery cost ("they didn't notice the picker"), the r
 - `OutputStatusBar.referenceExpected: Bool` — new parameter (defaults to `false` so existing call sites compile, but `RootView` always passes the live value from the project).
 - `OutputStatusBar.evaluateFreeRunBanner(referenceExpected:referenceState:) -> Bool` — pure helper, exposed for testability without standing up a `PlaybackController`.
 
+---
+
+## 2026-05-08 — C3: PDF rasterize destination + import-context shape
+
+**Decision**: Rendered PDF→PNG sidecars live inside the project bundle at `Cache/Renders/<batchUUID>/page_NNN.png` whenever the document has been saved (i.e. `NSDocument.fileURL != nil`). For untitled documents, fall back to `~/Library/Application Support/Simple Playback/Renders/<sessionUUID>/<batchUUID>/page_NNN.png` so PDF import works the moment the operator drags a deck into a fresh window. The on-disk PNG layout matches spec §3.17's `Cache/Renders/` directive.
+
+The plumbing shape: `MediaImporter.importSlides(from:)` keeps its old signature (silently drops PDFs — back-compat) and gains an overload `importSlides(from:context:)` that takes a `MediaImportContext { rasterSize: CGSize, renderRootDirectory: URL }`. RootView builds the context per-import; the bundle URL is supplied to RootView via a `[weak self] in self?.fileURL` closure passed by `SimplePlaybackProjectDocument.makeWindowControllers`.
+
+**Why**:
+- **Bundle-relative renders match spec §2.2 venue portability.** A `Bundle for Travel` pass (still TBD) would copy linked media into the bundle; renders living inside the bundle from day one means there's nothing extra to migrate. Final Cut's `.fcpbundle` and Logic's `.logicx` follow the same pattern.
+- **Untitled-doc fallback to App Support** rather than temp-dir avoids the "first launch, drop a PDF, restart, slides are gone" failure mode (`NSTemporaryDirectory()` is purged unpredictably). App Support persists; a `[sessionUUID]` keyed subdirectory keeps concurrent untitled windows independent.
+- **Context-aware overload (not single-method, not new top-level service)** keeps the call shape `MediaImporter.importSlides(from:context:)` familiar and keeps non-PDF media on its existing fast path. A new top-level `PDFImporter` service would have orphaned the existing `mediaKind` UTType detection logic (UTI-aware drop targets need a single is-this-importable predicate).
+- **Closure-based bundle-URL provider** (`() -> URL?`) rather than a `Binding<URL?>` because `NSDocument.fileURL` is KVO-observable but not a published Combine source; a closure is read on every import with no observation cost and stays nil-safe if the NSDocument is deallocated mid-window-lifetime.
+- **Output × 2 raster (spec §3.10)**, scale-to-fit aspect-preserving (not stretch, not crop). PDF page aspect varies per source (Letter, A4, 16:9 export, 4:3 export); stretch would distort PowerPoint→PDF→PNG decks; crop would silently lose content. The compositor's `ScaleMode` is the right place to express scaling intent per cue, not the rasterizer.
+
+**Alternatives considered**:
+- **Always App Support, copy into bundle on save** — operator's filesystem stays clean but venue portability requires every save to copy potentially gigabytes of PNGs. Rejected: rejected for the same reason Final Cut keeps `Renders/` in the bundle.
+- **Sidecar folder next to PDF source** (`MyDeck.pdf` + `MyDeck.pdf.renders/`) — rejected: clutters the user's filesystem; breaks portability when the source PDF moves.
+- **Temp dir** — rejected: not persistent; first launch cycle of imports would vanish.
+- **Render at `rasterSize` literally with stretch** — rejected for the aspect-preservation reasons above.
+- **Single-method `MediaImporter.importSlides(from:rasterSize:renderRoot:)` overload** — rejected: forced every caller (UI, future automation, future CLI) to know about render-root semantics even when they're importing only video. The optional context is a smaller cognitive load.
+- **Put `Cache/Renders/` path constant directly in PDFImporter** — rejected: layered separation. `ProjectBundleLayout.rendersDirectory` belongs with the other bundle path constants (`projectFilename`); PDFImporter is bundle-agnostic and can be reused outside the document-bundle world (CLI tooling, future Bundle-for-Travel logic).
+
+**Reversibility**: easy. `MediaImportContext` and the new overload are additive. `importSlides(from:)` (no context) still works; existing tests continue to pass unchanged. Reverting C3 = delete `PDFImporter.swift` + `MediaImporterPDFTests.swift` + the `importSlides(from:context:)` overload + the RootView `currentMediaImportContext` helper. Saved projects keep their PNG references via absolute path; opening such a project after a revert just shows them as offline images.
+
+**What I'd revisit if**:
+- Operators report the App Support fallback feels unsafe (e.g., "I dropped a PDF into an untitled doc, my disk filled up, I had to find this hidden directory to clean it"). At that point either prompt-to-save before allowing PDF import, or auto-cleanup on app-quit when the session UUID never had a corresponding save.
+- Stage resize mid-project leaves stale low-resolution renders (the asset library would need to track raster size per slide and offer a "Re-rasterize" action).
+- `Cache/Renders/<batchUUID>/` accumulates orphaned batches when slides are deleted (no GC today). A future "Compact project" action would walk the bundle and remove batches no `MediaSlide` resolves to.
+
+**Public API impact**:
+- `enum PDFImportError: LocalizedError` — `.unreadable(URL)`, `.noPages(URL)`, `.writeFailed(URL, underlying: Error)` in `Services/PDFImporter.swift`.
+- `enum PDFImporter` with `static func rasterize(pdfURL: URL, rasterSize: CGSize, destinationDirectory: URL) throws -> [URL]`.
+- `struct MediaImportContext { rasterSize: CGSize; renderRootDirectory: URL }` in `Services/MediaImporter.swift`.
+- `MediaImporter.importSlides(from urls: [URL], context: MediaImportContext?) -> [MediaSlide]` overload; legacy `importSlides(from:)` preserved.
+- `MediaImporter.isPDF(_:)` static predicate (UTType-aware) — exposed for testability.
+- `ProjectBundleLayout.rendersDirectory = "Cache/Renders"` in `Models/SimplePlaybackProjectDocument.swift`.
+- `RootView.init(document:outputSettings:projectBundleURLProvider:)` — third argument is a `() -> URL?` closure (defaulted to `{ nil }` so existing test call sites compile).
+- `SimplePlaybackProjectDocument.makeWindowControllers` passes `{ [weak self] in self?.fileURL }`.
+
