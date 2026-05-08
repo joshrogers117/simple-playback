@@ -45,24 +45,70 @@ struct MediaImporter {
     }
 
     static func importSlides(from urls: [URL], context: MediaImportContext?) -> [MediaSlide] {
-        urls.flatMap { url -> [MediaSlide] in
+        importSlidesAndReport(from: urls, context: context).slides
+    }
+
+    /// Result-bearing variant. Returns the imported slides AND a per-URL list of failures
+    /// (PDF render error, Keynote AppleScript error, unsupported file type). The
+    /// non-modal `ImportStatusBanner` (C-banner) presents the failure list to the
+    /// operator; per-spec §3.10 silent failures are no longer acceptable.
+    static func importSlidesAndReport(
+        from urls: [URL],
+        context: MediaImportContext?
+    ) -> MediaImportReport {
+        var slides: [MediaSlide] = []
+        var failures: [MediaImportFailure] = []
+
+        for url in urls {
             if isPDF(url) {
-                guard let context else { return [] }
-                return importPDF(at: url, context: context)
+                guard let context else { continue }
+                do {
+                    slides.append(contentsOf: try importPDFThrowing(at: url, context: context))
+                } catch {
+                    failures.append(makeFailure(url: url, kind: .pdfImport, error: error))
+                }
+                continue
             }
             if isKeynote(url) {
-                guard let context else { return [] }
-                return importKeynote(at: url, context: context)
+                guard let context else { continue }
+                do {
+                    slides.append(contentsOf: try importKeynoteThrowing(at: url, context: context))
+                } catch {
+                    failures.append(makeFailure(url: url, kind: .keynoteImport, error: error))
+                }
+                continue
             }
-            guard let kind = mediaKind(for: url) else { return [] }
+            guard let kind = mediaKind(for: url) else {
+                failures.append(MediaImportFailure(
+                    url: url,
+                    kind: .unsupportedMedia,
+                    summary: "Unsupported media: \(url.lastPathComponent)"
+                ))
+                continue
+            }
             let fps = kind == .video ? nativeFrameRate(for: url) : nil
             let flags: MediaFlags
             switch kind {
             case .video: flags = MediaFlagsInspector.inspect(url: url)
             case .image: flags = AnimatedImageInspector.inspect(url: url)
             }
-            return [MediaSlide(url: url, mediaKind: kind, nativeFrameRate: fps, flags: flags)]
+            slides.append(MediaSlide(url: url, mediaKind: kind, nativeFrameRate: fps, flags: flags))
         }
+
+        return MediaImportReport(slides: slides, failures: failures)
+    }
+
+    /// Operator-facing summary string. `LocalizedError.errorDescription` is the canonical
+    /// source; we pass through `error.localizedDescription` as a fallback for anything that
+    /// doesn't conform.
+    private static func makeFailure(url: URL, kind: MediaImportFailure.Kind, error: Error) -> MediaImportFailure {
+        let summary: String
+        if let localized = error as? LocalizedError, let description = localized.errorDescription {
+            summary = description
+        } else {
+            summary = error.localizedDescription
+        }
+        return MediaImportFailure(url: url, kind: kind, summary: summary)
     }
 
     /// Reads the video track's nominal frame rate. Returns `nil` if the asset has no video
@@ -143,49 +189,34 @@ struct MediaImporter {
     }
 
     /// One PDF in → N image MediaSlides out (one per page). Each PNG lands inside a fresh
-    /// per-batch subdirectory of `context.renderRootDirectory`. On render failure (corrupt
-    /// PDF, write error) returns an empty array — callers see "nothing imported" rather
-    /// than a half-imported deck.
-    private static func importPDF(at url: URL, context: MediaImportContext) -> [MediaSlide] {
+    /// per-batch subdirectory of `context.renderRootDirectory`. Throws on PDFKit failure;
+    /// `importSlidesAndReport` catches and converts to a `MediaImportFailure` for the
+    /// non-modal banner.
+    private static func importPDFThrowing(at url: URL, context: MediaImportContext) throws -> [MediaSlide] {
         let batchDirectory = context.renderRootDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let pageURLs: [URL]
-        do {
-            pageURLs = try PDFImporter.rasterize(
-                pdfURL: url,
-                rasterSize: context.rasterSize,
-                destinationDirectory: batchDirectory
-            )
-        } catch {
-            return []
-        }
+        let pageURLs = try PDFImporter.rasterize(
+            pdfURL: url,
+            rasterSize: context.rasterSize,
+            destinationDirectory: batchDirectory
+        )
         return imageSlides(forPagesAt: pageURLs, baseTitle: url.deletingPathExtension().lastPathComponent)
     }
 
     /// One Keynote deck in → N image MediaSlides out, via Keynote → PDF → PNG. The
     /// intermediate PDF lands in the per-batch directory next to its rasterized pages so a
     /// future "Re-rasterize" command (deferred from C3) can re-render from the same source.
-    /// On any failure (Keynote not installed, AppleScript error, corrupt deck) returns an
-    /// empty array — UI surfaces a banner separately.
-    private static func importKeynote(at url: URL, context: MediaImportContext) -> [MediaSlide] {
+    /// Throws on Keynote install / AppleScript / PDFKit failure;
+    /// `importSlidesAndReport` catches and converts to a `MediaImportFailure`.
+    private static func importKeynoteThrowing(at url: URL, context: MediaImportContext) throws -> [MediaSlide] {
         let batchDirectory = context.renderRootDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let pdfURL: URL
-        do {
-            pdfURL = try keynoteExporter(url, batchDirectory)
-        } catch {
-            return []
-        }
-        let pageURLs: [URL]
-        do {
-            pageURLs = try PDFImporter.rasterize(
-                pdfURL: pdfURL,
-                rasterSize: context.rasterSize,
-                destinationDirectory: batchDirectory
-            )
-        } catch {
-            return []
-        }
+        let pdfURL = try keynoteExporter(url, batchDirectory)
+        let pageURLs = try PDFImporter.rasterize(
+            pdfURL: pdfURL,
+            rasterSize: context.rasterSize,
+            destinationDirectory: batchDirectory
+        )
         return imageSlides(forPagesAt: pageURLs, baseTitle: url.deletingPathExtension().lastPathComponent)
     }
 
