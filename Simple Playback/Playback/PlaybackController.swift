@@ -683,9 +683,21 @@ final class PlaybackController: ObservableObject {
                 let generator = AVAssetImageGenerator(asset: prepared.item.asset)
                 generator.appliesPreferredTrackTransform = true
                 generator.maximumSize = prepared.outputSize
-                guard let cgImage = try? generator.copyCGImage(at: .zero, actualTime: nil) else {
-                    return nil
+                // The deprecated sync `copyCGImage(at:actualTime:)` was replaced
+                // in macOS 13+ by `image(at:)` (async-only). This site is
+                // already off the render hot path (videoPreparationQueue), so
+                // bridge the non-deprecated callback variant
+                // `generateCGImageAsynchronously(for:completionHandler:)` to
+                // a synchronous result via DispatchSemaphore — same pattern as
+                // session 21's ThumbnailGenerator.
+                let box = FirstFrameBox()
+                let semaphore = DispatchSemaphore(value: 0)
+                generator.generateCGImageAsynchronously(for: .zero) { cg, _, _ in
+                    box.image = cg
+                    semaphore.signal()
                 }
+                semaphore.wait()
+                guard let cgImage = box.image else { return nil }
 
                 return FrameRenderer().render(
                     cgImage: cgImage,
@@ -1627,4 +1639,13 @@ final class PlaybackController: ObservableObject {
             stop()
         }
     }
+}
+
+/// Mutable carrier for the AVF generateCGImageAsynchronously completion-
+/// handler payload. Written on AVF's internal queue, read on the calling
+/// thread after the semaphore signal — `@unchecked Sendable` because the
+/// semaphore (not the type) is the memory-barrier. Same pattern as
+/// `ThumbnailGenerator.ThumbnailExtractionBox`.
+private final class FirstFrameBox: @unchecked Sendable {
+    var image: CGImage?
 }
