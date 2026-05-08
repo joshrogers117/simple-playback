@@ -80,8 +80,17 @@ final class LateTakeDetector {
     /// first frame for the pending take's expected slide, returns a verdict
     /// (`.onTime` or `.late`) and clears the pending state. Returns nil if
     /// the slide doesn't match the pending take, or no take is pending, or
-    /// the frame's timestamp pre-dates the GO (clock skew defense — never
-    /// happens on the same host but cheap to guard).
+    /// the frame's timestamp pre-dates the GO (clock-skew defense).
+    ///
+    /// **Important**: `firedAt` and `frameAt` must come from the same clock
+    /// source. The integration session that wires this into `ShowController`
+    /// + `PlaybackController` should sample both with `Date()` (or both with
+    /// `mach_absolute_time` via the same converter). Mixing wall-clock and
+    /// monotonic-clock timestamps risks negative-latency frames — those
+    /// currently return nil *and leave pending unchanged*, which means a
+    /// subsequent same-slide frame can still close the verdict. Callers
+    /// that prefer to drop the take outright on clock-skew can call
+    /// `clearPending()` after a nil-return.
     func recordFrameSubmitted(slideID: UUID, at frameAt: Date) -> LateTakeVerdict? {
         guard let pending else { return nil }
         guard pending.slideID == slideID else { return nil }

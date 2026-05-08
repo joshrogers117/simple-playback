@@ -35,11 +35,21 @@ struct BundleForTravelProgress: Equatable {
     )
 }
 
-/// Coordinates a C7d Bundle for Travel copy pass. Owns the I/O loop on a
-/// background queue, publishes progress to the main actor, and exposes a
-/// cancel hook. Pure-logic plan/apply lives in `BundleForTravelPlan`; this
-/// coordinator runs the live copies and signals the host (RootView) to apply
-/// the plan to `project.slides` on completion.
+/// Coordinates a C7d Bundle for Travel copy pass. Owns the I/O loop, publishes
+/// progress, and exposes a cancel hook. Pure-logic plan/apply lives in
+/// `BundleForTravelPlan`; this coordinator runs the live copies and signals
+/// the host (RootView) to apply the plan to `project.slides` on completion.
+///
+/// **Threading limitation (known)**: the copy loop runs on the main actor.
+/// `FileManager.copyItem` is synchronous; while a multi-GB file is copying,
+/// the UI freezes (the progress bar can't tick mid-file, the Cancel button
+/// can't be hit until the active copy returns). This is acceptable for v1
+/// because typical show-sized media (single-digit GB per file) copies in
+/// seconds on local SSDs; the concern is multi-tens-of-GB bundles to slower
+/// volumes. A future iteration should hop the per-file copy to a detached
+/// Task — out of scope here because the existing static-closure test seam
+/// shape interacts awkwardly with `@Sendable` and we'd rather not regress
+/// the stable test contract before there's a real perf ask.
 ///
 /// Test seams: `copyFile`, `ensureDirectory`, `removeItem` are all injectable
 /// statics. The coordinator's state machine is unit-tested via stubs that
