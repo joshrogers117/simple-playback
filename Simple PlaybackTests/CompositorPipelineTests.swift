@@ -152,6 +152,40 @@ final class CompositorPipelineTests: XCTestCase {
                        "Setting the same directory is a no-op — the cache is preserved.")
     }
 
+    // C8 v1.1 — same invalidation contract as `bundleMediaDirectory`. The
+    // resolved-URL string is the cache key, and `folderBookmarks` participates
+    // in `MediaReference.resolvedURL`, so a swap of the lookup must drop the
+    // cache so a stale entry can't masquerade against the new resolution.
+    func testFolderBookmarksChangeInvalidatesBugImageCache() {
+        var resolveCount = 0
+        let pipeline = CompositorPipeline(imageResolver: { _ in
+            resolveCount += 1
+            return solidImage(width: 4, height: 4, red: 1, green: 0, blue: 0)
+        })
+        let base = greenFrame(width: 32, height: 32)
+        var overlays = CompositorOverlays.empty
+        overlays.bug = BugOverlay(
+            enabled: true,
+            media: MediaReference(url: URL(fileURLWithPath: "/tmp/folder-bookmark-test.png")),
+            corner: .topLeft,
+            sizePercent: 0.25
+        )
+
+        _ = pipeline.compose(baseFrame: base, overlays: overlays, canvasSize: CGSize(width: 32, height: 32))
+        XCTAssertEqual(resolveCount, 1)
+
+        let bookmark = FolderBookmark(label: "x", originalPath: "/tmp/x")
+        pipeline.folderBookmarks = [bookmark.id: bookmark]
+        _ = pipeline.compose(baseFrame: base, overlays: overlays, canvasSize: CGSize(width: 32, height: 32))
+        XCTAssertEqual(resolveCount, 2,
+                       "Mutating folderBookmarks must invalidate the bug-image cache so a re-resolved URL re-fetches.")
+
+        pipeline.folderBookmarks = [bookmark.id: bookmark]
+        _ = pipeline.compose(baseFrame: base, overlays: overlays, canvasSize: CGSize(width: 32, height: 32))
+        XCTAssertEqual(resolveCount, 2,
+                       "Equal-valued reassignment is a no-op — the cache is preserved.")
+    }
+
     func testInvalidateBugImageCacheForcesResolverReinvocation() {
         var resolveCount = 0
         let pipeline = CompositorPipeline(imageResolver: { _ in

@@ -33,6 +33,11 @@ final class CompositorPipeline {
     /// memory-model hazard even when the writer is monotonic.
     private var _bundleMediaDirectory: URL?
 
+    /// Backing storage for `folderBookmarks`. Same lock discipline as
+    /// `_bundleMediaDirectory` — writer is PlaybackController on main, reader
+    /// is the compose path on `outputQueue`.
+    private var _folderBookmarks: [UUID: FolderBookmark] = [:]
+
     /// C7d — current project bundle's `<bundle>/Media/` URL when one exists.
     /// Threaded into the default bug-image resolver and the cache key so a
     /// moved bundle's managed overlay assets resolve to their bundled copy
@@ -55,6 +60,32 @@ final class CompositorPipeline {
             cacheLock.lock()
             let didChange = _bundleMediaDirectory != newValue
             _bundleMediaDirectory = newValue
+            if didChange {
+                bugImageCache.removeAll()
+            }
+            cacheLock.unlock()
+        }
+    }
+
+    /// C8 v1.1 — id → `FolderBookmark` lookup mirrored from
+    /// `PlayoutProject.folderBookmarks` via PlaybackController. Threaded into
+    /// the bug-image resolver so an overlay asset whose per-file bookmark and
+    /// absolute path are both dead can still resolve via the rung-2 folder
+    /// fallback. A change to the lookup invalidates the bug-image cache
+    /// atomically with the swap (same reason `bundleMediaDirectory` does:
+    /// the cache key is the resolved URL string and the resolved URL depends
+    /// on this lookup, so a stale cache could otherwise return the old image
+    /// against the new resolution path).
+    var folderBookmarks: [UUID: FolderBookmark] {
+        get {
+            cacheLock.lock()
+            defer { cacheLock.unlock() }
+            return _folderBookmarks
+        }
+        set {
+            cacheLock.lock()
+            let didChange = _folderBookmarks != newValue
+            _folderBookmarks = newValue
             if didChange {
                 bugImageCache.removeAll()
             }
@@ -214,28 +245,44 @@ final class CompositorPipeline {
     }
 
     private func bugImage(for media: MediaReference) -> NSImage? {
-        // Snapshot the bundle dir under the same lock that guards the cache —
-        // bundleMediaDirectory and bugImageCache are coupled (the cache key
-        // depends on the resolved URL), so reading them apart races the setter.
+        // Snapshot the bundle dir + folder-bookmark lookup under the same
+        // lock that guards the cache — they're coupled (the cache key depends
+        // on the resolved URL, which depends on both), so reading them apart
+        // would race the setter.
         cacheLock.lock()
         let bundleDir = _bundleMediaDirectory
-        let key = media.resolvedURL(bundleMediaDirectory: bundleDir)?.absoluteString ?? media.originalPath
+        let folderBookmarks = _folderBookmarks
+        let key = media.resolvedURL(
+            bundleMediaDirectory: bundleDir,
+            folderBookmarks: folderBookmarks
+        )?.absoluteString ?? media.originalPath
         if let cached = bugImageCache[key] {
             cacheLock.unlock()
             return cached
         }
         cacheLock.unlock()
 
-        guard let image = resolveImage(media, bundleMediaDirectory: bundleDir) else { return nil }
+        guard let image = resolveImage(
+            media,
+            bundleMediaDirectory: bundleDir,
+            folderBookmarks: folderBookmarks
+        ) else { return nil }
         cacheLock.lock()
         bugImageCache[key] = image
         cacheLock.unlock()
         return image
     }
 
-    private func resolveImage(_ ref: MediaReference, bundleMediaDirectory: URL?) -> NSImage? {
+    private func resolveImage(
+        _ ref: MediaReference,
+        bundleMediaDirectory: URL?,
+        folderBookmarks: [UUID: FolderBookmark]
+    ) -> NSImage? {
         if let injectedResolver { return injectedResolver(ref) }
-        guard let url = ref.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) else { return nil }
+        guard let url = ref.resolvedURL(
+            bundleMediaDirectory: bundleMediaDirectory,
+            folderBookmarks: folderBookmarks
+        ) else { return nil }
         return NSImage(contentsOf: url)
     }
 

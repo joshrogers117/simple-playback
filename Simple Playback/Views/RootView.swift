@@ -224,6 +224,7 @@ struct RootView: View {
             configureShowController()
             lockController.evaluate(bundleURL: projectBundleURLProvider())
             playback.bundleMediaDirectory = bundleMediaDirectory()
+            playback.folderBookmarks = projectFolderBookmarkLookup()
             recomputeAssetLibraryStatus()
         }
         .onChange(of: document.project.slides) {
@@ -236,6 +237,14 @@ struct RootView: View {
             // Refresh playback's bundle-aware resolution and the missing-media
             // banner so they don't keep using the stale `nil` from `.onAppear`.
             playback.bundleMediaDirectory = bundleMediaDirectory()
+            recomputeAssetLibraryStatus()
+        }
+        .onChange(of: document.project.folderBookmarks) {
+            // C8 v1.1 — keep the playback / compositor lookup in sync with the
+            // project's bookmark list so an Add Folder import (or future
+            // bookmark-edit affordance) takes effect on the next take without
+            // a save / reopen.
+            playback.folderBookmarks = projectFolderBookmarkLookup()
             recomputeAssetLibraryStatus()
         }
         .onChange(of: playback.devices) {

@@ -206,10 +206,29 @@ final class PlaybackController: ObservableObject {
         }
     }
 
+    /// C8 v1.1 — id → `FolderBookmark` lookup mirroring
+    /// `PlayoutProject.folderBookmarks`. Threaded into the per-take
+    /// `resolvedURL` call so a clip moved within its imported folder still
+    /// plays (rung 2 of the resolver waterfall) without waiting for a relink
+    /// pass. RootView publishes this from `document.project.folderBookmarks`
+    /// on `.onAppear` and on every change to that array. Mirrored to the
+    /// compositor so overlay bug-image resolution follows the same fallback
+    /// rung as the primary take.
+    var folderBookmarks: [UUID: FolderBookmark] = [:] {
+        didSet {
+            if oldValue != folderBookmarks {
+                compositor.folderBookmarks = folderBookmarks
+            }
+        }
+    }
+
     func take(slide: MediaSlide, deviceID: String?, modeID: String?, transitionSettings: PlayoutTransitionSettings) {
         cancelPendingVideoPreparation()
 
-        guard let url = slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) else {
+        guard let url = slide.media.resolvedURL(
+            bundleMediaDirectory: bundleMediaDirectory,
+            folderBookmarks: folderBookmarks
+        ) else {
             status = "Missing media: \(slide.title)"
             return
         }
