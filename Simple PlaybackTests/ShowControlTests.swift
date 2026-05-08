@@ -517,4 +517,113 @@ final class ShowControlTests: XCTestCase {
         )
         XCTAssertTrue(json.contains("\"apiVersion\":1"))
     }
+
+    // MARK: - Timecode (D12)
+
+    func testTimecodeParsesAndFormats() {
+        let tc = TimecodeValue.parse("01:02:03:15", frameRate: .fps30)
+        XCTAssertNotNil(tc)
+        XCTAssertEqual(tc?.stringValue, "01:02:03:15")
+    }
+
+    func testTimecodeDropFrameUsesSemicolon() {
+        let tc = TimecodeValue(hours: 0, minutes: 1, seconds: 0, frames: 0, frameRate: .fps29_97_df)
+        XCTAssertEqual(tc.stringValue, "00:01:00;00")
+    }
+
+    func testTimecodeFrameCountMatchesNDF() {
+        let tc = TimecodeValue(hours: 0, minutes: 1, seconds: 0, frames: 0, frameRate: .fps29_97_ndf)
+        XCTAssertEqual(tc.frameCount, 60 * 30)
+    }
+
+    func testTimecodeFrameCountAccountsForDropFrame() {
+        // First minute boundary: drop 2 frames.
+        let tc = TimecodeValue(hours: 0, minutes: 1, seconds: 0, frames: 0, frameRate: .fps29_97_df)
+        // Without DF: 30 fps * 60 = 1800. With DF: 1800 - 2.
+        XCTAssertEqual(tc.frameCount, 1800 - 2)
+    }
+
+    func testTimecodeFromFrameCountRoundTripsNDF() {
+        let original = TimecodeValue(hours: 1, minutes: 23, seconds: 45, frames: 12, frameRate: .fps30)
+        let roundTrip = TimecodeValue.fromFrameCount(original.frameCount, frameRate: .fps30)
+        XCTAssertEqual(roundTrip, original)
+    }
+
+    func testTimecodeFollowerArmsThenChases() {
+        var clockNow: TimeInterval = 0
+        let follower = TimecodeFollower(clock: { clockNow })
+        follower.arm()
+        XCTAssertEqual(follower.engagement, .armed)
+        let tc = TimecodeValue(hours: 1, minutes: 0, seconds: 0, frames: 0, frameRate: .fps30)
+        let decision = follower.frameReceived(tc)
+        XCTAssertEqual(follower.engagement, .chasing)
+        if case let .lock(t) = decision { XCTAssertEqual(t, tc) } else { XCTFail("expected lock") }
+    }
+
+    func testTimecodeFollowerSnapsWithinThreshold() {
+        var clockNow: TimeInterval = 0
+        let follower = TimecodeFollower(clock: { clockNow })
+        follower.arm()
+        let tc1 = TimecodeValue(hours: 0, minutes: 0, seconds: 0, frames: 0, frameRate: .fps30)
+        _ = follower.frameReceived(tc1)
+        clockNow = 1.0 / 30.0 // one frame later in real time
+        let tc2 = TimecodeValue(hours: 0, minutes: 0, seconds: 0, frames: 1, frameRate: .fps30)
+        let decision = follower.frameReceived(tc2)
+        if case .snap = decision {} else { XCTFail("expected snap, got \(decision)") }
+    }
+
+    func testTimecodeFollowerRelocksOutsideThreshold() {
+        var clockNow: TimeInterval = 0
+        let follower = TimecodeFollower(clock: { clockNow })
+        follower.snapThresholdFrames = 2
+        follower.arm()
+        _ = follower.frameReceived(TimecodeValue(hours: 0, minutes: 0, seconds: 0, frames: 0, frameRate: .fps30))
+        clockNow = 1.0 / 30.0
+        // Jump 30 frames ahead — way outside snap threshold.
+        let tc2 = TimecodeValue(hours: 0, minutes: 0, seconds: 1, frames: 0, frameRate: .fps30)
+        let decision = follower.frameReceived(tc2)
+        if case .relock = decision {} else { XCTFail("expected relock, got \(decision)") }
+    }
+
+    func testTimecodeFollowerEntersFreewheelThenLost() {
+        var clockNow: TimeInterval = 0
+        let follower = TimecodeFollower(clock: { clockNow })
+        follower.freewheelWindow = 1.0
+        follower.arm()
+        _ = follower.frameReceived(TimecodeValue(hours: 0, minutes: 0, seconds: 0, frames: 0, frameRate: .fps30))
+        XCTAssertEqual(follower.engagement, .chasing)
+        clockNow += 0.5
+        follower.poll()
+        XCTAssertEqual(follower.engagement, .freewheeling)
+        clockNow += 1.0
+        follower.poll()
+        XCTAssertEqual(follower.engagement, .lost)
+    }
+
+    func testLTCGeneratorEncodesPayloadShape() {
+        let tc = TimecodeValue(hours: 1, minutes: 2, seconds: 3, frames: 4, frameRate: .fps30)
+        let bits = LTCGenerator.encodePayload(tc)
+        XCTAssertEqual(bits.count, 64)
+        // Frame units = 4 → bits 0-3 = 0,0,1,0 (LSB-first BCD).
+        XCTAssertFalse(bits[0])
+        XCTAssertFalse(bits[1])
+        XCTAssertTrue(bits[2])
+        XCTAssertFalse(bits[3])
+    }
+
+    func testLTCGeneratorProducesAudioForFrame() {
+        let tc = TimecodeValue(hours: 1, minutes: 0, seconds: 0, frames: 5, frameRate: .fps30)
+        let gen = LTCGenerator(sampleRate: 48000, frameRate: .fps30)
+        let frame = gen.samples(for: tc)
+        // 48000 samples/sec / 30 fps = 1600 samples/frame.
+        XCTAssertEqual(frame.count, 1600)
+        // Should oscillate — count zero crossings.
+        var crossings = 0
+        for i in 1..<frame.count {
+            if (frame[i - 1] >= 0) != (frame[i] >= 0) { crossings += 1 }
+        }
+        // 80 bits * 2 half-bits = 160 boundaries, plus mid-bit transitions for
+        // every "1" bit. We expect at least 160 crossings.
+        XCTAssertGreaterThanOrEqual(crossings, 80, "Expected at least one crossing per bit boundary")
+    }
 }
