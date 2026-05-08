@@ -89,6 +89,7 @@
 		D2D87259CFD1B81F53DBC0C8 /* ImageSequenceEncodeCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DE55003A493F69B338D09BA /* ImageSequenceEncodeCoordinatorTests.swift */; };
 		D93CCBEA7AE13AB4FC44F4F3 /* MediaFlagsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF79938EE267D36AF458C582 /* MediaFlagsTests.swift */; };
 		DCABF0FFCC0E6E0596173F64 /* CompositorPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21271656A4CCF6A5AD4E2940 /* CompositorPipelineTests.swift */; };
+		DE590B021826D8B2C652636D /* PreShowCheckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95005D52A657E2A60F9E2008 /* PreShowCheckView.swift */; };
 		DE5FE0EC53035F43FFA246E0 /* PreShowCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B45DD8149F1F904849FDFC2 /* PreShowCheck.swift */; };
 		DF9D9D2A7D5D102CC20FCD95 /* DeckLinkSDKDispatch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9E8B4217656574F74350F1FF /* DeckLinkSDKDispatch.cpp */; };
 		DFB8E02D46414DBF7C34D646 /* OverlayInspectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD1EB0DEF2FFFA7B96C902D /* OverlayInspectorTests.swift */; };
@@ -180,6 +181,7 @@
 		93004BE1F2BECBBF122DB00C /* MediaFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlags.swift; sourceTree = "<group>"; };
 		934A545F270968E04F027F8B /* LTCReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LTCReader.swift; sourceTree = "<group>"; };
 		93727D6450DEE3ED3934DA97 /* WebSocketFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketFrame.swift; sourceTree = "<group>"; };
+		95005D52A657E2A60F9E2008 /* PreShowCheckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreShowCheckView.swift; sourceTree = "<group>"; };
 		96F3960B5C5F817DFB3377D4 /* OSCQueryServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCQueryServer.swift; sourceTree = "<group>"; };
 		9A70EA9D270E7268A7C74D62 /* TranscodeServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscodeServiceTests.swift; sourceTree = "<group>"; };
 		9E5D5CE935540C98B6BAAAEF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -290,6 +292,7 @@
 				5D0C8298731E2AD4C22B2306 /* OutputPreviewView.swift */,
 				27589625C8FC5B053A3F725C /* OutputStatusBar.swift */,
 				2B85E5A857820D320657302C /* OverlayInspectorView.swift */,
+				95005D52A657E2A60F9E2008 /* PreShowCheckView.swift */,
 				213CB5AEDC97C0942C10558F /* RootView.swift */,
 				4040F3064AA861BCD17050FB /* ShowListView.swift */,
 				75B620D6408556D32380C918 /* SlideGridView.swift */,
@@ -583,6 +586,7 @@
 				E9E3C51A99F9323FE1D530DC /* PDFImporter.swift in Sources */,
 				28C1335FD15B6AE87DD31AB3 /* PlaybackController.swift in Sources */,
 				DE5FE0EC53035F43FFA246E0 /* PreShowCheck.swift in Sources */,
+				DE590B021826D8B2C652636D /* PreShowCheckView.swift in Sources */,
 				020E6C3D173AD7E05AC7A15A /* RootView.swift in Sources */,
 				4D7E6C165E984434FD9A4BB0 /* SPFrameBlend.c in Sources */,
 				976DD722059E40449CB77621 /* ShowControlActions.swift in Sources */,

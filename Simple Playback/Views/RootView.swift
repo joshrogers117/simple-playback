@@ -18,6 +18,9 @@ struct RootView: View {
     /// completes. Drives the modal sheet that asks for per-sequence frame rates before
     /// kicking off ProRes 4444 encodes.
     @State private var pendingFolderImport: PendingFolderImport?
+    /// Toggle for the Phase E1 pre-show check sheet. The rows are computed on demand
+    /// when the sheet opens (cheap — pure-logic over the project + sampled signals).
+    @State private var preShowCheckPresented: Bool = false
     /// Stable per-window UUID. Untitled documents — which have no fileURL yet —
     /// rasterize PDFs (and transcode to ProRes) into an app-support subdirectory keyed
     /// by this ID so concurrent untitled windows don't collide.
@@ -100,6 +103,13 @@ struct RootView: View {
                 }
                 .disabled(selectedSlideID == nil || showController.controller?.showMode == true)
 
+                Button {
+                    preShowCheckPresented = true
+                } label: {
+                    Label("Pre-Show", systemImage: "checklist")
+                }
+                .help("Run the pre-show check — media resolution, frame-rate conformance, output, system signals.")
+
                 Spacer()
 
                 Toggle(isOn: showModeBinding) {
@@ -145,6 +155,15 @@ struct RootView: View {
                     .padding(10)
                     .allowsHitTesting(false)
             }
+        }
+        .sheet(isPresented: $preShowCheckPresented) {
+            PreShowCheckView(
+                rows: PreShowCheck.evaluate(
+                    project: document.project,
+                    context: preShowCheckContext()
+                ),
+                onClose: { preShowCheckPresented = false }
+            )
         }
         .sheet(item: $pendingFolderImport) { _ in
             // The closure parameter is read-only; we drive the sheet from the @State so
@@ -408,6 +427,21 @@ struct RootView: View {
         if panel.runModal() == .OK {
             addMedia(panel.urls)
         }
+    }
+
+    /// Builds the pre-show check Context with whatever signals the host can sample
+    /// synchronously without blocking the UI. Today: free disk space at the project
+    /// bundle's enclosing volume (or the app-support fallback for untitled documents).
+    /// DeckLink lock state and audio-device availability are deferred — they need
+    /// adapters into PlaybackController / CoreAudio that aren't built yet.
+    private func preShowCheckContext() -> PreShowCheck.Context {
+        var ctx = PreShowCheck.Context()
+        let probeURL = projectBundleURLProvider() ?? RootView.untitledRenderRoot
+        if let values = try? probeURL.resourceValues(forKeys: [.volumeAvailableCapacityKey]),
+           let bytes = values.volumeAvailableCapacity {
+            ctx.availableDiskBytes = Int64(bytes)
+        }
+        return ctx
     }
 
     private func openFolderPanel() {
