@@ -308,11 +308,20 @@ final class AudioPump {
 
         func prepareReader() -> Bool {
             stopReader()
-            let asset = AVAsset(url: url)
-            guard let track = asset.tracks(withMediaType: .audio).first else {
+            // Bridges the deprecated sync `tracks(withMediaType:)` to the
+            // async `loadTracks(...)` API via `AVTrackLoader.loadFirstAudioTrack`
+            // (DispatchSemaphore-bridged). AudioPump.prepareReader runs on its
+            // own audio dispatch queue, off the main actor and off the render
+            // hot path; first-call latency is the AVF container parse cost,
+            // typically a few ms. We hold the asset alongside the track because
+            // AVAssetReader requires the asset that owns its tracks and
+            // AVAssetTrack.asset is weak.
+            guard let loaded = AVTrackLoader.loadFirstAudioTrack(url: url) else {
                 isActive = false
                 return false
             }
+            let asset = loaded.asset
+            let track = loaded.track
 
             do {
                 let reader = try AVAssetReader(asset: asset)

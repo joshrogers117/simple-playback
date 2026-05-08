@@ -62,10 +62,15 @@ enum AVTrackLoader {
         return box.inspection
     }
 
-    /// Load the first audio track at `url`. Mirror of the video helper for
-    /// AudioPump — the property reads aren't audio-relevant, so this stays
-    /// at the bare-track shape rather than carrying an inspection bundle.
-    static func loadFirstAudioTrack(url: URL) -> AVAssetTrack? {
+    /// Load the first audio track at `url` along with the asset that owns
+    /// it. AVAssetReader requires the parent asset (per Apple docs: "The
+    /// track that you specify must be one of the tracks of the asset
+    /// associated with this reader"); we return both because
+    /// `AVAssetTrack.asset` is weak and the asset must outlive the
+    /// reader's setup. Mirror of the video helper for AudioPump — the
+    /// property reads aren't audio-relevant, so this stays at the
+    /// bare-track shape rather than carrying an inspection bundle.
+    static func loadFirstAudioTrack(url: URL) -> (asset: AVURLAsset, track: AVAssetTrack)? {
         let asset = AVURLAsset(url: url)
         let box = TrackBox()
         let semaphore = DispatchSemaphore(value: 0)
@@ -74,7 +79,8 @@ enum AVTrackLoader {
             semaphore.signal()
         }
         semaphore.wait()
-        return box.tracks?.first
+        guard let track = box.tracks?.first else { return nil }
+        return (asset, track)
     }
 
     private final class InspectionBox: @unchecked Sendable {
