@@ -64,6 +64,7 @@
 		DF9D9D2A7D5D102CC20FCD95 /* DeckLinkSDKDispatch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9E8B4217656574F74350F1FF /* DeckLinkSDKDispatch.cpp */; };
 		E5DFE39B8CB8514358205B8E /* SubscriptionPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4A7CF3D1DF29B837A0BF44 /* SubscriptionPump.swift */; };
 		EAA4BC2642696555F131F8BE /* OutputPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0C8298731E2AD4C22B2306 /* OutputPreviewView.swift */; };
+		EDB3E5ED1721A22A5B31024C /* CompositorLayers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6214E79B299E7C7AB111C790 /* CompositorLayers.swift */; };
 		F52CA35701C089E08D0BFDCB /* ShowControlState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FD2B422FED7E9102FAEA3D2 /* ShowControlState.swift */; };
 		F6777B6986F9083E1C779BD2 /* CoreImage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E66F934F6D6C5561905E6550 /* CoreImage.framework */; };
 		FC32EE8637C41BE54C785AF4 /* UniformTypeIdentifiers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D8CA5B1A327E84EEA75F0B9F /* UniformTypeIdentifiers.framework */; };
@@ -105,6 +106,7 @@
 		569A548ECCAC07CC9E9B92D2 /* MediaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaModels.swift; sourceTree = "<group>"; };
 		5D0C8298731E2AD4C22B2306 /* OutputPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputPreviewView.swift; sourceTree = "<group>"; };
 		6023F5FCD12A96AE5EAD4313 /* ShowControlStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlStack.swift; sourceTree = "<group>"; };
+		6214E79B299E7C7AB111C790 /* CompositorLayers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositorLayers.swift; sourceTree = "<group>"; };
 		63903ACF2604D9E2128B0F6C /* TransportSinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportSinks.swift; sourceTree = "<group>"; };
 		6A4A7CF3D1DF29B837A0BF44 /* SubscriptionPump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionPump.swift; sourceTree = "<group>"; };
 		6CD51FEB5E50862496E8A6BA /* ShowControlActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlActions.swift; sourceTree = "<group>"; };
@@ -220,6 +222,7 @@
 		5BFBB06B9DEAD094F0552AE7 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				6214E79B299E7C7AB111C790 /* CompositorLayers.swift */,
 				1C201B22E860FB94D92CA433 /* FrameRateConformance.swift */,
 				569A548ECCAC07CC9E9B92D2 /* MediaModels.swift */,
 				29F9DCDACFB1E27A47F7D0DE /* SimplePlaybackDocument.swift */,
@@ -432,6 +435,7 @@
 				62CDF088556B0DAA473AC800 /* AudioPump.swift in Sources */,
 				44E0E08A26F3691D8E7A2C44 /* AuthTokenStore.swift in Sources */,
 				11F48F224E2E07F3A2CD4894 /* BonjourPublisher.swift in Sources */,
+				EDB3E5ED1721A22A5B31024C /* CompositorLayers.swift in Sources */,
 				5B7913C72F3E6AF0B894DE59 /* CueRuntime.swift in Sources */,
 				C9842DF5C4DF8FAA50B74011 /* DeckLinkBridge.mm in Sources */,
 				4A94C48FF22B0552314D441E /* DeckLinkDiagnostics.swift in Sources */,

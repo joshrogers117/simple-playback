@@ -20,6 +20,10 @@ struct Stage: Identifiable, Codable, Hashable {
     var colorSpace: ColorSpaceTag = .rec709
     var range: ColorRange = .limited
 
+    /// Persistent compositor overlay state for this Stage — bug + message layers per spec
+    /// §3.6. Defaults to inert (`.empty`) so existing projects render unchanged.
+    var compositorOverlays: CompositorOverlays = .empty
+
     var size: CGSize { CGSize(width: width, height: height) }
     var framesPerSecond: Double {
         guard frameRateDenominator > 0 else { return 60 }
@@ -34,7 +38,8 @@ struct Stage: Identifiable, Codable, Hashable {
         frameRateNumerator: Int = 60_000,
         frameRateDenominator: Int = 1001,
         colorSpace: ColorSpaceTag = .rec709,
-        range: ColorRange = .limited
+        range: ColorRange = .limited,
+        compositorOverlays: CompositorOverlays = .empty
     ) {
         self.id = id
         self.name = name
@@ -44,12 +49,14 @@ struct Stage: Identifiable, Codable, Hashable {
         self.frameRateDenominator = frameRateDenominator
         self.colorSpace = colorSpace
         self.range = range
+        self.compositorOverlays = compositorOverlays
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, width, height
         case frameRateNumerator, frameRateDenominator
         case colorSpace, range
+        case compositorOverlays
     }
 
     init(from decoder: Decoder) throws {
@@ -62,6 +69,7 @@ struct Stage: Identifiable, Codable, Hashable {
         frameRateDenominator = try c.decodeIfPresent(Int.self, forKey: .frameRateDenominator) ?? 1001
         colorSpace = try c.decodeIfPresent(ColorSpaceTag.self, forKey: .colorSpace) ?? .rec709
         range = try c.decodeIfPresent(ColorRange.self, forKey: .range) ?? .limited
+        compositorOverlays = try c.decodeIfPresent(CompositorOverlays.self, forKey: .compositorOverlays) ?? .empty
     }
 }
 

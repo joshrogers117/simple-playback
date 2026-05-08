@@ -928,6 +928,132 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(project.screens.first?.stageID, project.stages.first?.id)
     }
 
+    // MARK: - Compositor overlays (B12a)
+
+    func testFreshCompositorOverlaysAreInert() {
+        let overlays = CompositorOverlays.empty
+        XCTAssertTrue(overlays.isInert,
+                      "Fresh overlays must be inert so existing projects render unchanged.")
+        XCTAssertFalse(overlays.bug.isVisible)
+        XCTAssertFalse(overlays.message.isVisible)
+    }
+
+    func testStageDefaultsCompositorOverlaysToEmpty() {
+        let stage = Stage(name: "Program")
+        XCTAssertEqual(stage.compositorOverlays, .empty)
+    }
+
+    func testBugOverlayInvisibleWhenDisabledOrAssetMissing() {
+        var bug = BugOverlay()
+        XCTAssertFalse(bug.isVisible, "Disabled bug is invisible.")
+
+        bug.enabled = true
+        XCTAssertFalse(bug.isVisible, "Enabled bug with no media is invisible.")
+
+        let url = URL(fileURLWithPath: "/tmp/logo.png")
+        bug.media = MediaReference(url: url)
+        bug.opacity = 0
+        XCTAssertFalse(bug.isVisible, "Zero opacity is invisible.")
+
+        bug.opacity = 1
+        bug.sizePercent = 0
+        XCTAssertFalse(bug.isVisible, "Zero size is invisible.")
+
+        bug.sizePercent = 0.1
+        XCTAssertTrue(bug.isVisible)
+    }
+
+    func testMessageOverlayInvisibleWithoutTextOrCountdown() {
+        var msg = MessageOverlay()
+        XCTAssertFalse(msg.isVisible, "Disabled is invisible.")
+
+        msg.enabled = true
+        XCTAssertFalse(msg.isVisible, "Enabled with empty text and no countdown is invisible.")
+
+        msg.text = "Welcome"
+        XCTAssertTrue(msg.isVisible)
+
+        msg.text = ""
+        msg.countdownTo = Date().addingTimeInterval(60)
+        XCTAssertTrue(msg.isVisible, "Countdown alone is enough to render.")
+
+        msg.opacity = 0
+        XCTAssertFalse(msg.isVisible, "Zero opacity is invisible regardless of content.")
+    }
+
+    func testBugCornerHasAllFourCornersWithReadableLabels() {
+        XCTAssertEqual(BugCorner.allCases, [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        XCTAssertEqual(BugCorner.topRight.label, "Top Right")
+        XCTAssertEqual(BugCorner.bottomLeft.label, "Bottom Left")
+    }
+
+    func testMessagePositionLabelsReadable() {
+        XCTAssertEqual(MessagePosition.allCases, [.top, .lowerThird, .center])
+        XCTAssertEqual(MessagePosition.lowerThird.label, "Lower Third")
+    }
+
+    func testStageRoundTripsCompositorOverlays() throws {
+        let url = URL(fileURLWithPath: "/tmp/logo.png")
+        let overlays = CompositorOverlays(
+            bug: BugOverlay(
+                enabled: true,
+                media: MediaReference(url: url),
+                corner: .bottomRight,
+                marginPercent: 0.05,
+                sizePercent: 0.12,
+                opacity: 0.85
+            ),
+            message: MessageOverlay(
+                enabled: true,
+                text: "Doors {time_left}",
+                position: .top,
+                fontSizePercent: 0.07,
+                textColor: .white,
+                backgroundColor: RGBAColor(red: 0, green: 0, blue: 0, alpha: 0.6),
+                opacity: 0.9,
+                countdownTo: Date(timeIntervalSince1970: 1_750_000_000)
+            )
+        )
+        var stage = Stage(name: "Program")
+        stage.compositorOverlays = overlays
+
+        let project = PlayoutProject(stages: [stage])
+        let data = try JSONEncoder.simplePlayback.encode(project)
+        let decoded = try JSONDecoder.simplePlayback.decode(PlayoutProject.self, from: data)
+
+        let restored = try XCTUnwrap(decoded.stages.first?.compositorOverlays)
+        XCTAssertTrue(restored.bug.enabled)
+        XCTAssertEqual(restored.bug.corner, .bottomRight)
+        XCTAssertEqual(restored.bug.sizePercent, 0.12, accuracy: 0.0001)
+        XCTAssertEqual(restored.bug.opacity, 0.85, accuracy: 0.0001)
+        XCTAssertNotNil(restored.bug.media)
+        XCTAssertTrue(restored.message.enabled)
+        XCTAssertEqual(restored.message.text, "Doors {time_left}")
+        XCTAssertEqual(restored.message.position, .top)
+        XCTAssertNotNil(restored.message.backgroundColor)
+        let countdown = try XCTUnwrap(restored.message.countdownTo)
+        XCTAssertEqual(countdown.timeIntervalSince1970, 1_750_000_000, accuracy: 0.5)
+    }
+
+    func testStageDecodesWithoutCompositorOverlaysField() throws {
+        // Legacy stage JSON (pre-B12) must still decode and produce an empty overlays struct,
+        // not crash and not silently flip overlays on.
+        let legacyJSON = """
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "name": "Program",
+          "width": 1920,
+          "height": 1080,
+          "frameRateNumerator": 30000,
+          "frameRateDenominator": 1001,
+          "colorSpace": "rec709",
+          "range": "limited"
+        }
+        """.data(using: .utf8)!
+        let stage = try JSONDecoder.simplePlayback.decode(Stage.self, from: legacyJSON)
+        XCTAssertEqual(stage.compositorOverlays, .empty)
+    }
+
     func testGenerateDefaultShowListThenFireGOAdvancesPlayheadAcrossEntireList() {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
