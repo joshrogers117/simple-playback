@@ -23,7 +23,7 @@ final class HTTPServer {
     }
 
     var configuration: Configuration
-    weak var dispatcher: ShowControlDispatcher?
+    var dispatcher: ShowControlDispatcher?
     var subscriptions: SubscriptionRegistry?
     var tokens: AuthTokenStore?
 
@@ -43,11 +43,10 @@ final class HTTPServer {
     func start() throws {
         guard !isRunning else { return }
         let params = NWParameters.tcp
-        params.requiredLocalEndpoint = NWEndpoint.hostPort(
-            host: NWEndpoint.Host(configuration.host),
-            port: NWEndpoint.Port(rawValue: configuration.port) ?? .any
+        let listener = try NWListener(
+            using: params,
+            on: NWEndpoint.Port(rawValue: configuration.port) ?? .any
         )
-        let listener = try NWListener(using: params)
         listener.newConnectionHandler = { [weak self] connection in
             guard let self else { return }
             connection.start(queue: self.queue)

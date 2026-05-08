@@ -22,7 +22,7 @@ final class OSCServer {
     }
 
     var configuration: Configuration
-    weak var dispatcher: ShowControlDispatcher?
+    var dispatcher: ShowControlDispatcher?
     var subscriptions: SubscriptionRegistry?
 
     private var udpListener: NWListener?
@@ -62,19 +62,29 @@ final class OSCServer {
 
     private func startUDP() throws {
         let params = NWParameters.udp
-        let host = configuration.host
-        params.requiredLocalEndpoint = NWEndpoint.hostPort(
-            host: NWEndpoint.Host(host),
-            port: NWEndpoint.Port(rawValue: configuration.udpPort) ?? .any
+        let listener = try NWListener(
+            using: params,
+            on: NWEndpoint.Port(rawValue: configuration.udpPort) ?? .any
         )
-        let listener = try NWListener(using: params)
         listener.newConnectionHandler = { [weak self] connection in
             guard let self else { return }
             connection.start(queue: self.queue)
             self.handleUDPConnection(connection)
         }
-        listener.stateUpdateHandler = { [weak self] _ in _ = self }
+        let ready = DispatchSemaphore(value: 0)
+        listener.stateUpdateHandler = { [weak self] state in
+            switch state {
+            case .ready:
+                ready.signal()
+            case let .failed(error):
+                NSLog("OSCServer UDP listener failed: \(error)")
+                _ = self
+            default:
+                break
+            }
+        }
         listener.start(queue: queue)
+        _ = ready.wait(timeout: .now() + 1.0)
         udpListener = listener
     }
 
@@ -110,17 +120,21 @@ final class OSCServer {
 
     private func startTCP() throws {
         let params = NWParameters.tcp
-        params.requiredLocalEndpoint = NWEndpoint.hostPort(
-            host: NWEndpoint.Host(configuration.host),
-            port: NWEndpoint.Port(rawValue: configuration.tcpPort) ?? .any
+        let listener = try NWListener(
+            using: params,
+            on: NWEndpoint.Port(rawValue: configuration.tcpPort) ?? .any
         )
-        let listener = try NWListener(using: params)
         listener.newConnectionHandler = { [weak self] connection in
             guard let self else { return }
             connection.start(queue: self.queue)
             self.handleTCPConnection(connection)
         }
+        let ready = DispatchSemaphore(value: 0)
+        listener.stateUpdateHandler = { state in
+            if case .ready = state { ready.signal() }
+        }
         listener.start(queue: queue)
+        _ = ready.wait(timeout: .now() + 1.0)
         tcpListener = listener
     }
 

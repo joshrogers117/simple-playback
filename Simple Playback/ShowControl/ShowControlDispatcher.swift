@@ -41,7 +41,7 @@ enum OSCTransportKind: String, Equatable {
 /// All transports talk to the same dispatcher. Idempotency, capability checks,
 /// show-mode capability stripping, and source attribution all happen here.
 final class ShowControlDispatcher {
-    weak var runtime: CueRuntime?
+    var runtime: CueRuntime?
     let state: ShowControlState
     var clock: () -> TimeInterval
 
