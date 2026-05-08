@@ -1018,3 +1018,37 @@ if storedHash == nil && storedSize == nil {
 **Reversibility**: medium. Removing FolderBookmark from the model is straightforward (decode-if-present everywhere); the resolver rung removal would be a one-line patch. The Add Folder importer wiring is the largest delete (one method + one optional parameter).
 
 **What I'd revisit if**: operator workflows need *deep* per-file bookmark recovery (file moved out of the folder, parent folder renamed, etc.). The current rung 2 only handles "file moved within its imported folder." A more general "rebuild from common-prefix-path" recovery would need a different design.
+
+---
+
+## 2026-05-08 — C8 v1.1: thread folderBookmarks through every read path (session 22)
+
+**Why**: the session-21 foundation stamped folderBookmarkID + folderRelativePath at import and threaded the lookup through `MediaReference.resolvedURL(bundleMediaDirectory:folderBookmarks:)` + `AssetLibraryProbe` + `AssetRelinkPlan`. That made pre-show + Locate Folder relink folder-bookmark-aware, but the playback hot path (`PlaybackController.take`), the compositor's overlay bug-image resolver (`CompositorPipeline.bugImage`), the transcode eligibility check + entry point (`TranscodeService.canTranscode` + `TranscodeCoordinator.transcode`), and the palette tile thumbnails (`SlideGridView.SlideTile` + `ThumbnailLoader`) still called the bundle-only `resolvedURL(bundleMediaDirectory:)` overload. A clip moved within its imported folder would only recover after the next pre-show / Locate Folder pass; the live take would print "Missing media".
+
+**Decision**: add `folderBookmarks: [UUID: FolderBookmark]` to `PlaybackController` (mirrors to compositor in `didSet`, same shape as `bundleMediaDirectory`), to `CompositorPipeline` (lock-protected like `_bundleMediaDirectory`, with the same atomic cache invalidation on swap), and to `TranscodeService.canTranscode` / `TranscodeCoordinator.transcode` as a defaulted parameter. SlideGridView gains a folderBookmarks property threaded through SlideTile → ThumbnailView → `ThumbnailLoader.thumbnail(...)`. RootView publishes `playback.folderBookmarks` from `document.project.folderBookmarks` on `.onAppear` and on every change to that array (the `.onChange(of: document.project.folderBookmarks)` hook also triggers a missing-media banner recompute since the probe consumes the same lookup).
+
+**Alternatives considered**:
+- **Singleton "FolderBookmarkResolver" service.** Removes the threading at every consumer but introduces a global-state container that makes tests harder to seed and creates a new lifetime question (when does a document close clear its bookmarks?). The defaulted-parameter shape is pure and matches the existing `bundleMediaDirectory` discipline.
+- **Compute the dict inside `MediaReference.resolvedURL` from a hidden static.** Same ownership problem as singleton.
+- **Defer until v1.1.x and tell operators to run pre-show after every Add Folder rename.** Ship-blocking only for cross-host workflows that aren't yet exercised; could have waited. Picked the threading because the consumer-side story for a foundation that just landed is the natural completion, the work is well-bounded (3 commits), and it mirrors the C7d threading pattern the project already has muscle memory for.
+
+**Reversibility**: easy. Each consumer's folderBookmarks property is additive with a sensible default (`[:]` or `nil` lookup → bundle-only resolution). Reverting drops the property and the wiring without touching the foundation.
+
+**What I'd revisit if**: a future Director View / tear-off window grows a parallel media-resolution path that also needs the lookup. At that point a small `MediaResolutionContext` value type might be cleaner than continuing to thread the two parameters everywhere.
+
+---
+
+## 2026-05-08 — Option J: bridge MediaImporter / MediaFlagsInspector / PlaybackController copyCGImage off deprecated AV APIs (session 22)
+
+**Why**: the session-21 ThumbnailGenerator bridge (DispatchSemaphore + `@unchecked Sendable` carrier wrapping `generateCGImageAsynchronously`) was filed as the prescribed shape for the remaining sync-AV deprecations. Three sites had the same shape problem: `MediaImporter.nativeFrameRate` + `MediaImporter.hasVideoTrack` (sync `AVURLAsset.tracks(withMediaType:)`), `MediaFlagsInspector.inspect` (same), and `PlaybackController.renderFirstPreparedFrame` (sync `copyCGImage`). All sit on background queues / off the render hot path; full async-propagation would force the importer's slide-construction loop to become async, rippling through ~25 callsites for marginal correctness gain.
+
+**Decision**: apply the session-21 bridge pattern uniformly. `MediaImporter.loadFirstVideoTrackSync(url:)` is the single helper for both importer sites, wrapping `loadTracks(withMediaType:completionHandler:)` in a DispatchSemaphore + private `TrackLoadBox: @unchecked Sendable` carrier. `MediaFlagsInspector` duplicates the helper locally to avoid making MediaImporter's helper public — both helpers are tiny and could be merged in a follow-up if a third site needs the same shape. `PlaybackController.renderFirstPreparedFrame` bridges via `generateCGImageAsynchronously(for:completionHandler:)` + `FirstFrameBox: @unchecked Sendable` (filemate to ThumbnailGenerator's `ThumbnailExtractionBox`).
+
+**Alternatives considered**:
+- **Make MediaImporter / MediaFlagsInspector async end-to-end.** Honest migration but the importer's slide-construction loop would ripple through every drop/open-panel call, the encode/transcode sibling-importer callbacks, and the test seam. Punted as a follow-up gardening sweep when the importer naturally needs to become async (e.g., for bulk `loadValuesAsynchronously` over many slides at once).
+- **Keep the deprecated sync calls and accept the SourceKit warning.** xcodebuild build doesn't surface the deprecations today (only SourceKit does), so the warnings don't print in CI. Tolerable but ships an unbounded "we know about this" debt forward.
+- **Share one helper across MediaImporter + MediaFlagsInspector.** Considered; opted to duplicate the tiny helper locally to keep MediaImporter's helper private. A future merge into a `Services/AVTrackLoader.swift` is easy if a third caller materializes.
+
+**Reversibility**: easy. Each bridge is local to one function; reverting replaces the box + semaphore + callback with the deprecated sync property read.
+
+**What I'd revisit if**: track-level property reads (`nominalFrameRate`, `minFrameDuration`, `formatDescriptions`) trip a future SDK's deprecation gate that xcodebuild *does* surface. At that point a property-level bridge is the next layer — likely a small `loadVideoTrackProps(url:) -> (track: AVAssetTrack, fps: Double?, duration: CMTime?, formats: [CMFormatDescription])?` helper that loads everything in one async hop and returns a value-type bundle.
