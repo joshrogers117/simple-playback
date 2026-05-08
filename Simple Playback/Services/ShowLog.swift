@@ -201,6 +201,111 @@ final class ShowLog: ObservableObject {
     }
 }
 
+// MARK: - E4 filtering
+
+extension ShowLog {
+
+    /// Filter axis over `ShowLogEvent.Source`. The dispatcher tags every
+    /// event with one of six source variants; the operator-facing picker
+    /// collapses related variants (local-hotkey + operator-click stay
+    /// together as a single "Local" bucket) so the filter chrome stays
+    /// readable.
+    enum SourceFilter: String, Equatable, CaseIterable, Identifiable {
+        case all
+        case local
+        case osc
+        case http
+        case timecode
+        case system
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .all: "All sources"
+            case .local: "Local"
+            case .osc: "OSC"
+            case .http: "HTTP"
+            case .timecode: "Timecode"
+            case .system: "System"
+            }
+        }
+
+        func matches(_ source: ShowLogEvent.Source) -> Bool {
+            switch (self, source) {
+            case (.all, _): return true
+            case (.local, .localHotkey), (.local, .operatorButton): return true
+            case (.osc, .osc): return true
+            case (.http, .http): return true
+            case (.timecode, .timecode): return true
+            case (.system, .system): return true
+            default: return false
+            }
+        }
+    }
+
+    /// Filter axis over `ShowLogEvent.Action`. Mirrors the runtime/remote/
+    /// system split so an operator looking for "what did the show do" vs
+    /// "what did a remote do" vs "what did the OS do" can pick fast.
+    enum ActionFilter: String, Equatable, CaseIterable, Identifiable {
+        case all
+        case runtimeVerbs
+        case remoteActions
+        case systemEvents
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .all: "All actions"
+            case .runtimeVerbs: "Show verbs"
+            case .remoteActions: "Remote API"
+            case .systemEvents: "System"
+            }
+        }
+
+        func matches(_ action: ShowLogEvent.Action) -> Bool {
+            switch (self, action) {
+            case (.all, _):
+                return true
+            case (.runtimeVerbs, .go),
+                 (.runtimeVerbs, .previous),
+                 (.runtimeVerbs, .panic),
+                 (.runtimeVerbs, .clear),
+                 (.runtimeVerbs, .blackout),
+                 (.runtimeVerbs, .showModeOn),
+                 (.runtimeVerbs, .showModeOff):
+                return true
+            case (.remoteActions, .oscAction),
+                 (.remoteActions, .httpAction),
+                 (.remoteActions, .timecodeTrigger):
+                return true
+            case (.systemEvents, .missingMedia),
+                 (.systemEvents, .droppedFrame):
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
+    /// Pure-logic filter applied to a snapshot of `events`. The view passes
+    /// the result through `ForEach` for rendering so SwiftUI doesn't have
+    /// to redo the predicate work on every redraw.
+    func filteredEvents(
+        source: SourceFilter,
+        action: ActionFilter,
+        since: Date? = nil
+    ) -> [ShowLogEvent] {
+        events.filter { event in
+            guard source.matches(event.source) else { return false }
+            guard action.matches(event.action) else { return false }
+            if let since, event.timestamp < since { return false }
+            return true
+        }
+    }
+}
+
 /// RFC 4180 field quoting — wrap in `"` if the field contains a comma, a
 /// quote, or a newline; double any embedded `"`.
 private func csvField(_ value: String) -> String {

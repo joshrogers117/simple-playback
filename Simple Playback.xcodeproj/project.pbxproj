@@ -87,6 +87,7 @@
 		ABA983A9D89AD460EE548AF4 /* TransportSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9392E6B9D0468959B74A1F9 /* TransportSink.swift */; };
 		AC4ED3FB70B05A49DBA8AA3A /* StageScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9305D229FBA3B8EC6854577 /* StageScreen.swift */; };
 		AD31546ACCAED84FF1D140D4 /* HTTPRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189C4C83922BF987A389D797 /* HTTPRequest.swift */; };
+		B015D4752B6E1E5FFA06DC29 /* ShowLogFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29CDDBD1A7CD4394C852378 /* ShowLogFilterTests.swift */; };
 		B0198B8CBF5D9D7897AFAF9F /* PendingFolderImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6084981086D7D70B8E87C69E /* PendingFolderImportTests.swift */; };
 		B36D00350C08A8A28FF15181 /* ShowLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB5E45F95D97440E499B624D /* ShowLogTests.swift */; };
 		B48DB4DA5F28D7017F2E8EED /* ProjectLockBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 860D5CCBF5209A73B62CBA8F /* ProjectLockBannerView.swift */; };
@@ -219,6 +220,7 @@
 		AE5337B42A540319366F02D3 /* ShowLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowLog.swift; sourceTree = "<group>"; };
 		AFB3106A106C37E4EE56BC7E /* MTCReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MTCReader.swift; sourceTree = "<group>"; };
 		B133348CF010D337CDA988A0 /* ImportStatusBannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportStatusBannerTests.swift; sourceTree = "<group>"; };
+		B29CDDBD1A7CD4394C852378 /* ShowLogFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowLogFilterTests.swift; sourceTree = "<group>"; };
 		B328F432BC7CCB991A9A8373 /* MediaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporter.swift; sourceTree = "<group>"; };
 		B55CC65960D79FA6ECC0214F /* Simple Playback.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Simple Playback.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B631D588B2455E3C2C9EE89C /* PDFImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFImporterTests.swift; sourceTree = "<group>"; };
@@ -376,6 +378,7 @@
 				0E47E51BD45087956CCF2905 /* ShowControlIntegrationTests.swift */,
 				DBE4B045C1C58A97ED08C4B9 /* ShowControllerLogTests.swift */,
 				237C1358E779CC8F8EBA839E /* ShowControlTests.swift */,
+				B29CDDBD1A7CD4394C852378 /* ShowLogFilterTests.swift */,
 				BB5E45F95D97440E499B624D /* ShowLogTests.swift */,
 				633EE3FAB29225F6222E52AB /* TranscodeCoordinatorTests.swift */,
 				9A70EA9D270E7268A7C74D62 /* TranscodeServiceTests.swift */,
@@ -697,6 +700,7 @@
 				851AE7644559671FB09FD2BD /* ShowControlIntegrationTests.swift in Sources */,
 				00EC3572563AA2E459F2489F /* ShowControlTests.swift in Sources */,
 				8BD2A352FC9B61303CA55D19 /* ShowControllerLogTests.swift in Sources */,
+				B015D4752B6E1E5FFA06DC29 /* ShowLogFilterTests.swift in Sources */,
 				B36D00350C08A8A28FF15181 /* ShowLogTests.swift in Sources */,
 				66B172846E254E8FCC806D8B /* TranscodeCoordinatorTests.swift in Sources */,
 				4552EA56AF59686AE3373E66 /* TranscodeServiceTests.swift in Sources */,
