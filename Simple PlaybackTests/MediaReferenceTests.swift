@@ -131,6 +131,44 @@ final class MediaReferenceTests: XCTestCase {
         XCTAssertEqual(decoded.folderRelativePath, "scene/clip-01.mov")
     }
 
+    func testResolvedURLConsultsFolderBookmarkRungWhenOriginalIsGone() throws {
+        // Build a real folder + file, capture a FolderBookmark on the folder,
+        // record a MediaReference whose originalPath points at the folder but
+        // whose folderBookmarkID/folderRelativePath address a real file inside.
+        // Move the real file out of folder + delete it to ensure original-path
+        // resolution fails, then re-create the file at the same in-folder
+        // location and confirm rung 2 (folder bookmark) recovers it.
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ResolvedURLFolderRung-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let actual = folder.appendingPathComponent("clip.mov")
+        try Data([0x00, 0x01]).write(to: actual)
+
+        let bookmark = FolderBookmark(folderURL: folder)
+        var reference = MediaReference(url: URL(fileURLWithPath: "/Volumes/Gone/clip.mov"))
+        reference.folderBookmarkID = bookmark.id
+        reference.folderRelativePath = "clip.mov"
+
+        let resolved = reference.resolvedURL(
+            bundleMediaDirectory: nil,
+            folderBookmarks: [bookmark.id: bookmark]
+        )
+        XCTAssertEqual(resolved?.standardizedFileURL, actual.standardizedFileURL)
+    }
+
+    func testResolvedURLReturnsNilWhenFolderBookmarkLookupIsEmpty() {
+        // The reference carries folder fields but the host didn't supply the
+        // bookmarks lookup (pre-C8 callsite, or the project lost its bookmark
+        // list). Resolution falls through and returns nil.
+        var reference = MediaReference(url: URL(fileURLWithPath: "/Volumes/Gone/clip.mov"))
+        reference.folderBookmarkID = UUID()
+        reference.folderRelativePath = "clip.mov"
+
+        XCTAssertNil(reference.resolvedURL(bundleMediaDirectory: nil, folderBookmarks: [:]))
+    }
+
     func testLegacyDecodeDefaultsFolderBookmarkFieldsToNil() throws {
         // Pre-C8 projects encoded MediaReference without folderBookmarkID +
         // folderRelativePath. Loading those projects must continue to work;

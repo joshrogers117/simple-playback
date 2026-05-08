@@ -207,21 +207,38 @@ struct MediaReference: Codable, Hashable {
     }
 
     func resolvedURL() -> URL? {
-        resolvedURL(bundleMediaDirectory: nil)
+        resolvedURL(bundleMediaDirectory: nil, folderBookmarks: [:])
     }
 
-    /// Bundle-aware resolution for `.managed` references. When the caller
-    /// supplies the active project's `<bundle>/Media/` URL, a managed asset
-    /// short-circuits to `<bundleMediaDirectory>/<basename of originalPath>`
-    /// before consulting the bookmark / absolute path. This is what lets a
-    /// `.splayback` bundle moved to a new machine still play managed media:
-    /// the absolute path recorded at C7d apply time is wrong on the new host,
-    /// and the security-scoped bookmark is also stale, but the file IS in the
+    /// Bundle-aware resolution for `.managed` references. Forwards to the
+    /// folder-bookmark-aware overload with an empty lookup so legacy callsites
+    /// that don't yet thread folder bookmarks through compile unchanged.
+    func resolvedURL(bundleMediaDirectory: URL?) -> URL? {
+        resolvedURL(bundleMediaDirectory: bundleMediaDirectory, folderBookmarks: [:])
+    }
+
+    /// Bundle-aware resolution for `.managed` references plus C8 folder-bookmark
+    /// fallback. When the caller supplies the active project's `<bundle>/Media/`
+    /// URL, a managed asset short-circuits to
+    /// `<bundleMediaDirectory>/<basename of originalPath>` before consulting
+    /// the bookmark / absolute path. This is what lets a `.splayback` bundle
+    /// moved to a new machine still play managed media: the absolute path
+    /// recorded at C7d apply time is wrong on the new host, and the
+    /// security-scoped bookmark is also stale, but the file IS in the
     /// bundle's Media/ at a host-relative location.
     ///
     /// `.linked` references ignore the bundleMediaDirectory hint — there is
     /// no contract that a linked file ever lives inside a bundle.
-    func resolvedURL(bundleMediaDirectory: URL?) -> URL? {
+    ///
+    /// `folderBookmarks` is the project-level lookup; when the per-file
+    /// bookmark + originalPath are both dead, this method joins the matching
+    /// `FolderBookmark`'s resolved directory with `folderRelativePath` so a
+    /// clip moved within its imported folder still resolves without a
+    /// search-root walk. Empty lookup (default) skips the rung.
+    func resolvedURL(
+        bundleMediaDirectory: URL?,
+        folderBookmarks: [UUID: FolderBookmark]
+    ) -> URL? {
         if kind == .managed, let bundleMediaDirectory {
             let candidate = bundleMediaDirectory
                 .appendingPathComponent(URL(fileURLWithPath: originalPath).lastPathComponent)
@@ -250,7 +267,26 @@ struct MediaReference: Codable, Hashable {
         }
 
         let fallback = URL(fileURLWithPath: originalPath)
-        return FileManager.default.fileExists(atPath: fallback.path) ? fallback : nil
+        if FileManager.default.fileExists(atPath: fallback.path) {
+            return fallback
+        }
+
+        // C8 — folder-bookmark rung. Cheap (no walk): one bookmark resolve
+        // + path append + fileExists. Recovers a clip moved within its
+        // imported folder when both the per-file bookmark and absolute path
+        // have died together (a folder-level rename / drag).
+        if let folderID = folderBookmarkID,
+           let relative = folderRelativePath,
+           !relative.isEmpty,
+           let bookmark = folderBookmarks[folderID],
+           let directory = bookmark.resolvedDirectory() {
+            let candidate = directory.appendingPathComponent(relative)
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+        }
+
+        return nil
     }
 }
 

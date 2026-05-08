@@ -65,8 +65,22 @@ enum AssetLibraryProbe {
     /// managed assets as online when the project bundle has been moved between
     /// machines (the absolute path is stale but the bundle Media/ has the file).
     static func makeIsOnline(bundleMediaDirectory: URL?) -> (MediaSlide) -> Bool {
+        makeIsOnline(bundleMediaDirectory: bundleMediaDirectory, folderBookmarks: [:])
+    }
+
+    /// C8-aware online-check. Same as the bundle-only overload but threads the
+    /// project's folder-bookmark lookup so a slide whose per-file bookmark +
+    /// absolute path are dead still reads as online when the imported folder's
+    /// bookmark + relative path resolves.
+    static func makeIsOnline(
+        bundleMediaDirectory: URL?,
+        folderBookmarks: [UUID: FolderBookmark]
+    ) -> (MediaSlide) -> Bool {
         { slide in
-            guard let url = slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) else {
+            guard let url = slide.media.resolvedURL(
+                bundleMediaDirectory: bundleMediaDirectory,
+                folderBookmarks: folderBookmarks
+            ) else {
                 return false
             }
             return FileManager.default.fileExists(atPath: url.path)
@@ -84,8 +98,21 @@ enum AssetLibraryProbe {
     /// the same URL the online-check used, so RootView passes both closures
     /// keyed off the same bundle media directory.
     static func makeResolveURL(bundleMediaDirectory: URL?) -> (MediaSlide) -> URL? {
+        makeResolveURL(bundleMediaDirectory: bundleMediaDirectory, folderBookmarks: [:])
+    }
+
+    /// C8-aware companion to `makeResolveURL`. Threads the same
+    /// `folderBookmarks` lookup that `makeIsOnline` uses so the
+    /// stale-fingerprint check sees the resolved-via-folder URL too.
+    static func makeResolveURL(
+        bundleMediaDirectory: URL?,
+        folderBookmarks: [UUID: FolderBookmark]
+    ) -> (MediaSlide) -> URL? {
         { slide in
-            slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory)
+            slide.media.resolvedURL(
+                bundleMediaDirectory: bundleMediaDirectory,
+                folderBookmarks: folderBookmarks
+            )
         }
     }
 

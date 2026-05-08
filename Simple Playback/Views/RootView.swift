@@ -639,12 +639,29 @@ struct RootView: View {
         ctx.renderPathWarmed = playback.hasRenderedAnyFrame
         ctx.systemPreventsIdleSleep = energyAssertion.isHeld
         let mediaDir = bundleMediaDirectory()
+        let folderBookmarks = projectFolderBookmarkLookup()
         ctx.assetLibraryStatus = AssetLibraryProbe.evaluate(
             slides: document.project.slides,
-            isOnline: AssetLibraryProbe.makeIsOnline(bundleMediaDirectory: mediaDir),
-            resolveURL: AssetLibraryProbe.makeResolveURL(bundleMediaDirectory: mediaDir)
+            isOnline: AssetLibraryProbe.makeIsOnline(
+                bundleMediaDirectory: mediaDir,
+                folderBookmarks: folderBookmarks
+            ),
+            resolveURL: AssetLibraryProbe.makeResolveURL(
+                bundleMediaDirectory: mediaDir,
+                folderBookmarks: folderBookmarks
+            )
         )
         return ctx
+    }
+
+    /// C8 — id → `FolderBookmark` lookup the resolver / probe / relink-plan
+    /// callsites consume. Built fresh from `document.project.folderBookmarks`
+    /// so a bookmark added by an Add Folder import shows up in the next
+    /// pre-show / resolution pass without an extra refresh hop.
+    private func projectFolderBookmarkLookup() -> [UUID: FolderBookmark] {
+        Dictionary(uniqueKeysWithValues:
+            document.project.folderBookmarks.map { ($0.id, $0) }
+        )
     }
 
     /// C7d — current project bundle's `<bundle>/Media/` URL, when one exists.
@@ -667,10 +684,17 @@ struct RootView: View {
     /// immediately when the bundle moves.
     private func recomputeAssetLibraryStatus() {
         let mediaDir = bundleMediaDirectory()
+        let folderBookmarks = projectFolderBookmarkLookup()
         assetLibraryStatus = AssetLibraryProbe.evaluate(
             slides: document.project.slides,
-            isOnline: AssetLibraryProbe.makeIsOnline(bundleMediaDirectory: mediaDir),
-            resolveURL: AssetLibraryProbe.makeResolveURL(bundleMediaDirectory: mediaDir)
+            isOnline: AssetLibraryProbe.makeIsOnline(
+                bundleMediaDirectory: mediaDir,
+                folderBookmarks: folderBookmarks
+            ),
+            resolveURL: AssetLibraryProbe.makeResolveURL(
+                bundleMediaDirectory: mediaDir,
+                folderBookmarks: folderBookmarks
+            )
         )
     }
 
@@ -835,7 +859,15 @@ struct RootView: View {
 
         let report = AssetRelinkPlan.plan(
             slides: document.project.slides,
-            searchRoots: [folder]
+            searchRoots: [folder],
+            // C8 — thread the project's folder-bookmark lookup so the relink
+            // plan can mark slides as "still online via folder bookmark"
+            // (recovered through rung 2) without proposing a redundant
+            // contentHash/nameAndSize update for them.
+            resolve: AssetRelinkPlan.liveResolve(
+                folderBookmarks: projectFolderBookmarkLookup(),
+                bundleMediaDirectory: bundleMediaDirectory()
+            )
         )
         guard !report.updates.isEmpty else {
             // Nothing matched — surface so the operator doesn't think the click

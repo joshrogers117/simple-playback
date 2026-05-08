@@ -44,6 +44,26 @@ enum AssetRelinkPlan {
         MediaResolver.resolve(reference: reference, searchRoots: roots)
     }
 
+    /// C8 — factory for a live resolver closure that threads
+    /// `folderBookmarks` + `bundleMediaDirectory` into every per-slide
+    /// `MediaResolver.resolve` call. RootView builds one of these from
+    /// `document.project.folderBookmarks` and passes it as the `resolve:`
+    /// argument to `plan(...)` so the folder-bookmark rung fires for the
+    /// pre-show `media.files` Locate Folder action.
+    static func liveResolve(
+        folderBookmarks: [UUID: FolderBookmark],
+        bundleMediaDirectory: URL?
+    ) -> (MediaReference, [URL]) -> MediaResolutionResult {
+        { reference, roots in
+            MediaResolver.resolve(
+                reference: reference,
+                searchRoots: roots,
+                bundleMediaDirectory: bundleMediaDirectory,
+                folderBookmarks: folderBookmarks
+            )
+        }
+    }
+
     /// Live default — re-fingerprints the new URL after relink. Tests substitute
     /// a deterministic stub.
     static let liveFingerprint: (URL) -> MediaAssetFingerprint? = { url in
