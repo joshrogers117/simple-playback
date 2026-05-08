@@ -1,5 +1,7 @@
 # Phase E — Reliability — Summary
 
+**Status (session 16 — 2026-05-08)**: Phase E gets a small but high-value addition tied to C7's new asset-library primitives — Pre-Show now has a `media.files` row that flags slides whose linked file is offline (error) or whose size/mtime drifted since import (warning). The same row carries a Fix button (E2) that opens NSOpenPanel and runs the C7c MediaResolver waterfall against the chosen folder, splicing resolved URLs back into `project.slides` with refreshed fingerprints. This closes the long-deferred E2 `media.resolution` Fix gap. Late-take detection (E3+ tail) remains deferred — needs a "first frame submitted for cue X" callback that PlaybackController doesn't expose yet.
+
 **Status (session 15 — 2026-05-08)**: **Phase E mostly landed**. Session 15 picked off the four most contained leftovers: E3+ dropped-frame counter, E5 take history (in-memory v1), E7 crash recovery on next launch. 4 commits, 498 → 543 tests (+45).
 
 The reliability surface now covers: pre-show check (live signals + Fix actions); show log (writer + filter UI); autosave (rolling + checkpoint); project lock (duplicate-open warning); no-idle-sleep (energy assertion); dropped-frame instrumentation (status chip + debounced log entries); take history (last 200 fires, viewer sheet); crash recovery (Restore/Discard banner on autosave-newer-than-Show.json).

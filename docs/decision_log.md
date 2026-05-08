@@ -500,3 +500,93 @@ The detector returns leftovers in their original drop order so non-sequence file
 
 **What I'd revisit if**:
 - A recurring crash leaves checkpoint mtime exactly equal to Show.json mtime (unusual on real file systems with millisecond resolution but possible on networked stores with second-resolution mtime). Bump to `<=` and add a hash check to suppress nuisance banners.
+
+
+---
+
+## 2026-05-08 — C7a: SHA-256 streaming + size + mtime as the fingerprint shape
+
+**Decision**: `MediaAssetFingerprint` carries hex-encoded SHA-256 + size + mtime. The hash is streamed (1 MiB default chunk) so multi-GB ProRes files don't load into RAM. Failure is non-blocking — `try? AssetFingerprinter.fingerprint(url:)` returns nil and the importer creates the slide anyway.
+
+**Why**:
+- **SHA-256 is the right durability/cost tradeoff** for an operator-facing identity check. MD5 is faster but the collision surface in a venue-portable bundle (multiple sources copy-deduped on a NAS) is non-trivial; SHA-256 closes the door without making import unbearably slow.
+- **Size + mtime are the cheap pre-flight** for stale-link detection. The pre-show check needs to ask "did this file change since import?" without re-hashing every file every open. Stat-only comparison answers that for the typical case; a full re-hash is a future operator action when stat ambiguity bites.
+- **Streaming I/O** because import-time hashing of multi-GB ProRes hits real machines hard. Loading the file into memory before hashing would push 4–8 GB RAM allocations; `InputStream` at 1 MiB chunks holds 1 MB.
+- **Non-blocking failure** because a fingerprint is a relink-ladder *aid*, not a load-bearing primitive. A slide whose fingerprint failed to compute (unreadable, transient I/O glitch, race with the operator deleting the file mid-import) is still importable and playable; the C9 relink waterfall just falls through to name+size on that slide.
+
+**Alternatives considered**:
+- **xxHash / BLAKE3** — faster, but introduces a non-standard dependency for marginal gain. SHA-256 is in CryptoKit; no third-party code.
+- **Compute fingerprint at first-resolve rather than at import** — defers cost but means project files can be edited without ever capturing a baseline; the stale-fingerprint check loses its ground truth.
+- **Skip mtime, hash on every check** — would force a several-second pause every Pre-Show open on big libraries.
+
+**Reversibility**: easy. The struct is one file; the importer wiring is two callsites. Removing both reverts cleanly; existing projects ignore the new fields on decode (decode-if-present).
+
+**What I'd revisit if**:
+- Real rehearsals show the 1 s mtime tolerance false-positives on SMB volumes (some SMB servers report mtime at 2 s precision). Bump to 2 s, or read filesystem-precision capability.
+- Hash performance becomes a problem on huge project imports. Move fingerprinting off the import hot path into a background queue with a "fingerprint pending" placeholder.
+
+**Public API impact**:
+- `struct MediaAssetFingerprint { contentHash: String, size: Int64, mtime: Date }` (Codable, Hashable).
+- `enum AssetFingerprintError: LocalizedError, Equatable` (`.unreadable`, `.missingAttributes`).
+- `enum AssetFingerprinter` — `fingerprint(url:chunkSize:)`, `sha256Hex(_:)`.
+- `enum MediaReferenceKind: String, Codable, CaseIterable, Identifiable { case linked, managed }`.
+- `MediaReference` gains `kind` and `fingerprint` fields, both decode-if-present.
+- `MediaImporter.fingerprinter: (URL) -> MediaAssetFingerprint?` — test seam, default delegates to `AssetFingerprinter.fingerprint`.
+
+---
+
+## 2026-05-08 — C7c: bookmark resolution lives inside the resolver, not just `MediaReference.resolvedURL()`
+
+**Decision**: `MediaResolver.resolve` re-implements the bookmark / originalPath check internally using its injected `fileExists` closure rather than delegating to `MediaReference.resolvedURL()`. The convenience method on `MediaReference` stays — it's the production-fast-path used everywhere else — but it isn't load-bearing inside the resolver.
+
+**Why**:
+- **`resolvedURL()` does its own real-filesystem check** in the absolute-path fallback branch. That couples the resolver to `FileManager.default` and breaks pure-logic testability — the first cut routed through `resolvedURL()` and the resolver's tests immediately failed because the absolute path didn't exist on disk.
+- **Bookmark data is still resolved via Foundation** (`URL(resolvingBookmarkData:)`), which is real I/O but tolerant — invalid bookmarks return nil rather than throwing or stat'ing. Tests pass empty bookmarks and the resolver falls through to the absolute-path branch (where the injected `fileExists` takes over).
+- **Cost**: the resolver duplicates ~6 lines of bookmark/path resolution that already exist in `MediaReference.resolvedURL()`. Worth it for the testability gain; the duplication is small and stable.
+
+**Alternatives considered**:
+- **Refactor `MediaReference.resolvedURL()` to take an injectable `fileExists`** — more invasive, propagates a closure-arg through every existing caller. Rejected: too much surface change for one resolver feature.
+- **Tests use real temp files** — works but every hash/name+size scenario would need fixture creation. The injected closures are dramatically faster and clearer.
+
+**Reversibility**: easy. The duplicated lines are scoped to `MediaResolver.resolve`; collapsing back into `resolvedURL()` is a refactor, not a feature change.
+
+**What I'd revisit if**:
+- The resolver and the convenience method drift. Track via a comment cross-reference; if the resolver picks up new bookmark-handling logic that `resolvedURL()` doesn't have, audit both before merging.
+
+---
+
+## 2026-05-08 — C7c: search roots iterate in caller order; first hash-hit wins
+
+**Decision**: `MediaResolver.resolve` walks `searchRoots` in the order the caller passed them. The first `.contentHash` match wins immediately; `.nameAndSize` matches are remembered as "last resort" and only used if no hash match surfaces in any root. The resolver does not search beyond the first hash match.
+
+**Why**:
+- **Caller order encodes operator intent**. The host typically passes `[bundle Media/, project-relink folder, Documents/Media/]` — bundle-local media should win because it's the venue-portable copy.
+- **Hash > name+size** because hashes are authoritative (identical bytes ⇒ identical asset); name+size is heuristic. The resolver promotes the harder-evidence match unconditionally.
+- **First hash match wins without a tiebreaker** because a content-hash collision across multiple search roots would imply identical files in two locations — picking either is correct; picking the first preserves caller intent.
+
+**Reversibility**: easy. The loop is one function; reordering or adding tiebreakers is a localized change.
+
+**What I'd revisit if**:
+- Operators want a "find all matches" view to disambiguate. Today the resolver picks one; a future surface could return all candidates and ask the operator. That's a separate API (`resolveAll(...)`) layered on top.
+
+---
+
+## 2026-05-08 — C7c stale-fingerprint: 1 s mtime tolerance on the pre-show row
+
+**Decision**: `AssetLibraryProbe.isStale` accepts a 1-second mtime tolerance window before flagging a slide as stale. Smaller drifts are silently treated as identical.
+
+**Why**:
+- **HFS+ rounds mtime to whole seconds.** A file copied between APFS and HFS+ volumes will show a sub-second drift even though the bytes are identical.
+- **SMB drops to 2 s precision** on some servers. Real rehearsal venues have NAS shares whose mtime changes by 0–2 s on every open.
+- **Stale is a warning, not an error**, so a tolerance window's downside is minimal — a true content change still differs at the byte / size axis, which the predicate also checks.
+- **1 s is the conservative floor** that catches HFS+ but doesn't suppress real edits (a legitimate edit takes more than a second to make + save).
+
+**Alternatives considered**:
+- **0 s tolerance** — false positives on every venue-portable bundle move.
+- **2 s tolerance** — survives SMB but starts swallowing fast-edit cycles in normal use.
+- **Read filesystem-precision capability** — possible via `URLResourceKey`, but the implementation surface isn't worth it for a pre-show signal that's already a warning.
+
+**Reversibility**: easy. One scalar parameter on `isStale`.
+
+**What I'd revisit if**: real SMB rehearsals show 1 s isn't enough — bump to 2 s or read the precision capability.
+
