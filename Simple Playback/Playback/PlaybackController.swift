@@ -89,9 +89,72 @@ final class PlaybackController: ObservableObject {
     /// reads this to compare against the configured `activeFrameInterval`.
     private var lastTimerTickHostTime: CFTimeInterval?
 
+    /// E3+ tail Path 1 — slide ID of the most recent `take(...)` that has not
+    /// yet seen its first composed frame reach `submitFrame`. Set on `take()`
+    /// (main), consumed inside `submitFrame` (outputQueue) on the next
+    /// successful submit. `stopOutput()` / `clear()` clear it so a stale
+    /// pending take from a stopped session can't fire on a subsequent restart.
+    /// Lock-protected because the writer (`take()` on main) and the reader
+    /// (`submitFrame` on outputQueue) cross threads.
+    private var _pendingCueFireSlideID: UUID?
+    private let cueFireLock = NSLock()
+
+    /// E3+ tail Path 1 — emitted exactly once per `take(...)` call when the
+    /// first composed frame for that take reaches `submitFrame`. Tightens the
+    /// late-take measurement: the Path 2 proxy via `$liveSlideID` flips
+    /// synchronously inside `take(...)` for image cues (always reads as
+    /// on-time), but this callback waits for the first frame to actually
+    /// reach the output driver. Dispatched on main so the late-take
+    /// detector / show-log path can consume without a second hop.
+    var onFirstComposedFrameForCue: ((UUID, Date) -> Void)?
+
     init(outputDriver: VideoOutputDriver = CompositeVideoOutputDriver()) {
         self.outputDriver = outputDriver
         outputQueue.setSpecific(key: outputQueueKey, value: ())
+    }
+
+    private func setPendingCueFireSlideID(_ slideID: UUID?) {
+        cueFireLock.lock()
+        _pendingCueFireSlideID = slideID
+        cueFireLock.unlock()
+    }
+
+    private func consumePendingCueFireSlideID() -> UUID? {
+        cueFireLock.lock()
+        defer { cueFireLock.unlock() }
+        let result = _pendingCueFireSlideID
+        _pendingCueFireSlideID = nil
+        return result
+    }
+
+    /// Test seam — drive the Path 1 emission deterministically without going
+    /// through `take(...) → AVFoundation → submitFrame`. Tests arm the token
+    /// via `armPendingCueFireSlideIDForTesting`, then call this helper to
+    /// simulate the first composed frame reaching the output. The dispatch is
+    /// `.async` to mirror production; tests await on a main-queue expectation.
+    func simulateFirstComposedFrameForTesting() {
+        if let callback = onFirstComposedFrameForCue,
+           let firedSlideID = consumePendingCueFireSlideID() {
+            let firedAt = Date()
+            DispatchQueue.main.async {
+                callback(firedSlideID, firedAt)
+            }
+        }
+    }
+
+    /// Test seam — arm the Path 1 token without going through `take(...)`.
+    /// Production callsites are `take(...)` and the transition-commit paths.
+    func armPendingCueFireSlideIDForTesting(_ slideID: UUID?) {
+        setPendingCueFireSlideID(slideID)
+    }
+
+    /// Test seam — read the armed token without consuming. Tests use this to
+    /// verify `clear()` / `stopOutput()` drop a previously-armed token before
+    /// the impending black-frame submit fires the callback.
+    func peekPendingCueFireSlideIDForTesting() -> UUID? {
+        cueFireLock.lock()
+        defer { cueFireLock.unlock() }
+        return _pendingCueFireSlideID
     }
 
     func refreshDevices() {
@@ -211,6 +274,10 @@ final class PlaybackController: ObservableObject {
         activeSettings = slide.settings
         beginTransition(nil, outgoingVideo: outgoingVideo)
         liveSlideID = slide.id
+        // Path 1 — arm the "first composed frame for cue X" emission. Set
+        // after liveSlideID so a reader that observes liveSlideID also
+        // observes the token (under-lock writes happen-before the publish).
+        setPendingCueFireSlideID(slide.id)
         liveTitle = slide.title
         isRunning = true
 
@@ -225,6 +292,9 @@ final class PlaybackController: ObservableObject {
 
     func clear() {
         cancelPendingVideoPreparation()
+        // Drop any pending Path-1 token so the impending black-frame submit
+        // doesn't masquerade as the first composed frame of the cleared cue.
+        setPendingCueFireSlideID(nil)
         stopMediaOnly()
         drainAudioOutput()
         let frame = renderer.blackFrame(outputSize: activeOutputSize)
@@ -246,6 +316,9 @@ final class PlaybackController: ObservableObject {
 
     func stopOutput() {
         cancelPendingVideoPreparation()
+        // Path 1 — stale pending take from a stopped session must not fire on
+        // a subsequent restart's first frame.
+        setPendingCueFireSlideID(nil)
         stopMediaOnly()
         drainAudioOutput()
         syncOutput {
@@ -673,6 +746,9 @@ final class PlaybackController: ObservableObject {
 
         beginTransition(transition, outgoingVideo: outgoingVideo)
         liveSlideID = prepared.slide.id
+        // Path 1 — arm "first composed frame for cue X" emission for the
+        // video-transition path (mirrors the non-transition arm in `take`).
+        setPendingCueFireSlideID(prepared.slide.id)
         liveTitle = prepared.slide.title
         isRunning = true
 
@@ -823,6 +899,9 @@ final class PlaybackController: ObservableObject {
 
         beginTransition(transition, outgoingVideo: outgoingVideo)
         liveSlideID = prepared.slide.id
+        // Path 1 — arm "first composed frame for cue X" emission for the
+        // image-transition path. Mirror with the video and non-transition arms.
+        setPendingCueFireSlideID(prepared.slide.id)
         liveTitle = prepared.slide.title
         isRunning = true
 
@@ -1280,6 +1359,19 @@ final class PlaybackController: ObservableObject {
             currentFrame = frame
         }
         publishTransitionPreview(composed)
+        // Path 1 — emit "first composed frame for cue X reached output" exactly
+        // once per take. Consume drains the token so subsequent frames in the
+        // same take don't re-fire. Dispatched on main so the late-take detector
+        // and show log path can run without a second hop. Capture the callback
+        // pointer at consume time so a re-entrant assignment from main can't
+        // race the async dispatch.
+        if let callback = onFirstComposedFrameForCue,
+           let firedSlideID = consumePendingCueFireSlideID() {
+            let firedAt = Date()
+            DispatchQueue.main.async {
+                callback(firedSlideID, firedAt)
+            }
+        }
     }
 
     private func updateScopedAccess(url: URL) {
