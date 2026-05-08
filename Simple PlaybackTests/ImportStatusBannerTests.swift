@@ -65,6 +65,36 @@ final class ImportStatusBannerTests: XCTestCase {
         XCTAssertEqual(banner.headline, "")
     }
 
+    func testHasKeynoteFailureFalseForNonKeynoteFailures() {
+        let banner = ImportStatusBanner()
+        banner.record([
+            MediaImportFailure(url: nil, kind: .pdfImport, summary: "a"),
+            MediaImportFailure(url: nil, kind: .transcode, summary: "b"),
+            MediaImportFailure(url: nil, kind: .unsupportedMedia, summary: "c")
+        ])
+        XCTAssertFalse(banner.hasKeynoteFailure,
+                       "Non-Keynote failures must not trip the automation deep-link.")
+    }
+
+    func testHasKeynoteFailureTrueWhenAnyKeynoteFailurePresent() {
+        let banner = ImportStatusBanner()
+        banner.record([
+            MediaImportFailure(url: nil, kind: .pdfImport, summary: "a"),
+            MediaImportFailure(url: nil, kind: .keynoteImport, summary: "b")
+        ])
+        XCTAssertTrue(banner.hasKeynoteFailure)
+    }
+
+    func testAutomationPrivacySettingsURLIsValidDeepLink() {
+        // Spec contract — deep-link must use the macOS x-apple.systempreferences scheme
+        // and target the Automation Privacy pane. NSWorkspace will open whatever URL we
+        // hand it, so a typo here would silently fail to surface the right setting.
+        XCTAssertEqual(
+            AutomationPrivacySettings.url.absoluteString,
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
+        )
+    }
+
     func testHeadlinePluralization() {
         let banner = ImportStatusBanner()
         XCTAssertEqual(banner.headline, "")

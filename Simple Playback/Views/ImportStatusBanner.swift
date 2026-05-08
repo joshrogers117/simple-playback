@@ -43,6 +43,22 @@ final class ImportStatusBanner: ObservableObject {
         default: return "\(failures.count) items failed to import"
         }
     }
+
+    /// True when at least one Keynote import failure is in the banner. Drives the
+    /// "Open Privacy & Security → Automation" deep-link button on the details popover —
+    /// macOS automation refusal is the most opaque failure mode for `.key` imports
+    /// (operator denies the prompt once and every subsequent import fails silently),
+    /// and a one-click jump to the right setting closes the loop.
+    var hasKeynoteFailure: Bool {
+        failures.contains { $0.kind == .keynoteImport }
+    }
+}
+
+/// macOS deep-link target for the Privacy & Security → Automation pane. Exposed at
+/// module scope so the banner view and tests can both reference the URL string without
+/// duplicating it.
+enum AutomationPrivacySettings {
+    static let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
 }
 
 /// Non-modal banner rendered above the `OutputStatusBar` whenever the per-document
@@ -114,7 +130,32 @@ struct ImportStatusBannerView: View {
                 }
             }
             .frame(maxHeight: 240)
+
+            if banner.hasKeynoteFailure {
+                Divider()
+                automationDeepLink
+            }
         }
         .padding(14)
+    }
+
+    /// Rendered when any failure is a Keynote import — the most common opaque failure
+    /// mode is the operator denying the macOS automation prompt for Keynote, after
+    /// which every `.key` import returns `KeynoteImportError.exportFailed` with no
+    /// indication of cause. The button jumps straight to the right Privacy & Security
+    /// pane so the operator can flip the toggle.
+    @ViewBuilder
+    private var automationDeepLink: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Keynote import requires automation permission.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button {
+                NSWorkspace.shared.open(AutomationPrivacySettings.url)
+            } label: {
+                Label("Open Privacy & Security → Automation", systemImage: "lock.shield")
+            }
+            .controlSize(.small)
+        }
     }
 }
