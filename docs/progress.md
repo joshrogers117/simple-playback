@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B in flight (B1–B5 done; B6 partial)
-- **Last commit**: B6 — DeckLink REF lock state surfaced in status bar
+- **Active phase**: A and D complete; B in flight (B1–B5 done; B6, B14 partial)
+- **Last commit**: B14 — frame-rate conformance warning at clip-into-show time
 - **Branch**: `development`
 
 ---
@@ -52,7 +52,7 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 - [ ] B11: NDI Full sender as a transport binding
 - [ ] B12: Compositor — three layers (media, bug/logo, message/timer)
 - [ ] B13: Color pipeline — per-Screen range/space; visible color chain in inspector; NCLC/ICC respect with overrides; gamma-aware crossfade
-- [ ] B14: Frame-rate conformance warnings at clip-into-show time and pre-show
+- [~] B14: Frame-rate conformance warning surfaced in CueInspectorView when a video cue's native frame rate differs from the active Stage. `MediaSlide.nativeFrameRate` populated at import via AVAsset. Pure-logic `FrameRateConformance` evaluator with 0.1 fps tolerance (catches the four canonical fractional/integer pairs as matches). **Pre-show check (E1) reuse pending.**
 - [ ] B15: Hot-unplug handling (UltraStudio Thunderbolt)
 - [ ] B16: Phase B summary + DeckLink mock layer for tests + manual rehearsal steps
 
