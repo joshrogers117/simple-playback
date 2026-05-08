@@ -27,6 +27,18 @@ final class PlaybackController: ObservableObject {
     /// once those land. The primary path still goes through `outputDriver` for backward
     /// compatibility with the (deviceID, modeID) UI; the router enables N>1 fan-out today.
     private let auxiliarySinks = TransportSinkRouter()
+    /// Three-layer compositor (media + bug + message). Defaults to `.empty` so no allocations
+    /// or behavior change for projects that haven't enabled overlays.
+    private let compositor = CompositorPipeline()
+    /// Persistent overlay state. Setting this is cheap when overlays are inert. Changes to the
+    /// bug's media reference flush the pipeline's image cache.
+    var compositorOverlays: CompositorOverlays = .empty {
+        didSet {
+            if oldValue.bug.media != compositorOverlays.bug.media {
+                compositor.invalidateBugImageCache()
+            }
+        }
+    }
     private var activeSinkStage: TransportSinkStage?
     private let outputQueue = DispatchQueue(label: "SimplePlayback.OutputSubmissions")
     private let outputQueueKey = DispatchSpecificKey<Void>()
@@ -1185,12 +1197,22 @@ final class PlaybackController: ObservableObject {
     }
 
     private func submitFrame(_ frame: RenderedFrame, cacheAsCurrent: Bool = true) throws {
-        try outputDriver.submitVideoFrame(frame.data, width: frame.width, height: frame.height, rowBytes: frame.rowBytes)
-        auxiliarySinks.submit(frame: frame)
+        // Compose the three-layer output (media → bug → message) before handing off to any
+        // transport. When overlays are inert the call returns `frame` itself — no allocation.
+        let composed = compositor.compose(
+            baseFrame: frame,
+            overlays: compositorOverlays,
+            canvasSize: activeOutputSize
+        )
+        try outputDriver.submitVideoFrame(composed.data, width: composed.width, height: composed.height, rowBytes: composed.rowBytes)
+        auxiliarySinks.submit(frame: composed)
         if cacheAsCurrent {
+            // Cache the BASE frame, not the composed one. Transitions blend cached frames
+            // with new media; if we cached composed frames the bug+message would get blended
+            // and re-composited, doubling the overlay during a crossfade.
             currentFrame = frame
         }
-        publishTransitionPreview(frame)
+        publishTransitionPreview(composed)
     }
 
     private func updateScopedAccess(url: URL) {

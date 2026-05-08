@@ -182,6 +182,22 @@ final class TransportSinkTests: XCTestCase {
         controller.unregister(sink: aux)
         XCTAssertFalse(aux.isRunning, "unregister(sink:) must stop the sink unconditionally.")
     }
+
+    // MARK: - Compositor overlay wiring (B12c)
+
+    func testControllerCompositorOverlaysDefaultToEmpty() {
+        let controller = PlaybackController()
+        XCTAssertEqual(controller.compositorOverlays, .empty,
+                       "Fresh PlaybackController must have inert overlays so behavior is unchanged from pre-B12.")
+    }
+
+    func testControllerAcceptsCompositorOverlayUpdate() {
+        let controller = PlaybackController()
+        var overlays = CompositorOverlays.empty
+        overlays.message = MessageOverlay(enabled: true, text: "STAND BY")
+        controller.compositorOverlays = overlays
+        XCTAssertTrue(controller.compositorOverlays.message.isVisible)
+    }
 }
 
 // MARK: - Test fixtures
