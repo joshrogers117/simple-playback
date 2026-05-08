@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B8 pure-logic recommendation + inspector hint shipped; B14 partial); Phase C in progress — C1, C2, C3, C4, C5 (a/b/c all shipped), C6, C-banner all shipped end-to-end. Inline transcode button is Show-Mode-gated (Option B). Apple-events deep-link button surfaces on the banner for `.keynoteImport` failures (Option E).
-- **Last commit**: Apple-events deep-link button on import banner (Option E)
+- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B8 pure-logic recommendation + inspector hint shipped; B14 partial); Phase C substantially done (C1–C6 + C-banner all in; cancelled transcode/encode partial files now self-clean); **Phase E started** — E1 (pre-show check panel) shipped end-to-end with pure-logic evaluator + sheet UI + toolbar entry; system-signal adapters (DeckLink lock state, audio device) are deferred. E2 (per-row Fix actions) is next.
+- **Last commit**: clean up partial files on transcode/encode cancel (C2/C5c gap)
 - **Branch**: `development`
 
 ---
@@ -119,7 +119,7 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Phase E — Reliability
 
-- [ ] E1: Pre-show check panel — media, DeckLink, disk, macOS energy/DND/screensaver/Spotlight, audio device, render path warmed
+- [~] E1: Pre-show check panel — `Services/PreShowCheck.swift` pure-logic evaluator + `Views/PreShowCheckView.swift` sheet + toolbar "Pre-Show" button. Rules shipped: media resolution (every cue's assetID resolves), FPS conformance (B14 reuse), 10-bit recommendation (B8 reuse), external reference vs DeckLink lock, disk space, audio device. Free disk space sampled live from project bundle (or app-support fallback). **Still deferred**: DeckLink lock-state plumbing into Context (needs PlaybackController adapter), audio-device sampling (needs CoreAudio adapter), macOS energy / DND / screensaver / Spotlight checks (each needs a small system-API adapter), render-path-warmed signal.
 - [ ] E2: "Fix" actions per pre-show row where automatable
 - [ ] E3: Show log writer — append-only, persisted in bundle `Logs/`
 - [ ] E4: Show log viewer with filtering (source, action type, time range)
