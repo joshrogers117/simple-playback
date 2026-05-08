@@ -832,6 +832,102 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(decoded.activeShowListID, list.id)
     }
 
+    // MARK: - Stage / Screen model (B1-B4)
+
+    func testStageDefaultsTo1080p59_94Rec709Limited() {
+        let stage = Stage(name: "Program")
+        XCTAssertEqual(stage.width, 1920)
+        XCTAssertEqual(stage.height, 1080)
+        XCTAssertEqual(stage.frameRateNumerator, 60_000)
+        XCTAssertEqual(stage.frameRateDenominator, 1001)
+        XCTAssertEqual(stage.framesPerSecond, 60_000.0 / 1001.0, accuracy: 0.001)
+        XCTAssertEqual(stage.colorSpace, .rec709)
+        XCTAssertEqual(stage.range, .limited)
+    }
+
+    func testScreenRoleHasAllExpectedCases() {
+        XCTAssertEqual(ScreenRole.allCases, [.program, .confidence, .multiviewer, .mirror, .auxiliary, .streamOut])
+        XCTAssertEqual(ScreenRole.program.label, "Program")
+        XCTAssertEqual(ScreenRole.confidence.label, "Confidence")
+    }
+
+    func testCornerPinIdentityIsActuallyIdentity() {
+        XCTAssertTrue(CornerPin.identity.isIdentity)
+        XCTAssertEqual(CornerPin.identity.topLeft.x, 0)
+        XCTAssertEqual(CornerPin.identity.bottomRight.x, 1)
+    }
+
+    func testTransportBindingLabelsAreReadable() {
+        let dl = TransportBinding.deckLink(deviceID: "deck:0", modeID: "1080p59.94", fillKey: true, audioEmbed: true, tenBit: true)
+        XCTAssertTrue(dl.label.contains("DeckLink"))
+        XCTAssertTrue(dl.label.contains("fill+key"))
+        XCTAssertTrue(dl.label.contains("10-bit"))
+
+        let ndi = TransportBinding.ndi(senderName: "SP-Program")
+        XCTAssertEqual(ndi.label, "NDI SP-Program")
+
+        let win = TransportBinding.operatorWindow
+        XCTAssertEqual(win.label, "Operator window")
+    }
+
+    func testStageScreenRoundTripThroughJSON() throws {
+        let stage = Stage(
+            name: "Program",
+            width: 3840,
+            height: 2160,
+            frameRateNumerator: 30000,
+            frameRateDenominator: 1001,
+            colorSpace: .rec709,
+            range: .full
+        )
+        let screen = Screen(role: .confidence, name: "Stage Mon", stageID: stage.id)
+        let project = PlayoutProject(stages: [stage], screens: [screen])
+
+        let data = try JSONEncoder.simplePlayback.encode(project)
+        let decoded = try JSONDecoder.simplePlayback.decode(PlayoutProject.self, from: data)
+        XCTAssertEqual(decoded.stages.count, 1)
+        XCTAssertEqual(decoded.stages[0].width, 3840)
+        XCTAssertEqual(decoded.stages[0].framesPerSecond, 30000.0 / 1001.0, accuracy: 0.001)
+        XCTAssertEqual(decoded.stages[0].range, .full)
+        XCTAssertEqual(decoded.screens.count, 1)
+        XCTAssertEqual(decoded.screens[0].role, .confidence)
+        XCTAssertEqual(decoded.screens[0].name, "Stage Mon")
+        XCTAssertEqual(decoded.screens[0].stageID, stage.id)
+    }
+
+    func testScreenBindingRoundTripPreservesTransport() throws {
+        let screenID = UUID()
+        let binding = ScreenBinding(
+            screenID: screenID,
+            transport: .deckLink(deviceID: "deck:0", modeID: "1080p59.94", fillKey: true, audioEmbed: true, tenBit: true)
+        )
+        let profile = OutputBindingProfile(name: "Booth A", bindings: [binding])
+
+        let data = try JSONEncoder.simplePlayback.encode(profile)
+        let decoded = try JSONDecoder.simplePlayback.decode(OutputBindingProfile.self, from: data)
+        XCTAssertEqual(decoded.bindings.count, 1)
+        XCTAssertEqual(decoded.bindings[0].screenID, screenID)
+        if case let .deckLink(_, _, fillKey, _, tenBit) = decoded.bindings[0].transport {
+            XCTAssertTrue(fillKey)
+            XCTAssertTrue(tenBit)
+        } else {
+            XCTFail("Expected DeckLink transport, got \(decoded.bindings[0].transport)")
+        }
+        XCTAssertNotNil(decoded.binding(forScreenID: screenID))
+    }
+
+    func testMarkCurrentFormatVersionSeedsDefaultStageAndScreen() {
+        var project = PlayoutProject()
+        XCTAssertTrue(project.stages.isEmpty)
+        XCTAssertTrue(project.screens.isEmpty)
+        project.markCurrentFormatVersion()
+        XCTAssertEqual(project.stages.count, 1)
+        XCTAssertEqual(project.stages.first?.name, "Program")
+        XCTAssertEqual(project.screens.count, 1)
+        XCTAssertEqual(project.screens.first?.role, .program)
+        XCTAssertEqual(project.screens.first?.stageID, project.stages.first?.id)
+    }
+
     func testGenerateDefaultShowListThenFireGOAdvancesPlayheadAcrossEntireList() {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)

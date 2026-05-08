@@ -46,6 +46,7 @@
 		A34CA8E22BA04CC530DD0597 /* LTCReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 934A545F270968E04F027F8B /* LTCReader.swift */; };
 		A73C56A196D7FCFABC2C00F2 /* ShowListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4040F3064AA861BCD17050FB /* ShowListView.swift */; };
 		A81F8D8813F0437F211EF445 /* MediaImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B328F432BC7CCB991A9A8373 /* MediaImporter.swift */; };
+		AC4ED3FB70B05A49DBA8AA3A /* StageScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9305D229FBA3B8EC6854577 /* StageScreen.swift */; };
 		AD31546ACCAED84FF1D140D4 /* HTTPRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189C4C83922BF987A389D797 /* HTTPRequest.swift */; };
 		B69CE1461F740680651EFC39 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F1E1F27FCEA1C60E3C601307 /* AppIcon.icon */; };
 		BFE5FEA90AEA11BD597BEC0C /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EB3CFD9074943CC8F73C637C /* AVFoundation.framework */; };
@@ -131,6 +132,7 @@
 		DBA2A137EBDAA8855CAA24A2 /* AuthTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthTokenStore.swift; sourceTree = "<group>"; };
 		E1B3AC760F776AC4DDC6B0F9 /* DeckLinkSDK.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DeckLinkSDK.h; sourceTree = "<group>"; };
 		E66F934F6D6C5561905E6550 /* CoreImage.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreImage.framework; path = System/Library/Frameworks/CoreImage.framework; sourceTree = SDKROOT; };
+		E9305D229FBA3B8EC6854577 /* StageScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageScreen.swift; sourceTree = "<group>"; };
 		EB3CFD9074943CC8F73C637C /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		ECEAD362FE5313C14713663D /* SimplePlaybackApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackApp.swift; sourceTree = "<group>"; };
 		F1E1F27FCEA1C60E3C601307 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
@@ -209,6 +211,7 @@
 				569A548ECCAC07CC9E9B92D2 /* MediaModels.swift */,
 				29F9DCDACFB1E27A47F7D0DE /* SimplePlaybackDocument.swift */,
 				BAB740EFC960FD945A655941 /* SimplePlaybackProjectDocument.swift */,
+				E9305D229FBA3B8EC6854577 /* StageScreen.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -449,6 +452,7 @@
 				9525CC03694D231B2D50683E /* SimplePlaybackDocument.swift in Sources */,
 				51CA5DA530C6B560FA1A7989 /* SimplePlaybackProjectDocument.swift in Sources */,
 				3E21186036951CC387B69F2E /* SlideGridView.swift in Sources */,
+				AC4ED3FB70B05A49DBA8AA3A /* StageScreen.swift in Sources */,
 				54E5A1988F51C1AE8DE5B42A /* StateSnapshotEncoder.swift in Sources */,
 				E5DFE39B8CB8514358205B8E /* SubscriptionPump.swift in Sources */,
 				67058819C3FE046151E4BCAD /* SubscriptionRegistry.swift in Sources */,

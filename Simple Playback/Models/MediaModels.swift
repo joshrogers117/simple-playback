@@ -440,6 +440,15 @@ struct PlayoutProject: Codable, Hashable {
     /// when nil or unknown.
     var activeShowListID: UUID?
 
+    /// Composition surfaces — each Stage is a virtual raster the compositor renders into.
+    /// Most projects have one Stage ("Program"); multi-screen shows add Confidence/Stage/etc.
+    var stages: [Stage] = []
+
+    /// Operator-named output destinations, role-typed. Cues reference screens by role; the
+    /// physical binding (DeckLink port, OS display, NDI sender) lives in `OutputBindingProfile`
+    /// per-machine — keeping the show file venue-portable.
+    var screens: [Screen] = []
+
     var selectedDeviceID: String?
     var selectedModeID: String?
     var outputWidth: Int = 1920
@@ -453,6 +462,8 @@ struct PlayoutProject: Codable, Hashable {
         slides: [MediaSlide] = [],
         showLists: [ShowList] = [],
         activeShowListID: UUID? = nil,
+        stages: [Stage] = [],
+        screens: [Screen] = [],
         selectedDeviceID: String? = nil,
         selectedModeID: String? = nil,
         outputWidth: Int = 1920,
@@ -463,6 +474,8 @@ struct PlayoutProject: Codable, Hashable {
         self.slides = slides
         self.showLists = showLists
         self.activeShowListID = activeShowListID
+        self.stages = stages
+        self.screens = screens
         self.selectedDeviceID = selectedDeviceID
         self.selectedModeID = selectedModeID
         self.outputWidth = outputWidth
@@ -475,6 +488,8 @@ struct PlayoutProject: Codable, Hashable {
         case slides
         case showLists
         case activeShowListID
+        case stages
+        case screens
         case selectedDeviceID
         case selectedModeID
         case outputWidth
@@ -488,6 +503,8 @@ struct PlayoutProject: Codable, Hashable {
         slides = try container.decodeIfPresent([MediaSlide].self, forKey: .slides) ?? []
         showLists = try container.decodeIfPresent([ShowList].self, forKey: .showLists) ?? []
         activeShowListID = try container.decodeIfPresent(UUID.self, forKey: .activeShowListID)
+        stages = try container.decodeIfPresent([Stage].self, forKey: .stages) ?? []
+        screens = try container.decodeIfPresent([Screen].self, forKey: .screens) ?? []
         selectedDeviceID = try container.decodeIfPresent(String.self, forKey: .selectedDeviceID)
         selectedModeID = try container.decodeIfPresent(String.self, forKey: .selectedModeID)
         outputWidth = try container.decodeIfPresent(Int.self, forKey: .outputWidth) ?? 1920
@@ -508,6 +525,19 @@ struct PlayoutProject: Codable, Hashable {
         }
         if activeShowListID == nil {
             activeShowListID = showLists.first?.id
+        }
+        // Seed a default Program stage + screen so output topology is always non-empty.
+        // Operators can rename, retype, or add screens later.
+        if stages.isEmpty {
+            let stage = Stage(
+                name: "Program",
+                width: outputWidth,
+                height: outputHeight
+            )
+            stages.append(stage)
+        }
+        if screens.isEmpty, let firstStage = stages.first {
+            screens.append(Screen(role: .program, name: "Program", stageID: firstStage.id))
         }
     }
 

@@ -35,10 +35,10 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Phase B — Output pipeline rework
 
-- [ ] B1: Stage abstraction (resolution, frame rate, color space, range)
-- [ ] B2: Screen abstraction with typed roles (Program, Confidence, Multiviewer, Mirror, Auxiliary)
-- [ ] B3: Transport binding layer — DeckLink, OS Display, NDI Full, Operator-Mac window
-- [ ] B4: Per-machine local config mapping role → device (separate from project file)
+- [x] B1: Stage abstraction (resolution, frame rate, color space, range)
+- [x] B2: Screen abstraction with typed roles (Program, Confidence, Multiviewer, Mirror, Auxiliary, StreamOut)
+- [x] B3: Transport binding layer — DeckLink, OS Display, NDI Full, Syphon, Operator-Mac window, file-record
+- [x] B4: Per-machine local config mapping role → device (`OutputBindingProfile` — schema only; UI defers)
 - [ ] B5: Refactor `VideoOutput.swift` and `DeckLinkBridge` against the new abstraction
 - [ ] B6: DeckLink REF input handling — surface lock state, refuse silent free-run when expected, warn on format mismatch
 - [ ] B7: DeckLink format negotiation — explicit at start, mid-show change requires re-arm
