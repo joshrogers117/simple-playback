@@ -49,6 +49,9 @@ final class ShowController: ObservableObject {
         self.transitionSettingsLookup = transitionSettings
         self.outputBindingLookup = outputBinding
         wireRuntime()
+        // Hand this document's runtime to the process-wide show-control hub so
+        // OSC/HTTP/Companion route GO/PANIC/etc. to this show list.
+        ShowControlHub.shared.bind(runtime: runtime)
     }
 
     // MARK: - Verb facade

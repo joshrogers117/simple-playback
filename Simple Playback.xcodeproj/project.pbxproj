@@ -10,10 +10,12 @@
 		00EC3572563AA2E459F2489F /* ShowControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237C1358E779CC8F8EBA839E /* ShowControlTests.swift */; };
 		020E6C3D173AD7E05AC7A15A /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213CB5AEDC97C0942C10558F /* RootView.swift */; };
 		02E7848C2C617A208282F42A /* OSCMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 473B7534956D23833D7E61BD /* OSCMessage.swift */; };
+		11107495CED0238B67C8D7AC /* ShowControlStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6023F5FCD12A96AE5EAD4313 /* ShowControlStack.swift */; };
 		11F48F224E2E07F3A2CD4894 /* BonjourPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACFD5B151F32CFDFFECCB68 /* BonjourPublisher.swift */; };
 		154CB32BBDF7469F91B49587 /* MediaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569A548ECCAC07CC9E9B92D2 /* MediaModels.swift */; };
 		1624805A1FF72880895DDB5A /* OutputStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27589625C8FC5B053A3F725C /* OutputStatusBar.swift */; };
 		1FA47C61D92B5CF6AFD91783 /* LTCDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AAABB8C041A4E6DF8BE8685 /* LTCDecoder.swift */; };
+		27C597830A79418BECCDFEC6 /* ShowControlHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474A0C6ABB641B1CA5416495 /* ShowControlHub.swift */; };
 		28C1335FD15B6AE87DD31AB3 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A5E1B676CDA189E4C8C26CB /* PlaybackController.swift */; };
 		2E94C7044EE3CF2C00F39C69 /* ShowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87395AF6ACFB3496B47EFFB3 /* ShowController.swift */; };
 		3E21186036951CC387B69F2E /* SlideGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B620D6408556D32380C918 /* SlideGridView.swift */; };
@@ -89,9 +91,11 @@
 		39A90630AF349E25D5676488 /* SPFrameBlend.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SPFrameBlend.h; sourceTree = "<group>"; };
 		4040F3064AA861BCD17050FB /* ShowListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowListView.swift; sourceTree = "<group>"; };
 		473B7534956D23833D7E61BD /* OSCMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCMessage.swift; sourceTree = "<group>"; };
+		474A0C6ABB641B1CA5416495 /* ShowControlHub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlHub.swift; sourceTree = "<group>"; };
 		4FFDD7785740559EEB94F4CA /* SPFrameBlend.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SPFrameBlend.c; sourceTree = "<group>"; };
 		569A548ECCAC07CC9E9B92D2 /* MediaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaModels.swift; sourceTree = "<group>"; };
 		5D0C8298731E2AD4C22B2306 /* OutputPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputPreviewView.swift; sourceTree = "<group>"; };
+		6023F5FCD12A96AE5EAD4313 /* ShowControlStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlStack.swift; sourceTree = "<group>"; };
 		6A4A7CF3D1DF29B837A0BF44 /* SubscriptionPump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionPump.swift; sourceTree = "<group>"; };
 		6CD51FEB5E50862496E8A6BA /* ShowControlActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlActions.swift; sourceTree = "<group>"; };
 		70B339087E0F91F6B7504F6D /* ShowControlDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlDispatcher.swift; sourceTree = "<group>"; };
@@ -292,6 +296,8 @@
 				BBBA363D1C04A7119011031E /* OSCServer.swift */,
 				6CD51FEB5E50862496E8A6BA /* ShowControlActions.swift */,
 				70B339087E0F91F6B7504F6D /* ShowControlDispatcher.swift */,
+				474A0C6ABB641B1CA5416495 /* ShowControlHub.swift */,
+				6023F5FCD12A96AE5EAD4313 /* ShowControlStack.swift */,
 				8FD2B422FED7E9102FAEA3D2 /* ShowControlState.swift */,
 				A13557C5F98007D62499B140 /* StateSnapshotEncoder.swift */,
 				6A4A7CF3D1DF29B837A0BF44 /* SubscriptionPump.swift */,
@@ -434,6 +440,8 @@
 				4D7E6C165E984434FD9A4BB0 /* SPFrameBlend.c in Sources */,
 				976DD722059E40449CB77621 /* ShowControlActions.swift in Sources */,
 				606D52F6D2E3F0F49B4DD22E /* ShowControlDispatcher.swift in Sources */,
+				27C597830A79418BECCDFEC6 /* ShowControlHub.swift in Sources */,
+				11107495CED0238B67C8D7AC /* ShowControlStack.swift in Sources */,
 				F52CA35701C089E08D0BFDCB /* ShowControlState.swift in Sources */,
 				2E94C7044EE3CF2C00F39C69 /* ShowController.swift in Sources */,
 				A73C56A196D7FCFABC2C00F2 /* ShowListView.swift in Sources */,

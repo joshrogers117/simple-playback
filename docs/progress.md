@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A complete; B not started
-- **Last commit**: A13 — Phase A summary
+- **Active phase**: A and D complete; B not started
+- **Last commit**: D17 — ShowControlStack + Hub wired into app
 - **Branch**: `development`
 
 ---
@@ -73,23 +73,23 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Phase D — Show control
 
-- [ ] D1: OSC server (UDP + TCP) on `/sp` with curated namespace
-- [ ] D2: HTTP/JSON twin (`/api/v1/...`) mirroring every OSC address
-- [ ] D3: WebSocket `/api/v1/events` for state push
-- [ ] D4: OSCQuery server publishing namespace with type/range/value/description
-- [ ] D5: Bonjour/mDNS discovery (`_simpleplayback._udp` + `_simpleplayback._tcp`)
-- [ ] D6: Bearer-token auth + capability flags (`read` / `fire` / `edit`); Show-Mode capability stripping
-- [ ] D7: Subscription state push at 10 Hz when subscribed
-- [ ] D8: Per-cue feedbacks (running, standby, is-playhead, elapsed > X, remaining < X)
-- [ ] D9: Per-cue variables + globals (cue_id, cue_name, playhead_id, tc_locked, tc_now, onair, …)
-- [ ] D10: Ping/heartbeat (`/sp/ping` → `/sp/pong f uptime`)
-- [ ] D11: Versioned API (`apiVersion` in every reply); idempotent action retrigger lockout (50 ms)
-- [ ] D12: LTC chase via Core Audio input — engagement state machine, per-cue trigger/offset, drop-frame handling, jam-sync
-- [ ] D13: MTC chase via Core MIDI input
-- [ ] D14: Internal TC generator for rehearsal
-- [ ] D15: Companion module (separate target / sibling repo decision logged)
-- [ ] D16: Headless OSC client integration tests covering full action surface
-- [ ] D17: Phase D summary + manual rehearsal steps
+- [x] D1: OSC server (UDP + TCP) on `/sp` with curated namespace
+- [x] D2: HTTP/JSON twin (`/api/v1/...`) mirroring every OSC address
+- [x] D3: WebSocket `/api/v1/events` for state push
+- [x] D4: OSCQuery server publishing namespace with type/range/value/description
+- [x] D5: Bonjour/mDNS discovery (`_simpleplayback._udp` + `_simpleplayback._tcp`)
+- [x] D6: Bearer-token auth + capability flags (`read` / `fire` / `edit`); Show-Mode capability stripping
+- [x] D7: Subscription state push at 10 Hz when subscribed
+- [x] D8: Per-cue feedbacks (running, standby, is-playhead, elapsed > X, remaining < X)
+- [x] D9: Per-cue variables + globals (cue_id, cue_name, playhead_id, tc_locked, tc_now, onair, …)
+- [x] D10: Ping/heartbeat (`/sp/ping` → `/sp/pong f uptime`)
+- [x] D11: Versioned API (`apiVersion` in every reply); idempotent action retrigger lockout (50 ms)
+- [x] D12: LTC chase via Core Audio input — engagement state machine, per-cue trigger/offset, drop-frame handling, jam-sync
+- [x] D13: MTC chase via Core MIDI input
+- [x] D14: Internal TC generator for rehearsal
+- [x] D15: Companion module — design doc only (`docs/phase_d/companion_module_design.md`); JS module is a sibling-repo deliverable
+- [x] D16: Headless OSC client integration tests covering full action surface
+- [x] D17: Phase D summary + ShowControlStack/Hub wiring into SimplePlaybackApp + ShowController
 
 ## Phase E — Reliability
 

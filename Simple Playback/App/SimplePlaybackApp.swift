@@ -13,6 +13,10 @@ struct SimplePlaybackApp: App {
             ? SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
             : nil
         DeckLinkDiagnostics.runIfRequested()
+        // Stand up the show-control stack at app launch so external triggers (OSC,
+        // HTTP, Companion) can connect immediately. The active runtime is rebound
+        // each time a document's ShowController is created.
+        ShowControlHub.shared.startIfNeeded()
     }
 
     var body: some Scene {
