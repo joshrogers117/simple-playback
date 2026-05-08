@@ -1,5 +1,7 @@
 # Phase C — Media pipeline — Summary
 
+**Status (session 12 — 2026-05-08)**: **C5c shipped end-to-end** (Add Folder…  toolbar + folder-walk pure-logic + per-sequence frame-rate confirm sheet + encode kickoff + sibling-slide splice + unified background-jobs progress strip alongside C2 transcodes). Plus three small reconciliations: **Show-Mode gate on inline transcode button** (Option B — `CueInspectorView.showMode` parameter mirrors SlideGridView's `transcodeEnabled`), and **Apple-events deep-link button** on the import-status banner (Option E — when any failure has `kind == .keynoteImport`, the details popover renders a one-click jump to System Settings → Privacy & Security → Automation, closing the loop on the most opaque `.key` import failure mode). 5 commits; 359 tests, all green (was 341 at session start; +18). **No frame-rate default is committed at any layer** — operators pick per import via the sheet picker (preset menu 24/25/30/48/50/60 + custom integer field). Phase C feature scope is now substantially complete (C1–C6 + C-banner all in); C7+ asset library / audio / subtitles remain.
+
 **Status (session 11 — 2026-05-08)**: C5b shipped end-to-end (`ImageSequenceEncoder` + `ImageSequenceEncodeCoordinator` — AVAssetWriter wrapping ProRes 4444). Plus three reconciliations: **C-banner-c** (modal "Keynote not installed" alert dropped — banner is the single failure surface), **inline transcode button** on the cue inspector flag chips (closes the C2/C4 chip → action gap), and **B8 logic** (`PlayoutProject.recommendsTenBitOutput` pure-logic computed property + Output inspector hint, now genuinely unblocked by C1's `tenBitYUV420` flag). 5 commits; 341 tests, all green (was 323 at session start; +18). C5c (folder-drop UX) is the next pickup, gated only on the operator-supplied frame-rate default decision.
 
 **Status (session 10 — 2026-05-08)**: C4 shipped end-to-end (animated GIF / APNG detect + ProRes 4444 default in right-click menu), Import Status Banner shipped across PDF / Keynote / transcode failure surfaces, and C5a (ImageSequenceDetector pure-logic) shipped. 323 tests, all green (was 269 at session start; +54). 6 new commits on `development` (C4a / C4b / C4c / C-banner-a / C-banner-b / C5a). The C2c right-click action and the silent-failure plumbing across PDF / Keynote / Transcode are now reconciled — every operator-visible failure mode reaches a non-modal banner instead of disappearing.
@@ -15,6 +17,67 @@
 Phase C is just starting. The codec inspector (C1) is the first piece because it has zero hardware dependency and unblocks B8 (10-bit YUV default once any clip is >8-bit) — the `MediaSlide.flags.tenBitYUV420` boolean is now the project-wide signal B8 will key off of.
 
 The remaining Phase C items (C2 transcode action, C3 PDF import, C4 GIF/APNG detect-and-convert, C5 image-sequence detect-and-encode, C6 Keynote import, C7+ asset library / audio / subtitles) are all autonomy-friendly with no hardware exposure — Phase C should be the workhorse phase for autonomous-build cycles.
+
+---
+
+## What shipped in session 12 (C5c + Show-Mode gate + Apple-events deep-link)
+
+### Option B — Show-Mode gate on inline transcode button
+
+- `CueInspectorView` gained a `showMode: Bool = false` parameter; when true the inline `"Transcode to ProRes …"` button is hidden. Mirrors `SlideGridView.transcodeEnabled` so the asset library and the cue inspector behave consistently in Show Mode. `RootView.selectionInspector` passes `showController.controller?.showMode ?? false`. No new tests (visibility gate; underlying `canTranscode` + `preferredPresetOrder` behavior is already pinned by C2/C4).
+
+### C5c — Folder-drop UX (Add Folder…  + confirm sheet + encode integration)
+
+- **`Services/AddFolderImporter.swift`** — pure-logic `plan(folderURL:) -> Plan` that does a single-level `contentsOfDirectory` walk (no recursion into subfolders — surprising operators with nested batch behavior is worse than asking them to add nested folders separately), skips hidden files (`.DS_Store`, AppleDouble forks), normalizes by last-path-component for deterministic ordering, and runs `ImageSequenceDetector.detect(in:)` against the result. Returns `Plan(sequences, standaloneMediaURLs)`. 7 tests cover sequence grouping, multi-sequence + standalone split, hidden-file skipping, no-recursion, empty folder, missing folder error, deterministic ordering.
+
+- **`Views/AddFolderImportSheet.swift`** — confirmation sheet rendered as a `.sheet(item:)` after the open panel returns. Shows one row per detected sequence with a checkbox (operator can opt out per sequence), a frame-rate preset picker (24/25/30/48/50/60), and a custom integer text field for any other rate. Standalone files are summarized as a count below — they pass through `MediaImporter` unchanged. The Encode button is gated on `pending.canConfirm` (every encode-checked sequence has `frameRate >= 1` AND there's at least one action to take).
+
+- **`PendingFolderImport`** — operator-supplied configuration model. Per-sequence `SequencePlan` carries `frameRate: Int` (sentinel `0` = "operator hasn't picked yet") and `encode: Bool` (default true). `canConfirm` and `encodableSequences` are pure-logic and unit-tested (7 tests in `PendingFolderImportTests`).
+
+- **`RootView` wiring** — new "Add Folder" toolbar button (Show-Mode-gated) opens an `NSOpenPanel` with `canChooseDirectories = true / canChooseFiles = false`. On OK, `presentFolderImport(at:)` runs the `AddFolderImporter` walk and stuffs the `PendingFolderImport` into `@State`, which `.sheet(item:)` presents. On Encode, `confirmFolderImport(_:)` imports standalone files via the existing `addMedia(_:)` path, then enqueues each sequence through `encodeCoordinator.encode(...)`. On encoder success the resulting sibling slide appends to `project.slides`. Failures route to the `ImportStatusBanner` (kind `.transcode` for encode failures, `.unsupportedMedia` for folder-walk failures). No frame-rate default is committed at any layer — the encoder takes its rate from the per-sequence operator pick.
+
+- **`SlideGridView.BackgroundJobsStrip`** — renamed from `TranscodeProgressStrip`; now renders both `TranscodeJob` rows (C2) and `ImageSequenceEncoder` rows (C5c) in a single non-modal strip just above the palette transition controls. Each row uses a distinct icon (`arrow.triangle.2.circlepath` for transcode, `rectangle.stack` for image-sequence encode) so the operator can tell them apart at a glance. Operators see all running ProRes background work in one place; the row disappears when the coordinator removes the job after terminal state.
+
+### Option E — Apple-events deep-link button on import-status banner
+
+- `ImportStatusBanner.hasKeynoteFailure: Bool` returns true when any failure has `kind == .keynoteImport`. When true, `ImportStatusBannerView`'s details popover renders an extra section with a `"Open Privacy & Security → Automation"` button that calls `NSWorkspace.shared.open(AutomationPrivacySettings.url)`. The deep-link URL is exposed at module scope (`AutomationPrivacySettings.url = "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"`) so tests can pin its exact shape. Closes the most opaque `.key` import failure mode — operator denies the macOS automation prompt for Keynote once, every subsequent import returns `KeynoteImportError.exportFailed` whose summary lands in the banner with no indication of cause; the button takes them one click from there to the right toggle.
+
+### Tests added (session 12)
+
+| Test | What it covers |
+|---|---|
+| `AddFolderImporterTests.testPlanGroupsContiguousFramesIntoSequence` | Folder with shot01.0001-3.png + README.txt → 1 sequence + README in leftovers. |
+| `AddFolderImporterTests.testPlanSeparatesMultipleSequencesAndStandaloneMedia` | Two sequences (different basenames) plus `.mov` + singleton `.png` → 2 sequences + 2 standalones. |
+| `AddFolderImporterTests.testPlanSkipsHiddenFiles` | `.DS_Store` not in standaloneMediaURLs (operator should never see ".DS_Store: unsupported media" in banner). |
+| `AddFolderImporterTests.testPlanDoesNotRecurseIntoSubfolders` | Subfolder contents are not read; only top-level sequence is detected. |
+| `AddFolderImporterTests.testPlanReturnsEmptyForEmptyFolder` | Empty folder → `Plan.empty`. |
+| `AddFolderImporterTests.testPlanThrowsForMissingFolder` | Bogus URL → throw. |
+| `AddFolderImporterTests.testPlanProducesDeterministicOrdering` | `["zebra", "alpha"]` filesystem-order input → `["alpha", "zebra"]` plan order (sorted by basename). |
+| `PendingFolderImportTests.testCanConfirmFalseWhenNoSequencesAndNoStandalones` | Empty plan → no Encode. |
+| `PendingFolderImportTests.testCanConfirmTrueWhenStandalonesPresentAndNoSequences` | Standalones-only → Encode enabled. |
+| `PendingFolderImportTests.testCanConfirmFalseWhenSequenceMarkedEncodeButRateUnset` | encode=true + rate=0 → Encode disabled. |
+| `PendingFolderImportTests.testCanConfirmTrueWhenSequenceMarkedEncodeWithRate` | encode=true + rate=30 → Encode enabled. |
+| `PendingFolderImportTests.testCanConfirmTrueWhenSequenceUnchecked` | Only sequence unchecked + no standalones → Encode disabled. |
+| `PendingFolderImportTests.testCanConfirmTrueWhenSequenceUncheckedButStandalonePresent` | Sequence unchecked + standalone present → Encode enabled. |
+| `PendingFolderImportTests.testEncodableSequencesExcludesUnchecked` | Filter drops unchecked. |
+| `PendingFolderImportTests.testEncodableSequencesExcludesZeroRate` | Filter drops zero-rate. |
+| `ImportStatusBannerTests.testHasKeynoteFailureFalseForNonKeynoteFailures` | PDF / transcode / unsupported don't trip. |
+| `ImportStatusBannerTests.testHasKeynoteFailureTrueWhenAnyKeynoteFailurePresent` | Mixed list with one Keynote failure trips the deep-link. |
+| `ImportStatusBannerTests.testAutomationPrivacySettingsURLIsValidDeepLink` | Pins the `x-apple.systempreferences` URL string. |
+
+Total: 359 tests, all green (was 341 at session start; +18).
+
+### Manual verification needed (session 12 deltas)
+
+1. Add Folder…  toolbar button: pick a folder containing `shot.0001.png … shot.0030.png` plus a stray `hero.mov`. The confirm sheet appears with one sequence row + "Plus 1 standalone file will be imported as-is." Standalone files import as normal slides; the sequence encodes into `<bundle>/Transcoded/<UUID>.mov` at the rate the operator picks.
+2. Pick a folder with two sequences at different basenames (`shotA.*.png` + `shotB.*.exr`). Both rows render; pick different rates per sequence; both encode in parallel and both progress rows appear in the palette strip.
+3. Uncheck a sequence in the sheet and confirm. That sequence is skipped; its frames become standalone-imported `.png` slides (the singleton-as-standalone fallback already covered by the detector's leftover behavior).
+4. Type a custom rate (say `27`) into the integer field. The picker shows no preset selected; the encode runs at 27 fps.
+5. Set rate to `0` (or leave the field blank-cum-zero); the Encode button stays disabled. Set to `1` (minimum); button enables.
+6. Drop a folder of mixed `.png` sequences plus `.psd` files plus `.DS_Store`. The `.DS_Store` does not appear; the `.psd` lands in `MediaImporter` and surfaces as `unsupportedMedia` in the banner.
+7. Cancel a running encode via the strip's xmark button. Row disappears, no banner entry (cancellation is operator-initiated and silent by design — same as transcodes).
+8. Inline transcode button: enter Show Mode (toolbar toggle). Open the cue inspector for a flagged clip — the button is gone. Exit Show Mode — button returns. Asset library context menu has the same gating.
+9. Trigger a Keynote import failure (drop a `.key` while Keynote is not installed, or while the operator hasn't granted automation permission). Click "Show Details" on the banner; the popover shows the failure rows AND a new "Keynote import requires automation permission." section with an `Open Privacy & Security → Automation` button. Click it; System Settings opens to the right pane.
 
 ---
 
@@ -470,17 +533,17 @@ These need human eyeballs — autonomous tests don't drive SwiftUI inspectors.
 - **B16** — final Phase B summary + DeckLink mock layer for tests.
 
 **Phase C remaining** (autonomy-friendly):
-- **C5c** — Folder-drop UX. Encoder (C5b) + coordinator are in place with stable contracts; C5c needs the open panel (`canChooseDirectories = true`), the drop handler that walks a folder and runs `ImageSequenceDetector.detect(in:)`, the per-sequence enqueue through `ImageSequenceEncodeCoordinator.encode(...)`, and the operator-supplied frame-rate input. Also needs to abstract `TranscodeProgressStrip` over both `TranscodeJob` and `ImageSequenceEncoder` (or duplicate it — pick based on how heavy the abstraction would be). **Product blocker on the frame-rate default** — Stage rate? operator-picked per import? 30 fps fallback? File a `docs/blockers.md` entry or surface options when the next session opens C5c.
-- **C7+** — Asset library, audio engine, subtitles, etc. Larger.
+- **C7+** — Asset library, audio engine, subtitles, etc. Larger phase items. C7 (linked-vs-managed media + security-scoped bookmarks) is the biggest of these. C12 (audio engine refactor) sits behind a hardware question — what device tier is in scope for v1.
 
 **Phase C plumbing follow-ups** (small, ergonomics):
 - **Re-rasterize on Stage resize** — PDFs / Keynote decks rasterized at 1080p stay 1080p when the operator bumps the Stage to 2160p. C6's intermediate PDF stays in `Cache/Renders/<UUID>/` exactly so this can re-use the same source without re-driving Keynote. Architectural note: today `MediaSlide` doesn't track its source PDF/Keynote URL — adding that link is the prerequisite.
-- **Compact project** — `<bundle>/Transcoded/<UUID>.mov` and `<bundle>/Cache/Renders/<UUID>/` accumulate when the operator deletes the corresponding MediaSlides. A future "Compact project" action would walk the bundle and remove orphans no slide resolves to.
-- **Apple-events permission diagnostic** — if the operator denied the macOS automation prompt for Keynote, every subsequent `.key` import returns a `KeynoteImportError.exportFailed` whose summary now lands in the banner. A "Open System Settings → Privacy & Security → Automation" deep-link button on the banner would close the loop.
-- **Show-Mode gating on the inline transcode button** — `RootView.requestTranscode` is gated by Show Mode at the asset library level, but `CueInspectorView`'s inline button doesn't add its own check. Operators in Show Mode could press the inline button (which would fail downstream). Add a `showMode` Boolean parameter to the inspector and hide the button when set.
-- **Cancelled transcode partial-file cleanup** — known C2 gap; cancelled jobs leave a partial `<bundle>/Transcoded/<UUID>.mov` until the next start. A cleanup pass on cancellation (or "Compact project") would reconcile.
+- **Compact project** — `<bundle>/Transcoded/<UUID>.mov` and `<bundle>/Cache/Renders/<UUID>/` accumulate when the operator deletes the corresponding MediaSlides. A future "Compact project" action would walk the bundle and remove orphans no slide resolves to. Also the right home for cancelled-encode partial-file cleanup.
+- **Cancelled transcode / encode partial-file cleanup** — known C2 + C5c gap; cancelled jobs leave a partial `<bundle>/Transcoded/<UUID>.mov` until the next start. A cleanup pass on cancellation (or "Compact project") would reconcile.
+- **Image-sequence custom frame-rate validation** — the C5c sheet's custom integer field accepts any number; values < 1 are gated by the encoder, but a typo like `300` would silently encode at 300 fps. A future tightening could clamp the field range or warn at confirm-time.
+- **Per-clip transcode preset hint** — today both ProRes 422 and ProRes 4444 are always offered. A smarter menu would highlight ProRes 4444 when the source has alpha and ProRes 422 otherwise. (`preferredPresetOrder` already orders correctly; the menu doesn't visually differentiate.)
+- **Bulk transcode action** — operators with 50 phone clips would have to right-click each one. A future "Transcode all flagged clips…" action could iterate `project.slides.filter { $0.flags.hasAnyFlag }`.
 
-**Recommended next pick**: **C5c (folder-drop UX)** — the only thing standing between operators and end-to-end image-sequence ingestion. Surface the frame-rate default decision as a `docs/blockers.md` entry the moment the session opens, then either resume after the user picks one or ship a "frame-rate picker per sequence" UX (operator types the rate when they confirm the encode — no committed default). **E1 (pre-show check panel)** is the start of Phase E and a clean phase boundary if the user wants to pivot. **B11 (NDI Full sender)** is the next contained Phase B item once the NDI SDK dependency call is made. **The Show-Mode inline-button gate** is the smallest one-commit cleanup.
+**Recommended next pick**: **E1 (pre-show check panel)** — Phase E start, clean phase boundary, reuses `B14` (`FrameRateConformance` evaluator across every cue × Stage rate) and `B8` (`recommendsTenBitOutput`) as ready-made check rows. Spec §7. The pre-show panel is many small independently-testable rows; a session can ship a row at a time. **B11 (NDI Full sender)** is the next contained Phase B item once the NDI SDK dependency call is made — confirm license + binary size in `decision_log.md` before adding. **B7 (DeckLink format negotiation)** has UX questions worth filing as a blocker before scoping. **C7 (asset library — linked vs managed + security-scoped bookmarks)** is bigger and would consume most of a session by itself.
 
 ### Known gaps in the C6 Keynote import path
 

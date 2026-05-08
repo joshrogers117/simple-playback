@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B8 pure-logic recommendation + inspector hint shipped; B14 partial); Phase C in progress — C1, C2, C3, C4, C5a, C5b (encoder + coordinator), C6, C-banner all shipped end-to-end. C5c (folder-drop UX) is next. Inline transcode button on cue inspector chips closes the C2/C4 gap.
-- **Last commit**: C5b coordinator — ImageSequenceEncodeCoordinator + sibling outcome
+- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B8 pure-logic recommendation + inspector hint shipped; B14 partial); Phase C in progress — C1, C2, C3, C4, C5 (a/b/c all shipped), C6, C-banner all shipped end-to-end. Inline transcode button is Show-Mode-gated (Option B). Apple-events deep-link button surfaces on the banner for `.keynoteImport` failures (Option E).
+- **Last commit**: Apple-events deep-link button on import banner (Option E)
 - **Branch**: `development`
 
 ---
@@ -74,10 +74,10 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
   - [x] C4a: `MediaFlags.animatedImage` + `.animatedImage` WarningKind + spec-§3.10 warning copy
   - [x] C4b: `Services/AnimatedImageInspector.swift` (`CGImageSourceGetCount > 1`) wired into `MediaImporter` image branch
   - [x] C4c: `TranscodeService.canTranscode` widened to animated-image slides; `preferredPresetOrder(for:)` leads ProRes 4444 for animated images; `SlideGridView` right-click menu uses preferred order
-- [~] C5: Image-sequence detect (`name.0001.png`) → offer encode-to-ProRes-4444 via `AVAssetWriter`
+- [x] C5: Image-sequence detect (`name.0001.png`) → offer encode-to-ProRes-4444 via `AVAssetWriter`
   - [x] C5a: `Services/ImageSequenceDetector.swift` pure-logic — groups `name.NNN[N].(png|jpg|jpeg|tiff|tif|exr)` into Sequences vs leftovers; supports 3- or 4-digit counters, multi-dot basenames, multiple sequences in one batch, gaps in counter
   - [x] C5b: `Services/ImageSequenceEncoder.swift` — `@MainActor ObservableObject` wrapping `AVAssetWriter` (frames in → ProRes 4444 .mov out); state enum mirrors `TranscodeJob`; FourCC pinned to `ap4h`/`ap4x` end-to-end. Plus `ImageSequenceEncodeCoordinator` mirroring `TranscodeCoordinator` (jobs list + injectable `siblingImporter` test seam). Frame rate is operator-supplied; default committal deferred to C5c.
-  - [ ] C5c: Folder-drop UX (`canChooseDirectories = true` open panel; drop handler that walks a folder and runs `ImageSequenceDetector.detect(in:)`, then enqueues encode jobs through the coordinator). **Product blocker**: frame-rate default for image-sequence encoding (Stage rate? operator-supplied per import? 30 fps fallback?).
+  - [x] C5c: Add Folder…  toolbar button + `AddFolderImporter` folder-walk pure-logic + `AddFolderImportSheet` confirm sheet (per-sequence frame-rate picker — preset menu 24/25/30/48/50/60 plus custom integer field; Encode button gated on every encode-checked sequence having a non-zero rate). Standalone media routes through `MediaImporter`; sequences route through `ImageSequenceEncodeCoordinator.encode(...)`. `BackgroundJobsStrip` (renamed from `TranscodeProgressStrip`) renders both transcode and encode jobs side-by-side in the palette progress strip. **No frame-rate default committed at any layer** — operator picks per import.
 - [x] C6: Keynote import — AppleScript-driven `.key` → PDF → bitmaps; "Keynote not installed" diagnostic
   - [x] C6a: `Services/KeynoteImporter.swift` (NSAppleScript export-to-PDF, install detection, error mapping) + 9 tests
   - [x] C6b: `MediaImporter.importSlides(from:context:)` routes `.key` via injectable `keynoteExporter` → PDFImporter + 5 tests
