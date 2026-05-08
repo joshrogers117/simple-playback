@@ -598,7 +598,52 @@ struct RootView: View {
             }
         }
 
+        // media.files — operator picks a relink folder; we walk every offline
+        // slide through the C7c MediaResolver waterfall and apply the resulting
+        // plan to project.slides. C9-flavored: closes the duplicate-of-Pre-Show
+        // gap by giving the operator a one-click "find the missing files in
+        // this folder" action.
+        handlers.byRowID["media.files"] = {
+            chooseRelinkFolderAndApply()
+        }
+
         return handlers
+    }
+
+    /// Operator-triggered relink action wired into the `media.files` Pre-Show
+    /// fix button. NSOpenPanel for folder selection; result feeds the C7c
+    /// resolver via AssetRelinkPlan; the resulting updates land in
+    /// `document.project.slides`. Surfaces a one-line summary on the import
+    /// status banner so the operator gets feedback even when the sheet has
+    /// been dismissed.
+    private func chooseRelinkFolderAndApply() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.prompt = "Choose Relink Folder"
+        panel.message = "Pick a folder. Simple Playback will search it for any media files that are currently offline."
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+
+        let report = AssetRelinkPlan.plan(
+            slides: document.project.slides,
+            searchRoots: [folder]
+        )
+        guard !report.updates.isEmpty else {
+            // Nothing matched — surface so the operator doesn't think the click
+            // did nothing. Use the import-status banner; it's the existing
+            // non-modal failure surface.
+            importStatus.record([
+                MediaImportFailure(
+                    url: folder,
+                    kind: .unsupportedMedia,
+                    summary: "No offline media found in \(folder.lastPathComponent)."
+                )
+            ])
+            return
+        }
+        let updated = AssetRelinkPlan.apply(plan: report, to: document.project.slides)
+        document.project.slides = updated
     }
 
     private func openFolderPanel() {
