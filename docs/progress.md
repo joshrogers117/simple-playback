@@ -8,8 +8,8 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
 
 ## Current state
 
-- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B14 partial); Phase C in progress — C1 (codec inspector flags) and C3 (PDF rasterize-on-import) shipped end-to-end.
-- **Last commit**: C3c — RootView routes PDFs through `Cache/Renders/` with the active Stage's size × 2 raster target
+- **Active phase**: A and D complete; B mostly done (B1–B5, B12 shipped; B6 mostly done; B14 partial); Phase C in progress — C1 (codec inspector flags), C3 (PDF rasterize-on-import), and C6 (Keynote AppleScript→PDF→bitmaps) shipped end-to-end.
+- **Last commit**: C6c — RootView open panel + drop route `.key` files; Keynote-not-installed alert; Apple-events entitlement
 - **Branch**: `development`
 
 ---
@@ -69,7 +69,10 @@ Source of truth for what's left: this file. Source of truth for *why* it's broke
   - [x] C3c: `RootView` drop / open-panel build the context (Stage × 2 raster; bundle `Cache/Renders/` or app-support fallback for untitled docs); `ProjectBundleLayout.rendersDirectory` pinned
 - [ ] C4: Animated GIF / APNG detect → offer convert-to-ProRes-4444
 - [ ] C5: Image-sequence detect (`name.0001.png`) → offer encode-to-ProRes-4444 via `AVAssetWriter`
-- [ ] C6: Keynote import — AppleScript-driven `.key` → PDF → bitmaps; "Keynote not installed" diagnostic
+- [x] C6: Keynote import — AppleScript-driven `.key` → PDF → bitmaps; "Keynote not installed" diagnostic
+  - [x] C6a: `Services/KeynoteImporter.swift` (NSAppleScript export-to-PDF, install detection, error mapping) + 9 tests
+  - [x] C6b: `MediaImporter.importSlides(from:context:)` routes `.key` via injectable `keynoteExporter` → PDFImporter + 5 tests
+  - [x] C6c: Open panel/drop accept `.key`; modal `Keynote not installed` alert; `NSAppleEventsUsageDescription` + `com.apple.security.automation.apple-events` entitlement
 - [ ] C7: Asset library — linked vs managed media; security-scoped bookmark + path + content hash + size + mtime
 - [ ] C8: Folder-level bookmarks for batch imports
 - [ ] C9: Missing-media UX — non-modal banner, per-clip Locate, project-level Relink folder, hash-based auto-relink

@@ -197,3 +197,39 @@ The plumbing shape: `MediaImporter.importSlides(from:)` keeps its old signature 
 - `RootView.init(document:outputSettings:projectBundleURLProvider:)` — third argument is a `() -> URL?` closure (defaulted to `{ nil }` so existing test call sites compile).
 - `SimplePlaybackProjectDocument.makeWindowControllers` passes `{ [weak self] in self?.fileURL }`.
 
+
+---
+
+## 2026-05-08 — C6: Keynote import shape, AppleScript driver, diagnostic surface
+
+**Decision**: Keynote import is a thin shell that drives Keynote via `NSAppleScript` to export `.key` → PDF, then reuses the C3 `PDFImporter.rasterize` plumbing. The exporter is a `static var` on `MediaImporter` so tests can inject a stub PDF without invoking Keynote. The "Keynote not installed" diagnostic is a modal `NSAlert` triggered at import time when any dropped/picked URL is `.key` and the workspace can't resolve `com.apple.iWork.Keynote`. Hardened-runtime requires `com.apple.security.automation.apple-events` entitlement and a `NSAppleEventsUsageDescription` Info.plist string; both shipped this session.
+
+**Why**:
+- **Reuse over reinvent** — The C3 PDFImporter is exactly the rasterizer Keynote needs. Sharing the `MediaImportContext` keeps `Cache/Renders/<batchUUID>/` layout consistent across PDF and Keynote sources, so a future "Re-rasterize on Stage resize" action only has to know about one render destination shape.
+- **Injectable exporter** — Real Keynote can't run in CI; the `static var keynoteExporter` lets unit tests pin the routing chain (URL → exporter → PDFImporter → image MediaSlides) end-to-end with a synthetic PDF, while the default still drives the real AppleScript at runtime. Cleaner than dependency-inverting `MediaImporter` itself, which would force every call site to thread an importer instance.
+- **Modal NSAlert (not a banner)** — Spec §3.10 says "Surface a clear 'Keynote not installed' diagnostic if absent." A banner system doesn't exist yet (deferred from C3) and would be premature scope. NSAlert is honest, dismissible, and only fires from Edit Mode (addMedia is `showMode`-guarded), so the §3.5 "no modals in Show Mode" invariant holds.
+- **Entitlement + usage description** — Hardened runtime (`ENABLE_HARDENED_RUNTIME: YES` on Release) blocks Apple Events without `com.apple.security.automation.apple-events`. macOS still presents its standard "Allow Simple Playback to control Keynote?" prompt on first send; the usage description is the message inside that prompt. Pre-prompt UX (custom dialog before the macOS one) was explicitly rejected by the next-session prompt — stock prompt is already prescriptive.
+
+**Alternatives considered**:
+- **Drive `osascript` via `Process`** (subprocess) instead of `NSAppleScript` — works without the Apple Events entitlement on the *parent*, but `osascript` runs as a child and *still* needs Apple Events permission, just routed through `osascript`'s own usage description. No saving; adds process-spawn overhead and error-message surface area.
+- **Use the Keynote AppleScript Bridge (sdef-generated headers)** — produces stronger compile-time types but requires `sdef`/`sdp` build steps and a generated `Keynote.h` file. Strict-concurrency-warning surface is non-trivial. The simple `NSAppleScript` text path is what most third-party apps use (Hazel, Alfred, Default Folder X). Faster to ship, easier to test.
+- **Rasterize Keynote's PDF export at a different `rasterSize`** (e.g. literal Stage size, not ×2). Rejected: spec §3.10 says "output × 2" for PDF rasterize-on-import; Keynote's PDF intermediate is a PDF too — same pixel target.
+- **Pre-prompt before macOS's** "Allow Simple Playback to control Keynote?" — rejected. macOS's prompt is sufficient and already names the target app.
+- **Banner instead of modal alert** — rejected for now (no banner system yet); revisit when the C3 import-status banner work lands.
+
+**Reversibility**: easy. Revert = drop `KeynoteImporter.swift`, `KeynoteImporterTests.swift`, `MediaImporterKeynoteTests.swift`, the `importKeynote(at:context:)` branch in `MediaImporter`, the `keynoteExporter` static var, the open-panel `.key` content type, `presentKeynoteNotInstalledAlert`, the Apple-events entitlement key, and the `NSAppleEventsUsageDescription` string. No persisted state changes — `MediaSlide` round-trips are unaffected. Saved projects with Keynote-derived slides keep their PNG references; opening one after revert shows them as offline images at most.
+
+**What I'd revisit if**:
+- Real-Keynote rehearsal reveals the AppleScript needs an explicit `with properties {export style:IndividualSlides}` clause (Keynote occasionally exports as a single-page "handout" PDF). Add the property; pin shape in `testExportAppleScript…`.
+- Keynote prompts for password on encrypted decks — current AppleScript hangs on the dialog. Add a timeout (`NSAppleScript.executeAndReturnError` is synchronous; could move to `Process` + `osascript -e` with a hard timeout) and an `.passwordProtected` error case.
+- Operators report the modal alert is annoying when batch-dropping mixed media (PDF + .key + .mov). Switch to an aggregated banner once the import-status banner ships.
+- The first-run macOS prompt's UX is genuinely confusing in a dim booth (operator dismisses it before reading) — add a pre-prompt then.
+
+**Public API impact**:
+- `enum KeynoteImportError: LocalizedError` — `.keynoteNotInstalled`, `.unreadable(URL)`, `.exportFailed(String)` in `Services/KeynoteImporter.swift`.
+- `enum KeynoteImporter` — `static let keynoteBundleIdentifier`; `static var workspaceProvider: (String) -> URL?` (test seam); `static func isKeynoteInstalled() -> Bool`; `static func exportToPDF(keynoteURL:destinationDirectory:) throws -> URL`; `static func exportAppleScript(keynoteURL:pdfURL:) -> String` (exposed for shape tests).
+- `MediaImporter.keynoteExporter: (URL, URL) throws -> URL` — test seam; default delegates to `KeynoteImporter.exportToPDF`.
+- `MediaImporter.isKeynote(_:)` — UTType `com.apple.iwork.keynote.key` + extension fallback.
+- `RootView` open panel includes the Keynote UTType; `addMedia` filters `.key` URLs and presents `presentKeynoteNotInstalledAlert()` when the workspace can't resolve Keynote.
+- Entitlements: `com.apple.security.automation.apple-events` (true).
+- Info.plist: `NSAppleEventsUsageDescription` ("Simple Playback uses Apple Events to drive Keynote so it can export .key decks to PDF for slide rasterization.").

@@ -1,5 +1,7 @@
 # Phase C — Media pipeline — Summary
 
+**Status (session 8 — 2026-05-08)**: C6 shipped end-to-end (Keynote `.key` import via AppleScript → PDF → bitmaps). 257 tests, all green (was 243 at session start; +14 from the C6a/C6b suites — C6c is UI-only and has no new test surface). 3 new commits on `development` (C6a / C6b / C6c).
+
 **Status (session 7 — 2026-05-08)**: C3 shipped end-to-end (PDF rasterize-on-import). 243 tests, all green (was 233 at session start). 3 new commits on `development` (C3a / C3b / C3c).
 
 **Status (session 6 — 2026-05-08)**: C1 shipped end-to-end (codec inspector flags). 233 tests, all green (was 202 at session start). 3 commits on `development`.
@@ -7,6 +9,72 @@
 Phase C is just starting. The codec inspector (C1) is the first piece because it has zero hardware dependency and unblocks B8 (10-bit YUV default once any clip is >8-bit) — the `MediaSlide.flags.tenBitYUV420` boolean is now the project-wide signal B8 will key off of.
 
 The remaining Phase C items (C2 transcode action, C3 PDF import, C4 GIF/APNG detect-and-convert, C5 image-sequence detect-and-encode, C6 Keynote import, C7+ asset library / audio / subtitles) are all autonomy-friendly with no hardware exposure — Phase C should be the workhorse phase for autonomous-build cycles.
+
+---
+
+## What shipped in session 8 (C6)
+
+### C6a — `KeynoteImporter`
+
+- **`Services/KeynoteImporter.swift`** — `enum KeynoteImporter` with three entry points: `isKeynoteInstalled() -> Bool` (queries `NSWorkspace.shared.urlForApplication(withBundleIdentifier:)` for `com.apple.iWork.Keynote`), `exportToPDF(keynoteURL:destinationDirectory:) throws -> URL` (drives Keynote via `NSAppleScript`), and `exportAppleScript(keynoteURL:pdfURL:) -> String` (pure-string AppleScript text, exposed for shape tests).
+- **AppleScript** — minimal: `tell application "Keynote" / activate / open POSIX file "<src>" / export theDoc to POSIX file "<pdf>" as PDF / close theDoc saving no / end tell`. Path strings escape `"` and `\` for AppleScript string literals. The `close … saving no` is critical — the operator's deck stays untouched on disk after import.
+- **Errors** — `KeynoteImportError` is `.keynoteNotInstalled`, `.unreadable(URL)`, `.exportFailed(String)`. The exporter wraps `NSAppleScript.executeAndReturnError(_:)` and converts the error dictionary into `.exportFailed`.
+- **Test seam** — `static var workspaceProvider: (String) -> URL?` lets tests simulate Keynote installed/absent without depending on the host machine's Keynote install. Tests `setUp`/`tearDown` save and restore the provider so test-order independence holds.
+- **Why the indirection over a `protocol Workspace`** — single-test-overridable static var is simpler, has no virtual-call cost, and matches the pattern used elsewhere in the importer surface.
+- 9 tests cover bundle-ID identity, install-detection branches, query-by-correct-bundle-ID, error mapping for absent-Keynote and missing-source, AppleScript shape (tell-application block, POSIX file paths, close-without-saving), and quote/backslash escaping in path interpolation.
+
+### C6b — `MediaImporter` Keynote routing
+
+- **`Services/MediaImporter.swift`** — new `static var keynoteExporter: (URL, URL) throws -> URL` test seam, defaults to `KeynoteImporter.exportToPDF`. The `importSlides(from:context:)` overload now branches on `isKeynote(url)` after the existing `isPDF(url)` branch and routes through `importKeynote(at:context:)`.
+- **`importKeynote`** — creates a per-batch UUID subdirectory under `context.renderRootDirectory`, calls `keynoteExporter` to land an intermediate PDF inside, then calls `PDFImporter.rasterize` to fan it into PNG sidecars in the same directory. The intermediate PDF stays alongside the PNGs so a future "Re-rasterize on Stage resize" command (deferred from C3) can re-render from it without re-driving Keynote.
+- **`isKeynote(_:)`** — UTType-aware (`com.apple.iwork.keynote.key`) with extension fallback (`.key` / `.KEY`). Mirrors the C3 `isPDF(_:)` predicate shape.
+- **No-context fallthrough** — like C3, the no-context overload silently drops `.key` URLs (no place to write the intermediate PDF or PNGs without a context). UI callers must pass a context; legacy non-UI callers get the same back-compat behavior they did for PDFs.
+- 5 tests cover `isKeynote` recognition (.key and .KEY accepted; .pdf, .png, .mov rejected), no-context-drops-.key, Keynote-not-installed-returns-empty (verified via `KeynoteImporter.workspaceProvider` swap), success path through an injected exporter that synthesizes a 5-page PDF (5 image MediaSlides with resolvable URLs and `<deck-name> — page N` titles), and exporter-throws-returns-empty.
+
+### C6c — RootView wiring + entitlements + diagnostic
+
+- **`Views/RootView.swift`** — open panel `allowedContentTypes` now appends the Keynote UTType when `UTType("com.apple.iwork.keynote.key")` resolves (which it does on every modern macOS). The drop handler is unchanged (already accepts any `UTType.fileURL`); routing happens in the importer.
+- **Diagnostic** — `addMedia(_:)` filters incoming URLs for `.key` and, if any are present and `KeynoteImporter.isKeynoteInstalled()` is false, presents an `NSAlert` (warning style, "Keynote not installed" / "Install Keynote from the App Store to import .key files. Other dropped or selected media will still be imported."). The alert only fires from Edit Mode (the function early-exits in Show Mode), preserving the §3.5 modal-forbidden invariant. Non-key media in the same batch still imports.
+- **Entitlement** — `Simple Playback/Support/SimplePlayback.entitlements` adds `com.apple.security.automation.apple-events = true`. Required because Release config has `ENABLE_HARDENED_RUNTIME: YES`; without the entitlement, `NSAppleScript` returns `errAEEventNotPermitted` to any cross-process Apple Event. macOS still presents its standard "Allow Simple Playback to control Keynote?" prompt on first send.
+- **Info.plist** — adds `NSAppleEventsUsageDescription` ("Simple Playback uses Apple Events to drive Keynote so it can export .key decks to PDF for slide rasterization.") — the message inside macOS's standard automation prompt.
+- No new tests (UI wiring is exercised by manual rehearsal step 7 below; the diagnostic logic itself is reachable through `MediaImporter.isKeynote` + `KeynoteImporter.isKeynoteInstalled`, both already covered).
+
+---
+
+## Tests added (session 8)
+
+| Test | What it covers |
+|---|---|
+| `KeynoteImporterTests.testKeynoteBundleIDMatchesApplesIdentifier` | Bundle ID is `com.apple.iWork.Keynote` (renaming would break detection). |
+| `KeynoteImporterTests.testIsKeynoteInstalledTrueWhenWorkspaceProviderReturnsURL` | Install detection wired correctly. |
+| `KeynoteImporterTests.testIsKeynoteInstalledFalseWhenWorkspaceProviderReturnsNil` | Absence detection wired correctly. |
+| `KeynoteImporterTests.testIsKeynoteInstalledQueriesTheKeynoteBundleID` | The detection actually queries Keynote's bundle ID, not some other constant. |
+| `KeynoteImporterTests.testExportToPDFThrowsKeynoteNotInstalledWhenAbsent` | Absent-Keynote → `.keynoteNotInstalled`. |
+| `KeynoteImporterTests.testExportToPDFThrowsUnreadableWhenSourceMissing` | Missing source → `.unreadable`. |
+| `KeynoteImporterTests.testExportAppleScriptIsKeynoteTellBlock` | AppleScript text targets Keynote by name. |
+| `KeynoteImporterTests.testExportAppleScriptOpensSourceAndExportsToPDF` | AppleScript shape: open source via POSIX file, export as PDF, close without saving. |
+| `KeynoteImporterTests.testExportAppleScriptEscapesQuotesAndBackslashes` | Path-string escape contract for AppleScript literals. |
+| `MediaImporterKeynoteTests.testIsKeynoteRecognizesByExtension` | `.key`/`.KEY` accepted; `.png`/`.pdf`/`.mov` rejected. |
+| `MediaImporterKeynoteTests.testReturnsEmptyForKeynoteWhenContextIsAbsent` | No-context overload silently drops `.key` (back-compat for legacy callers). |
+| `MediaImporterKeynoteTests.testReturnsEmptyForKeynoteWhenKeynoteNotInstalled` | Keynote-absent path returns empty array (UI surfaces banner). |
+| `MediaImporterKeynoteTests.testRoutesKeynoteThroughExporterAndProducesImageSlides` | End-to-end: `.key` URL → injected exporter → PDFImporter → 5 image MediaSlides with resolvable URLs and zero-padded page titles. |
+| `MediaImporterKeynoteTests.testReturnsEmptyWhenExporterThrows` | Any exporter error swallowed → empty array. |
+
+Total: 257 tests, all green (was 243 at session start).
+
+---
+
+## Manual verification needed (session 8 deltas)
+
+These need a real Keynote install + a `.key` file. Autonomous tests cover the routing and the Keynote-absent path; live AppleScript / Apple-events permission UX needs human eyeballs.
+
+1. With Keynote installed, save a fresh project to disk (so it has a `fileURL`). Drag a multi-slide `.key` file into the asset library palette. macOS should present its standard "Simple Playback wants to control Keynote" prompt on first invocation; click "OK". Keynote opens, exports the deck to PDF, closes (without saving). Asset library populates with one image MediaSlide per Keynote slide. Browse `<project.spb>/Cache/Renders/<UUID>/` in Finder; the PDF + the PNG sidecars should both be there.
+2. With Keynote installed, but with the Apple-events permission previously denied (`System Settings → Privacy & Security → Automation → Simple Playback → Keynote = OFF`), drop a `.key`. The import should fail silently (returns 0 slides) with no crash. To re-enable, the operator toggles the switch in System Settings.
+3. Without Keynote installed (uninstall, or rename `Keynote.app` aside), drop a `.key`. The "Keynote not installed" `NSAlert` appears. Other media in the same drop should still import correctly.
+4. Use **Add Media…** (toolbar) to pick a `.key` file. Same result as drop.
+5. Drop a Keynote deck whose slides mix portrait and landscape orientations. Each slide is independently fit-into the raster; mixed-orientation decks browse correctly. (Inherits PDF behavior from C3.)
+6. Save the project, restart Simple Playback, reopen. The Keynote-derived slides resolve from the bundle's `Cache/Renders/<UUID>/` PNG paths.
+7. Drop into an *untitled* (unsaved) document. Slides appear; the intermediate PDF + PNGs land in `~/Library/Application Support/Simple Playback/Renders/<sessionUUID>/<batchUUID>/`. Save the project, restart, reopen — slides resolve via absolute path. (Same untitled-doc pattern as C3; same future "Bundle for Travel" pickup.)
 
 ---
 
@@ -142,7 +210,7 @@ These need human eyeballs — autonomous tests don't drive SwiftUI inspectors.
 
 ---
 
-## Still deferred (session 7+)
+## Still deferred (session 9+)
 
 **Phase B leftovers** (mostly hardware-bound):
 - **B6 (remaining)** — REF format-mismatch detection vs Stage frame rate. Needs a Blackmagic SDK spike against newer interfaces; possible blocker.
@@ -157,10 +225,17 @@ These need human eyeballs — autonomous tests don't drive SwiftUI inspectors.
 - **C2** — Right-click "Transcode to ProRes 422" action. Uses `AVAssetExportSession` with `.proRes422` preset. Open product question: does transcode replace the original slide or add a sibling? (Default to sibling — non-destructive, lets the operator A/B.) Needs a non-modal progress surface. Sibling folder location now has precedent: `<bundle>/Transcoded/` matching `<bundle>/Cache/Renders/` pattern.
 - **C4** — Animated GIF / APNG detect → offer convert-to-ProRes-4444. AVFoundation can't decode animated GIFs natively, so detection forces a conversion path. Decompose: "detect" first (an `animatedGIF` flag on MediaFlags? or a `MediaSlide.requiresConversion` enum?), then a separate "offer convert" UX.
 - **C5** — Image-sequence detect (`name.0001.png`) → offer encode-to-ProRes-4444 via `AVAssetWriter`. Pure import-time logic + AVAssetWriter wrapper.
-- **C6** — Keynote import via AppleScript → PDF → bitmaps. **Now unblocked by C3** — Keynote import is a thin shell around AppleScript that exports `.key` to PDF, then calls `PDFImporter.rasterize` with the same `MediaImportContext`. Needs the "Keynote not installed" diagnostic branch and AppleScript permission UX.
 - **C7+** — Asset library, audio engine, subtitles, etc. Larger.
 
-**Recommended next pick**: **C6 (Keynote import)** is the natural follow-up to C3 — the rasterize plumbing is in place and Keynote import collapses to AppleScript + reuse. Or **C2 (transcode action)** to close the C1 inspector-chip → action loop. C4/C5 also fit cleanly.
+**Recommended next pick**: **C2 (transcode action)** — closes the C1 inspector-chip → action loop the operator already sees. The `<bundle>/Transcoded/` layout from C3/C6 precedent makes the destination obvious. Or **C5 (image sequence)** for a smaller fully-autonomous win. C4 overlaps with C2 (both need the transcoded sibling pattern) — preferable to do C2 first so C4 can reuse the conversion plumbing.
+
+### Known gaps in the C6 Keynote import path
+
+- **AppleScript timeout / hang on encrypted decks.** A password-protected `.key` file makes Keynote pop a password dialog; `NSAppleScript.executeAndReturnError` is synchronous and will block until the operator dismisses the dialog (or, on quit-Keynote, fail). A future iteration could move to `Process` + `osascript -e` with a hard timeout, plus a `.passwordProtected` error case.
+- **No verification of Apple Events permission state.** If the operator denied the macOS automation prompt for Keynote, every subsequent `.key` import returns 0 slides silently. A future "Open Automation settings" affordance from a banner would close the loop.
+- **AppleScript export style not pinned.** Keynote occasionally exports as a single-page "handout" PDF rather than one-slide-per-page. If a real rehearsal hits this, add `with properties {export style:IndividualSlides}` to the AppleScript and pin the new shape in `testExportAppleScriptOpensSourceAndExportsToPDF`.
+- **No live-AppleScript test coverage.** Real Keynote can't run in CI — we test the routing chain via an injected exporter that synthesizes a PDF. The success of the live AppleScript exchange depends on manual rehearsal.
+- **Same `Stage resize` and `import status banner` gaps as C3** — Keynote-derived slides inherit those.
 
 ### Known gaps in the C3 import path
 
