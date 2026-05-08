@@ -66,7 +66,12 @@ enum AssetRelinkPlan {
         for slide in slides {
             let result = resolve(slide.media, searchRoots)
             switch result.step {
-            case .bundleMedia, .original:
+            case .bundleMedia, .original, .folderBookmark:
+                // C8 — `.folderBookmark` reads as "still resolves through the
+                // recorded folder bookmark, no relink update needed." The
+                // operator's per-file pointer is stale but the project-level
+                // FolderBookmark recovers it transparently, so this is treated
+                // the same as the per-file bookmark resolving (`.original`).
                 unchanged.append(slide.id)
             case .contentHash, .nameAndSize:
                 if let url = result.url {

@@ -12,6 +12,12 @@ enum MediaResolutionStep: Equatable {
     /// Found at `reference.originalPath` (or via the security-scoped bookmark — both
     /// resolve to the same location from the operator's POV).
     case original
+    /// C8 — resolved via the project-level `FolderBookmark` whose `id` matches the
+    /// reference's `folderBookmarkID`, joined with `folderRelativePath`. Recovers a
+    /// clip moved within its imported parent directory (a folder-level rename leaves
+    /// every per-file bookmark dead, but the folder bookmark plus the relative path
+    /// reaches the new location without a relink walk).
+    case folderBookmark
     /// Found a file in one of the search roots whose SHA-256 + size matches the
     /// reference's stored fingerprint. Authoritative — the bytes are identical.
     case contentHash
@@ -40,13 +46,18 @@ struct MediaResolutionResult: Equatable {
 ///    A bundle moved to a new machine still resolves even when the absolute-path /
 ///    security-scoped-bookmark recorded at C7d apply time are stale.
 /// 1. **Original location** — bookmark or absolute path. Cheap and authoritative.
-/// 2. **Content-hash search** — walk each `searchRoots` URL and fingerprint files
+/// 2. **C8 folder bookmark** — when the reference was imported via Add Folder /
+///    folder-drop and carries `folderBookmarkID + folderRelativePath`, look up the
+///    matching `FolderBookmark` in the project, resolve it to a directory URL, and
+///    join with the relative path. Cheap (no walk) and recovers a clip moved within
+///    its imported parent directory.
+/// 3. **Content-hash search** — walk each `searchRoots` URL and fingerprint files
 ///    whose size matches the reference's stored size. The first content-hash match
 ///    wins. Authoritative because identical bytes ⇒ identical asset.
-/// 3. **Name + size search** — same walk, but match by basename + extension + size.
+/// 4. **Name + size search** — same walk, but match by basename + extension + size.
 ///    Heuristic; the C9 banner exposes this so the operator can verify before going
 ///    live with a guessed file.
-/// 4. **Offline** — no rung resolved. The asset is offline; downstream surfaces
+/// 5. **Offline** — no rung resolved. The asset is offline; downstream surfaces
 ///    (palette, cue inspector, pre-show check) treat it as missing media.
 ///
 /// Every I/O dependency is injected so this whole pipeline unit-tests without a real
@@ -104,6 +115,10 @@ enum MediaResolver {
     ///     Drives rung 0 for `.managed` references so a bundle moved across machines
     ///     still resolves. Pass `nil` for untitled documents or when the caller
     ///     intentionally wants only the original-path waterfall.
+    ///   - folderBookmarks: id → `FolderBookmark` lookup for the active project.
+    ///     Drives rung 2 (C8) when the reference carries `folderBookmarkID` +
+    ///     `folderRelativePath`. Pass an empty dict to skip the rung; pre-C8
+    ///     callsites that don't yet know about folder bookmarks can omit it.
     ///   - fileExists: returns `true` iff the file exists at the URL.
     ///   - listFiles: enumerates every regular file under a directory.
     ///   - fileSize: cheap size lookup used to pre-filter hash candidates.
@@ -112,6 +127,7 @@ enum MediaResolver {
         reference: MediaReference,
         searchRoots: [URL],
         bundleMediaDirectory: URL? = nil,
+        folderBookmarks: [UUID: FolderBookmark] = [:],
         fileExists: (URL) -> Bool = liveFileExists,
         listFiles: (URL) -> [URL] = liveListFiles,
         fileSize: (URL) -> Int64? = liveFileSize,
@@ -150,8 +166,23 @@ enum MediaResolver {
             return MediaResolutionResult(url: originalURLForRung1, step: .original)
         }
 
-        // Rungs 2 & 3 require search roots and a non-nil fingerprint (rung 2) or at
-        // least a stored size (rung 3). If neither is available we go straight to
+        // Rung 2 — folder bookmark + relative path (C8). Cheap: a single bookmark
+        // resolution + path-append + fileExists. No walk. Only fires when the
+        // reference was imported with folder-mode (Add Folder / folder-drop) and
+        // the project's folderBookmarks lookup contains the matching entry.
+        if let folderID = reference.folderBookmarkID,
+           let relative = reference.folderRelativePath,
+           !relative.isEmpty,
+           let bookmark = folderBookmarks[folderID],
+           let directory = bookmark.resolvedDirectory(fileExists: fileExists) {
+            let candidate = directory.appendingPathComponent(relative)
+            if fileExists(candidate) {
+                return MediaResolutionResult(url: candidate, step: .folderBookmark)
+            }
+        }
+
+        // Rungs 3 & 4 require search roots and a non-nil fingerprint (rung 3) or at
+        // least a stored size (rung 4). If neither is available we go straight to
         // offline.
         guard !searchRoots.isEmpty else {
             return .offline
@@ -164,7 +195,7 @@ enum MediaResolver {
         let storedSize = reference.fingerprint?.size
 
         // Pre-C7 (legacy) references have no fingerprint, so both `storedHash` and
-        // `storedSize` are nil. Rung 2 needs a stored hash; rung 3 needs a stored
+        // `storedSize` are nil. Rung 3 needs a stored hash; rung 4 needs a stored
         // size — neither can match. Short-circuit before walking every file in
         // every search root for nothing. On a 500-slide deck this is the
         // difference between O(slides × roots × files) syscalls and zero.
@@ -184,7 +215,7 @@ enum MediaResolver {
 
                 let candidateSize = fileSize(candidate)
 
-                // Rung 2 — content hash. Requires both stored size and stored hash.
+                // Rung 3 — content hash. Requires both stored size and stored hash.
                 if let storedHash, let storedSize {
                     if candidateSize == storedSize,
                        let candidateFingerprint = fingerprintAt(candidate),
@@ -193,7 +224,7 @@ enum MediaResolver {
                     }
                 }
 
-                // Rung 3 — name + size. We only record the first hit; the loop
+                // Rung 4 — name + size. We only record the first hit; the loop
                 // continues looking for a content-hash match (which would supersede).
                 if nameAndSizeHit == nil,
                    candidate.lastPathComponent == originalBaseName,

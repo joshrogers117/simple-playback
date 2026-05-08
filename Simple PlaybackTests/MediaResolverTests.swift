@@ -451,6 +451,160 @@ final class MediaResolverTests: XCTestCase {
         XCTAssertEqual(result.url?.standardizedFileURL, url.standardizedFileURL)
     }
 
+    // MARK: - C8 folder bookmark rung
+
+    func testResolvesViaFolderBookmarkWhenOriginalIsGoneAndFolderHit() {
+        // Original path is gone but the folder bookmark resolves to a directory
+        // that contains the file at the recorded relative path. Should land on
+        // `.folderBookmark` without walking any search root.
+        let folderID = UUID()
+        let folderBookmark = FolderBookmark(
+            label: "Show Footage",
+            originalPath: "/Volumes/Show/Footage",
+            bookmarkData: nil
+        )
+        let reference = MediaReference(
+            url: URL(fileURLWithPath: "/OriginalGone/intro.mov"),
+            folderBookmarkID: folderID,
+            folderRelativePath: "scene-01/intro.mov"
+        )
+
+        let result = MediaResolver.resolve(
+            reference: reference,
+            searchRoots: [],
+            folderBookmarks: [folderID: folderBookmark],
+            fileExists: { url in
+                url.path == "/Volumes/Show/Footage" ||
+                url.path == "/Volumes/Show/Footage/scene-01/intro.mov"
+            },
+            listFiles: { _ in
+                XCTFail("Folder-bookmark rung must not walk any search root.")
+                return []
+            },
+            fileSize: { _ in nil },
+            fingerprintAt: { _ in nil }
+        )
+
+        XCTAssertEqual(result.step, .folderBookmark)
+        XCTAssertEqual(result.url?.path, "/Volumes/Show/Footage/scene-01/intro.mov")
+    }
+
+    func testFolderBookmarkRungSkippedWhenIDMissingFromLookup() {
+        // Reference carries folderBookmarkID + folderRelativePath but the host
+        // didn't supply that bookmark in the lookup (e.g. a project that hasn't
+        // run the folderBookmarks migration). Resolver must fall through, not
+        // error, and must not consult the rung.
+        let folderID = UUID()
+        let reference = MediaReference(
+            url: URL(fileURLWithPath: "/OriginalGone/intro.mov"),
+            folderBookmarkID: folderID,
+            folderRelativePath: "intro.mov"
+        )
+
+        let result = MediaResolver.resolve(
+            reference: reference,
+            searchRoots: [],
+            folderBookmarks: [:],
+            fileExists: { _ in false },
+            listFiles: { _ in [] },
+            fileSize: { _ in nil },
+            fingerprintAt: { _ in nil }
+        )
+
+        XCTAssertEqual(result, .offline)
+    }
+
+    func testFolderBookmarkRungSkippedWhenRelativePathIsEmpty() {
+        // Empty relative path means the importer never recorded an in-folder
+        // location — the rung is a no-op. Don't return the directory itself.
+        let folderID = UUID()
+        let folderBookmark = FolderBookmark(
+            label: "Show",
+            originalPath: "/Volumes/Show/Footage",
+            bookmarkData: nil
+        )
+        let reference = MediaReference(
+            url: URL(fileURLWithPath: "/OriginalGone/intro.mov"),
+            folderBookmarkID: folderID,
+            folderRelativePath: ""
+        )
+
+        let result = MediaResolver.resolve(
+            reference: reference,
+            searchRoots: [],
+            folderBookmarks: [folderID: folderBookmark],
+            fileExists: { url in url.path == "/Volumes/Show/Footage" },
+            listFiles: { _ in [] },
+            fileSize: { _ in nil },
+            fingerprintAt: { _ in nil }
+        )
+
+        XCTAssertEqual(result, .offline)
+    }
+
+    func testFolderBookmarkRungSkippedWhenFolderResolutionFails() {
+        // Folder bookmark resolves to nil (directory doesn't exist anymore).
+        // Resolver must continue to the search-root walk rather than treating
+        // the rung as a hit.
+        let folderID = UUID()
+        let folderBookmark = FolderBookmark(
+            label: "Gone",
+            originalPath: "/Volumes/MissingFolder",
+            bookmarkData: nil
+        )
+        let reference = MediaReference(
+            url: URL(fileURLWithPath: "/OriginalGone/intro.mov"),
+            folderBookmarkID: folderID,
+            folderRelativePath: "intro.mov"
+        )
+
+        let result = MediaResolver.resolve(
+            reference: reference,
+            searchRoots: [],
+            folderBookmarks: [folderID: folderBookmark],
+            fileExists: { _ in false },
+            listFiles: { _ in [] },
+            fileSize: { _ in nil },
+            fingerprintAt: { _ in nil }
+        )
+
+        XCTAssertEqual(result, .offline)
+    }
+
+    func testOriginalRungWinsWhenBothOriginalAndFolderBookmarkResolve() {
+        // When the per-file path still exists, the rung-1 hit must win over
+        // rung-2 — original location is the cheapest authoritative answer and
+        // we don't want a folder-bookmark mismatch to silently shadow it.
+        let folderID = UUID()
+        let folderBookmark = FolderBookmark(
+            label: "Show",
+            originalPath: "/Volumes/Show/Footage",
+            bookmarkData: nil
+        )
+        let reference = MediaReference(
+            url: URL(fileURLWithPath: "/Movies/intro.mov"),
+            folderBookmarkID: folderID,
+            folderRelativePath: "intro.mov"
+        )
+
+        let result = MediaResolver.resolve(
+            reference: reference,
+            searchRoots: [],
+            folderBookmarks: [folderID: folderBookmark],
+            fileExists: { url in
+                url.path == "/Movies/intro.mov" ||
+                url.path == "/Volumes/Show/Footage" ||
+                url.path == "/Volumes/Show/Footage/intro.mov"
+            },
+            listFiles: { _ in [] },
+            fileSize: { _ in nil },
+            fingerprintAt: { _ in nil }
+        )
+
+        XCTAssertEqual(result.step, .original)
+        XCTAssertEqual(result.url?.path, "/Movies/intro.mov")
+    }
+
     func testResolvedURLReturnsNilWhenBookmarkResolvesToDeletedFile() throws {
         // A security-scoped bookmark created over a real file resolves to a URL
         // even after that file is deleted (with `stale = true`). Pre-fix, the
