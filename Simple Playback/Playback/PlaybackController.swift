@@ -37,6 +37,10 @@ final class PlaybackController: ObservableObject {
             if oldValue.bug.media != compositorOverlays.bug.media {
                 compositor.invalidateBugImageCache()
             }
+            // Re-composite the cached base frame so live edits in the Overlays inspector
+            // update the in-app preview without requiring a fresh take. The driver/router
+            // hot path picks the new overlays up on the next regular submit.
+            republishComposedPreview()
         }
     }
     private var activeSinkStage: TransportSinkStage?
@@ -995,11 +999,27 @@ final class PlaybackController: ObservableObject {
     private func firePendingPostDissolveActivation() {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.transitionPreviewImage = nil
+            // Keep `transitionPreviewImage` populated past dissolve completion so the in-app
+            // preview tile keeps showing the composed frame (with overlays) instead of falling
+            // back to the raw `previewImage` / AVPlayer surface (B12f).
             guard let activation = self.pendingPostDissolveActivation else { return }
             self.pendingPostDissolveActivation = nil
             activation()
         }
+    }
+
+    private func republishComposedPreview() {
+        let snapshot: (frame: RenderedFrame, canvas: CGSize)? = syncOutput {
+            guard let frame = currentFrame else { return nil }
+            return (frame, activeOutputSize)
+        }
+        guard let snapshot else { return }
+        let composed = compositor.compose(
+            baseFrame: snapshot.frame,
+            overlays: compositorOverlays,
+            canvasSize: snapshot.canvas
+        )
+        publishTransitionPreview(composed)
     }
 
     private func makeTransitionPreviewImage(from frame: RenderedFrame) -> CGImage? {

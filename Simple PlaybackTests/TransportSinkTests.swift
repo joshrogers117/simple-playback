@@ -198,6 +198,23 @@ final class TransportSinkTests: XCTestCase {
         controller.compositorOverlays = overlays
         XCTAssertTrue(controller.compositorOverlays.message.isVisible)
     }
+
+    /// B12f: assigning new overlays before any frame has been submitted must be safe — the
+    /// re-publish path short-circuits when there is no cached base frame.
+    @MainActor
+    func testControllerOverlayAssignmentBeforeAnyFrameDoesNotPublishPreview() {
+        let controller = PlaybackController()
+        XCTAssertNil(controller.transitionPreviewImage)
+
+        var overlays = CompositorOverlays.empty
+        overlays.message = MessageOverlay(enabled: true, text: "Live")
+        controller.compositorOverlays = overlays
+
+        // Without a cached base frame the republish helper must not synthesize one or
+        // populate the preview field — there is nothing to composite onto.
+        XCTAssertNil(controller.transitionPreviewImage,
+                     "Overlay change with no current frame must not publish a preview.")
+    }
 }
 
 // MARK: - Test fixtures
