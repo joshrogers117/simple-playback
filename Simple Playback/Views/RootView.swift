@@ -8,11 +8,16 @@ struct RootView: View {
     @StateObject private var playback = PlaybackController()
     @StateObject private var showController: ShowControllerHolder
     @StateObject private var transcodeCoordinator = TranscodeCoordinator()
+    @StateObject private var encodeCoordinator = ImageSequenceEncodeCoordinator()
     @StateObject private var importStatus = ImportStatusBanner()
     @State private var selectedSlideID: UUID?
     @State private var selectedCueID: UUID?
     @State private var dropTargeted = false
     @State private var inspectorMode: InspectorMode = .selection
+    /// Set when the operator picks a folder via Add Folder…  and the C5c walk + detect
+    /// completes. Drives the modal sheet that asks for per-sequence frame rates before
+    /// kicking off ProRes 4444 encodes.
+    @State private var pendingFolderImport: PendingFolderImport?
     /// Stable per-window UUID. Untitled documents — which have no fileURL yet —
     /// rasterize PDFs (and transcode to ProRes) into an app-support subdirectory keyed
     /// by this ID so concurrent untitled windows don't collide.
@@ -80,6 +85,14 @@ struct RootView: View {
                 }
                 .disabled(showController.controller?.showMode == true)
 
+                Button {
+                    openFolderPanel()
+                } label: {
+                    Label("Add Folder", systemImage: "folder.badge.plus")
+                }
+                .help("Walk a folder for image sequences, then encode each as ProRes 4444.")
+                .disabled(showController.controller?.showMode == true)
+
                 Button(role: .destructive) {
                     deleteSelectedSlide()
                 } label: {
@@ -133,6 +146,29 @@ struct RootView: View {
                     .allowsHitTesting(false)
             }
         }
+        .sheet(item: $pendingFolderImport) { _ in
+            // The closure parameter is read-only; we drive the sheet from the @State so
+            // edits flow through the binding. The wrapper view keeps the binding non-nil
+            // for the sheet's lifetime.
+            if let binding = pendingFolderImportBinding {
+                AddFolderImportSheet(
+                    pending: binding,
+                    onConfirm: { confirmed in
+                        confirmFolderImport(confirmed)
+                        pendingFolderImport = nil
+                    },
+                    onCancel: { pendingFolderImport = nil }
+                )
+            }
+        }
+    }
+
+    private var pendingFolderImportBinding: Binding<PendingFolderImport>? {
+        guard pendingFolderImport != nil else { return nil }
+        return Binding(
+            get: { pendingFolderImport ?? PendingFolderImport(folderURL: URL(fileURLWithPath: "/"), plan: .empty) },
+            set: { pendingFolderImport = $0 }
+        )
     }
 
     @ViewBuilder
@@ -367,6 +403,69 @@ struct RootView: View {
         panel.allowedContentTypes = types
         if panel.runModal() == .OK {
             addMedia(panel.urls)
+        }
+    }
+
+    private func openFolderPanel() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.prompt = "Add Folder"
+        if panel.runModal() == .OK, let url = panel.url {
+            presentFolderImport(at: url)
+        }
+    }
+
+    /// Walk the chosen folder and present the confirm sheet. If the walk itself fails
+    /// (folder unreadable), surface via the import-status banner — it's the same uniform
+    /// non-modal failure surface as PDF/Keynote/transcode errors.
+    private func presentFolderImport(at folderURL: URL) {
+        guard !(showController.controller?.showMode ?? false) else { return }
+        do {
+            let plan = try AddFolderImporter.plan(folderURL: folderURL)
+            pendingFolderImport = PendingFolderImport(folderURL: folderURL, plan: plan)
+        } catch {
+            importStatus.record([
+                MediaImportFailure(
+                    url: folderURL,
+                    kind: .unsupportedMedia,
+                    summary: "Could not read folder \(folderURL.lastPathComponent): \(error.localizedDescription)"
+                )
+            ])
+        }
+    }
+
+    /// Operator pressed Encode in the sheet. Kick off one encode job per sequence with
+    /// the operator-supplied frame rate, and import the standalone files via the
+    /// existing media-importer path.
+    private func confirmFolderImport(_ confirmed: PendingFolderImport) {
+        if !confirmed.standaloneMediaURLs.isEmpty {
+            addMedia(confirmed.standaloneMediaURLs)
+        }
+
+        let dest = transcodedRootDirectory()
+        for plan in confirmed.encodableSequences {
+            encodeCoordinator.encode(
+                sequence: plan.sequence,
+                frameRate: plan.frameRate,
+                destinationDirectory: dest
+            ) { [self] result in
+                switch result {
+                case .success(let outcome):
+                    document.project.slides.append(outcome.siblingSlide)
+                    selectedSlideID = outcome.siblingSlide.id
+                case .failure(let error):
+                    if case .cancelled = error { return }
+                    importStatus.record([
+                        MediaImportFailure(
+                            url: plan.sequence.frameURLs.first,
+                            kind: .transcode,
+                            summary: error.errorDescription ?? "Image-sequence encode failed"
+                        )
+                    ])
+                }
+            }
         }
     }
 
