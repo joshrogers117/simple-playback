@@ -56,7 +56,11 @@ struct MediaImporter {
             }
             guard let kind = mediaKind(for: url) else { return [] }
             let fps = kind == .video ? nativeFrameRate(for: url) : nil
-            let flags = kind == .video ? MediaFlagsInspector.inspect(url: url) : .none
+            let flags: MediaFlags
+            switch kind {
+            case .video: flags = MediaFlagsInspector.inspect(url: url)
+            case .image: flags = AnimatedImageInspector.inspect(url: url)
+            }
             return [MediaSlide(url: url, mediaKind: kind, nativeFrameRate: fps, flags: flags)]
         }
     }

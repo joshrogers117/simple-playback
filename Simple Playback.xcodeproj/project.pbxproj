@@ -18,6 +18,7 @@
 		1B0E8B82E949A483E4B42B8A /* MediaFlagsInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD3490C4BA5C4A09BDBF9415 /* MediaFlagsInspector.swift */; };
 		1FA47C61D92B5CF6AFD91783 /* LTCDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AAABB8C041A4E6DF8BE8685 /* LTCDecoder.swift */; };
 		27C597830A79418BECCDFEC6 /* ShowControlHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474A0C6ABB641B1CA5416495 /* ShowControlHub.swift */; };
+		2802ED3F9310BC405ED40764 /* AnimatedImageInspectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F13F77220235167A2E3CF142 /* AnimatedImageInspectorTests.swift */; };
 		28C1335FD15B6AE87DD31AB3 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A5E1B676CDA189E4C8C26CB /* PlaybackController.swift */; };
 		2AE84FFB58E06C9A60B6C982 /* TransportSinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63903ACF2604D9E2128B0F6C /* TransportSinks.swift */; };
 		2E94C7044EE3CF2C00F39C69 /* ShowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87395AF6ACFB3496B47EFFB3 /* ShowController.swift */; };
@@ -78,6 +79,7 @@
 		DCABF0FFCC0E6E0596173F64 /* CompositorPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21271656A4CCF6A5AD4E2940 /* CompositorPipelineTests.swift */; };
 		DF9D9D2A7D5D102CC20FCD95 /* DeckLinkSDKDispatch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9E8B4217656574F74350F1FF /* DeckLinkSDKDispatch.cpp */; };
 		DFB8E02D46414DBF7C34D646 /* OverlayInspectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD1EB0DEF2FFFA7B96C902D /* OverlayInspectorTests.swift */; };
+		E047E0CE35C78C80772F54ED /* AnimatedImageInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB44C4BE122979080B759770 /* AnimatedImageInspector.swift */; };
 		E5DFE39B8CB8514358205B8E /* SubscriptionPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4A7CF3D1DF29B837A0BF44 /* SubscriptionPump.swift */; };
 		E9E3C51A99F9323FE1D530DC /* PDFImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45BCD3E72BF9F52C2653862E /* PDFImporter.swift */; };
 		EAA4BC2642696555F131F8BE /* OutputPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0C8298731E2AD4C22B2306 /* OutputPreviewView.swift */; };
@@ -161,6 +163,7 @@
 		A62C4E147CCC6686312E0815 /* MediaImporterPDFTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporterPDFTests.swift; sourceTree = "<group>"; };
 		A66F04C7C7C26DBC9EA69F81 /* Simple PlaybackTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Simple PlaybackTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA2109CBF6D66866EB07681F /* InternalTimecodeGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InternalTimecodeGenerator.swift; sourceTree = "<group>"; };
+		AB44C4BE122979080B759770 /* AnimatedImageInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedImageInspector.swift; sourceTree = "<group>"; };
 		AFB3106A106C37E4EE56BC7E /* MTCReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MTCReader.swift; sourceTree = "<group>"; };
 		B328F432BC7CCB991A9A8373 /* MediaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporter.swift; sourceTree = "<group>"; };
 		B55CC65960D79FA6ECC0214F /* Simple Playback.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Simple Playback.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -184,6 +187,7 @@
 		E9305D229FBA3B8EC6854577 /* StageScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageScreen.swift; sourceTree = "<group>"; };
 		EB3CFD9074943CC8F73C637C /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		ECEAD362FE5313C14713663D /* SimplePlaybackApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplePlaybackApp.swift; sourceTree = "<group>"; };
+		F13F77220235167A2E3CF142 /* AnimatedImageInspectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedImageInspectorTests.swift; sourceTree = "<group>"; };
 		F1E1F27FCEA1C60E3C601307 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		FD749649E2DEED56E2B8C243 /* CueRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueRuntime.swift; sourceTree = "<group>"; };
 		FF79938EE267D36AF458C582 /* MediaFlagsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlagsTests.swift; sourceTree = "<group>"; };
@@ -278,6 +282,7 @@
 		5DCAA6C450AB6D61658449BB /* Simple PlaybackTests */ = {
 			isa = PBXGroup;
 			children = (
+				F13F77220235167A2E3CF142 /* AnimatedImageInspectorTests.swift */,
 				21271656A4CCF6A5AD4E2940 /* CompositorPipelineTests.swift */,
 				22C8342BEF86901A52B41C81 /* FrameRateConformanceTests.swift */,
 				38F7D1388C31CB5FF57645DA /* KeynoteImporterTests.swift */,
@@ -386,6 +391,7 @@
 		E90F62939082F88EED632467 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				AB44C4BE122979080B759770 /* AnimatedImageInspector.swift */,
 				D2A8691862AC8AE01B87203D /* KeynoteImporter.swift */,
 				BD3490C4BA5C4A09BDBF9415 /* MediaFlagsInspector.swift */,
 				B328F432BC7CCB991A9A8373 /* MediaImporter.swift */,
@@ -490,6 +496,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E047E0CE35C78C80772F54ED /* AnimatedImageInspector.swift in Sources */,
 				62CDF088556B0DAA473AC800 /* AudioPump.swift in Sources */,
 				44E0E08A26F3691D8E7A2C44 /* AuthTokenStore.swift in Sources */,
 				11F48F224E2E07F3A2CD4894 /* BonjourPublisher.swift in Sources */,
@@ -554,6 +561,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2802ED3F9310BC405ED40764 /* AnimatedImageInspectorTests.swift in Sources */,
 				DCABF0FFCC0E6E0596173F64 /* CompositorPipelineTests.swift in Sources */,
 				4C060BE294B7C9A97DBA4FBE /* FrameRateConformanceTests.swift in Sources */,
 				92C91C709C683B4675395127 /* KeynoteImporterTests.swift in Sources */,
