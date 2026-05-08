@@ -322,6 +322,87 @@ final class ImageSequenceEncoder: ObservableObject, Identifiable {
     }
 }
 
+/// What the coordinator hands back on a successful encode. Mirrors `TranscodeOutcome` —
+/// the caller (RootView) does the actual splice into `project.slides`; the coordinator
+/// stays free of project-state knowledge.
+struct ImageSequenceEncodeOutcome {
+    /// Detected sequence's baseName; the operator-visible label of the resulting slide.
+    let baseName: String
+    let siblingSlide: MediaSlide
+}
+
+/// Owns live `ImageSequenceEncoder` instances for one window/document. Operators see the
+/// running jobs in the same non-modal progress surface as transcodes (C2c
+/// `TranscodeProgressStrip`) once C5c plumbs the folder-drop UX.
+///
+/// Mirrors `TranscodeCoordinator`'s shape (jobs list + injectable sibling-importer test
+/// seam) so the eventual C5c integration is symmetric — no parallel decisions about how
+/// progress / cancellation / sibling-slide construction should look.
+@MainActor
+final class ImageSequenceEncodeCoordinator: ObservableObject {
+
+    /// Test seam — given the encoded `.mov` URL, return the MediaSlide that lands in the
+    /// asset library. Default delegates to `MediaImporter.importSlides(from:)` so the
+    /// resulting slide carries fresh `nativeFrameRate` + `MediaFlags` populated by the C1
+    /// inspector. Tests substitute a stub that synthesizes a deterministic slide.
+    static var siblingImporter: (URL) -> MediaSlide? = { url in
+        MediaImporter.importSlides(from: [url]).first
+    }
+
+    @Published private(set) var jobs: [ImageSequenceEncoder] = []
+
+    /// Kicks off an encode for the given detected sequence. The coordinator builds the
+    /// destination URL (`<destinationDirectory>/<UUID>.mov`), starts the encoder, and on
+    /// success constructs an outcome whose sibling slide is named after the detected
+    /// sequence's baseName.
+    @discardableResult
+    func encode(
+        sequence: ImageSequenceDetector.Sequence,
+        frameRate: Int,
+        destinationDirectory: URL,
+        completion: @MainActor @escaping (Result<ImageSequenceEncodeOutcome, ImageSequenceEncodeError>) -> Void
+    ) -> ImageSequenceEncoder? {
+        let dest = destinationDirectory
+            .appendingPathComponent("\(UUID().uuidString).mov", isDirectory: false)
+        let label = sequence.baseName
+        let encoder = ImageSequenceEncoder(
+            frameURLs: sequence.frameURLs,
+            destinationURL: dest,
+            frameRate: frameRate,
+            displayLabel: label
+        )
+        jobs.append(encoder)
+
+        encoder.start { [weak self] result in
+            guard let self else { return }
+            self.jobs.removeAll { $0.id == encoder.id }
+            switch result {
+            case .success(let url):
+                guard var sibling = ImageSequenceEncodeCoordinator.siblingImporter(url) else {
+                    completion(.failure(.finishFailed("encoded file did not import as a video slide")))
+                    return
+                }
+                sibling.title = label
+                completion(.success(ImageSequenceEncodeOutcome(
+                    baseName: label,
+                    siblingSlide: sibling
+                )))
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+        return encoder
+    }
+
+    /// Cancels every running encode. Used by the document-close path so we don't leak
+    /// orphaned encoder tasks.
+    func cancelAll() {
+        for job in jobs {
+            job.cancel()
+        }
+    }
+}
+
 enum ImageSequenceEncodeError: LocalizedError, Equatable {
     case noFrames
     case invalidFrameRate(Int)
