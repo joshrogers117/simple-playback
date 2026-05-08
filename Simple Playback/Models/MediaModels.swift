@@ -100,20 +100,26 @@ struct MediaSlide: Identifiable, Codable, Hashable {
     /// projects). Used by `FrameRateConformance` to flag clip-vs-Stage mismatches.
     var nativeFrameRate: Double?
 
-    init(url: URL, mediaKind: MediaKind, nativeFrameRate: Double? = nil) {
+    /// Codec-inspector flags populated at import (long-GOP / VFR / 10-bit 4:2:0 / untagged
+    /// color). Empty (`MediaFlags.none`) for stills, audio-only sources, files imported before
+    /// the field existed (legacy projects), or any inspection failure. Spec §3.10.
+    var flags: MediaFlags
+
+    init(url: URL, mediaKind: MediaKind, nativeFrameRate: Double? = nil, flags: MediaFlags = .none) {
         id = UUID()
         title = url.deletingPathExtension().lastPathComponent
         self.mediaKind = mediaKind
         media = MediaReference(url: url)
         settings = SlideSettings()
         self.nativeFrameRate = nativeFrameRate
+        self.flags = flags
         if mediaKind == .video {
             settings.loopVideo = true
         }
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, mediaKind, media, settings, nativeFrameRate
+        case id, title, mediaKind, media, settings, nativeFrameRate, flags
     }
 
     init(from decoder: Decoder) throws {
@@ -124,6 +130,7 @@ struct MediaSlide: Identifiable, Codable, Hashable {
         media = try c.decode(MediaReference.self, forKey: .media)
         settings = try c.decodeIfPresent(SlideSettings.self, forKey: .settings) ?? SlideSettings()
         nativeFrameRate = try c.decodeIfPresent(Double.self, forKey: .nativeFrameRate)
+        flags = try c.decodeIfPresent(MediaFlags.self, forKey: .flags) ?? .none
     }
 }
 

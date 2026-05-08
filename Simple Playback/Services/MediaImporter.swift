@@ -19,7 +19,8 @@ struct MediaImporter {
         urls.compactMap { url in
             guard let kind = mediaKind(for: url) else { return nil }
             let fps = kind == .video ? nativeFrameRate(for: url) : nil
-            return MediaSlide(url: url, mediaKind: kind, nativeFrameRate: fps)
+            let flags = kind == .video ? MediaFlagsInspector.inspect(url: url) : .none
+            return MediaSlide(url: url, mediaKind: kind, nativeFrameRate: fps, flags: flags)
         }
     }
 

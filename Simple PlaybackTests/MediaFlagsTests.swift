@@ -1,3 +1,5 @@
+import AVFoundation
+import CoreVideo
 import Foundation
 import XCTest
 @testable import Simple_Playback
@@ -263,5 +265,170 @@ final class MediaFlagsTests: XCTestCase {
         XCTAssertFalse(decoded.variableFrameRate)
         XCTAssertFalse(decoded.tenBitYUV420)
         XCTAssertFalse(decoded.untaggedColor)
+    }
+
+    // MARK: - MediaSlide persistence
+
+    func testMediaSlideLegacyJSONWithoutFlagsDecodesToNoneFlags() throws {
+        // A v1/v2 project saved before C1 had no `flags` field. Slides on disk must keep
+        // opening cleanly — the decoder defaults to `.none`.
+        let json = """
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "title": "old clip",
+          "mediaKind": "video",
+          "media": { "originalPath": "/tmp/missing.mov" }
+        }
+        """.data(using: .utf8)!
+        let slide = try JSONDecoder().decode(MediaSlide.self, from: json)
+        XCTAssertEqual(slide.flags, .none,
+                       "Pre-C1 slide must decode with flags == .none, never a synthesized default.")
+    }
+
+    func testMediaSlideRoundTripsFlags() throws {
+        let url = URL(fileURLWithPath: "/tmp/clip.mov")
+        var slide = MediaSlide(
+            url: url,
+            mediaKind: .video,
+            nativeFrameRate: 29.97,
+            flags: MediaFlags(longGOP: true, variableFrameRate: false, tenBitYUV420: true, untaggedColor: false)
+        )
+        slide.title = "round trip"
+
+        let data = try JSONEncoder().encode(slide)
+        let decoded = try JSONDecoder().decode(MediaSlide.self, from: data)
+        XCTAssertEqual(decoded.flags.longGOP, true)
+        XCTAssertEqual(decoded.flags.tenBitYUV420, true)
+        XCTAssertFalse(decoded.flags.variableFrameRate)
+        XCTAssertFalse(decoded.flags.untaggedColor)
+    }
+
+    // MARK: - AVFoundation adapter (synthesized assets)
+
+    /// The adapter is a thin glue layer; we exercise it against a freshly synthesized H.264
+    /// movie to confirm long-GOP detection and the codable plumbing. Detailed branch
+    /// coverage of the evaluator stays in the pure-logic tests above — those don't depend
+    /// on AVFoundation behavior.
+    func testInspectorFlagsLongGOPForSynthesizedH264Movie() throws {
+        let url = try makeTinyMovie(codec: .h264)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let flags = MediaFlagsInspector.inspect(url: url)
+        XCTAssertTrue(flags.longGOP, "An H.264 .mov should flag long-GOP scrubbing.")
+    }
+
+    func testInspectorDoesNotFlagLongGOPForSynthesizedProResMovie() throws {
+        let url = try makeTinyMovie(codec: .proRes422)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let flags = MediaFlagsInspector.inspect(url: url)
+        XCTAssertFalse(flags.longGOP, "ProRes is intra-only; never flagged long-GOP.")
+        XCTAssertFalse(flags.tenBitYUV420, "ProRes 422 is not the spec's 10-bit 4:2:0 HEVC shape.")
+    }
+
+    func testInspectorReturnsNoneForMissingFile() {
+        let url = URL(fileURLWithPath: "/tmp/does-not-exist-\(UUID().uuidString).mov")
+        XCTAssertEqual(MediaFlagsInspector.inspect(url: url), .none)
+    }
+
+    func testInspectorReturnsNoneForNonVideoFile() throws {
+        // A still image has no video track; the inspector should bail with .none rather
+        // than crash. We synthesize a tiny PNG via NSImage to avoid committing a fixture.
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("flagless-\(UUID().uuidString).png")
+        let image = NSImage(size: NSSize(width: 4, height: 4))
+        image.lockFocus()
+        NSColor.black.setFill()
+        NSBezierPath.fill(NSRect(x: 0, y: 0, width: 4, height: 4))
+        image.unlockFocus()
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let data = rep.representation(using: .png, properties: [:]) else {
+            XCTFail("Could not synthesize PNG.")
+            return
+        }
+        try data.write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        XCTAssertEqual(MediaFlagsInspector.inspect(url: url), .none)
+    }
+
+    // MARK: - Movie synthesis helper
+
+    private enum SynthesizedCodec {
+        case h264
+        case proRes422
+
+        var avCodecType: AVVideoCodecType {
+            switch self {
+            case .h264: return .h264
+            case .proRes422: return .proRes422
+            }
+        }
+    }
+
+    private func makeTinyMovie(codec: SynthesizedCodec) throws -> URL {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("flags-\(UUID().uuidString).mov")
+        if FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
+        }
+
+        let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+        let input = AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: [
+                AVVideoCodecKey: codec.avCodecType,
+                AVVideoWidthKey: 16,
+                AVVideoHeightKey: 16
+            ]
+        )
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: input,
+            sourcePixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
+                kCVPixelBufferWidthKey as String: 16,
+                kCVPixelBufferHeightKey as String: 16
+            ]
+        )
+
+        XCTAssertTrue(writer.canAdd(input))
+        writer.add(input)
+        XCTAssertTrue(writer.startWriting())
+        writer.startSession(atSourceTime: .zero)
+
+        guard let pool = adaptor.pixelBufferPool else {
+            XCTFail("Pixel buffer pool unavailable for codec \(codec).")
+            return url
+        }
+
+        // Write 2 frames so the movie has a usable nominalFrameRate / minFrameDuration.
+        for frameIndex in 0..<2 {
+            var pixelBuffer: CVPixelBuffer?
+            CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pixelBuffer)
+            guard let pixelBuffer else {
+                XCTFail("Pixel buffer alloc failed.")
+                continue
+            }
+            CVPixelBufferLockBaseAddress(pixelBuffer, [])
+            if let base = CVPixelBufferGetBaseAddress(pixelBuffer) {
+                memset(base, 0, CVPixelBufferGetDataSize(pixelBuffer))
+            }
+            CVPixelBufferUnlockBaseAddress(pixelBuffer, [])
+
+            while !input.isReadyForMoreMediaData {
+                RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.01))
+            }
+            let pts = CMTime(value: CMTimeValue(frameIndex), timescale: 30)
+            XCTAssertTrue(adaptor.append(pixelBuffer, withPresentationTime: pts))
+        }
+        input.markAsFinished()
+
+        let finished = expectation(description: "Writer finished")
+        writer.finishWriting { finished.fulfill() }
+        wait(for: [finished], timeout: 10)
+        XCTAssertEqual(writer.status, .completed, "Writer failed: \(writer.error?.localizedDescription ?? "nil")")
+        if let error = writer.error { throw error }
+        return url
     }
 }
