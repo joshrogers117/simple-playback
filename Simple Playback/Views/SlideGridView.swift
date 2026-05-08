@@ -34,6 +34,11 @@ struct SlideGridView: View {
     /// Threaded into palette thumbnails and the right-click transcode gate so a
     /// moved bundle's managed assets resolve correctly.
     var bundleMediaDirectory: URL? = nil
+    /// C10 — directory where the importer cached per-slide poster JPEGs.
+    /// ThumbnailLoader falls back to `<dir>/<slide.id>.jpg` when the source
+    /// asset is offline so the palette still renders. Default nil for
+    /// previews / tests.
+    var thumbnailCacheDirectory: URL? = nil
 
     private let columns = [
         GridItem(.adaptive(minimum: 148, maximum: 190), spacing: 12)
@@ -67,7 +72,8 @@ struct SlideGridView: View {
                                     slide: slide,
                                     isSelected: selectedSlideID == slide.id,
                                     isLive: liveSlideID == slide.id,
-                                    bundleMediaDirectory: bundleMediaDirectory
+                                    bundleMediaDirectory: bundleMediaDirectory,
+                                    thumbnailCacheDirectory: thumbnailCacheDirectory
                                 )
                                 .onTapGesture {
                                     selectedSlideID = slide.id
@@ -279,11 +285,16 @@ private struct SlideTile: View {
     var isSelected: Bool
     var isLive: Bool
     var bundleMediaDirectory: URL?
+    var thumbnailCacheDirectory: URL?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .topLeading) {
-                ThumbnailView(slide: slide, bundleMediaDirectory: bundleMediaDirectory)
+                ThumbnailView(
+                    slide: slide,
+                    bundleMediaDirectory: bundleMediaDirectory,
+                    thumbnailCacheDirectory: thumbnailCacheDirectory
+                )
                     .aspectRatio(16 / 9, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
 
@@ -331,6 +342,7 @@ private struct SlideTile: View {
 private struct ThumbnailView: View {
     var slide: MediaSlide
     var bundleMediaDirectory: URL?
+    var thumbnailCacheDirectory: URL?
     @State private var image: NSImage?
 
     var body: some View {
@@ -349,13 +361,43 @@ private struct ThumbnailView: View {
             }
         }
         .task(id: slide.id) {
-            image = await ThumbnailLoader.thumbnail(for: slide, bundleMediaDirectory: bundleMediaDirectory)
+            image = await ThumbnailLoader.thumbnail(
+                for: slide,
+                bundleMediaDirectory: bundleMediaDirectory,
+                thumbnailCacheDirectory: thumbnailCacheDirectory
+            )
         }
     }
 }
 
-private enum ThumbnailLoader {
-    static func thumbnail(for slide: MediaSlide, bundleMediaDirectory: URL? = nil) async -> NSImage? {
+enum ThumbnailLoader {
+    /// Best-effort thumbnail for a palette tile. Tries the live source URL
+    /// first (existing behavior — generates from the actual asset). Falls
+    /// back to the C10 cached `<thumbnailCacheDirectory>/<slide.id>.jpg`
+    /// when the source is offline so a moved or relinked bundle still
+    /// renders the palette.
+    static func thumbnail(
+        for slide: MediaSlide,
+        bundleMediaDirectory: URL? = nil,
+        thumbnailCacheDirectory: URL? = nil
+    ) async -> NSImage? {
+        if let live = await liveThumbnail(for: slide, bundleMediaDirectory: bundleMediaDirectory) {
+            return live
+        }
+        return cachedThumbnail(for: slide, in: thumbnailCacheDirectory)
+    }
+
+    /// Locate the cached poster on disk if one exists. Synchronous — the
+    /// JPEG is small enough that `NSImage(contentsOf:)` doesn't need to
+    /// hop a queue.
+    static func cachedThumbnail(for slide: MediaSlide, in directory: URL?) -> NSImage? {
+        guard let directory else { return nil }
+        let url = directory.appendingPathComponent("\(slide.id.uuidString).jpg")
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return NSImage(contentsOf: url)
+    }
+
+    private static func liveThumbnail(for slide: MediaSlide, bundleMediaDirectory: URL?) async -> NSImage? {
         guard let url = slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) else { return nil }
         let didAccess = url.startAccessingSecurityScopedResource()
         defer {

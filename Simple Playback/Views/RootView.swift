@@ -339,7 +339,8 @@ struct RootView: View {
                 relinkSlide: { slide in
                     relinkSlideViaOpenPanel(slide)
                 },
-                bundleMediaDirectory: bundleMediaDirectory()
+                bundleMediaDirectory: bundleMediaDirectory(),
+                thumbnailCacheDirectory: thumbnailRootDirectory()
             )
             .frame(minWidth: 320, idealWidth: 460)
 
@@ -939,8 +940,40 @@ struct RootView: View {
         let baseWidth = stage?.width ?? document.project.outputWidth
         let baseHeight = stage?.height ?? document.project.outputHeight
         let rasterSize = CGSize(width: max(1, baseWidth) * 2, height: max(1, baseHeight) * 2)
-        return MediaImportContext(rasterSize: rasterSize, renderRootDirectory: renderRootDirectory())
+        return MediaImportContext(
+            rasterSize: rasterSize,
+            renderRootDirectory: renderRootDirectory(),
+            thumbnailRootDirectory: thumbnailRootDirectory()
+        )
     }
+
+    /// C10 — where per-slide poster JPEGs land. Bundle-relative when the
+    /// document is saved (spec §3.17 `<bundle>/Cache/Thumbnails/`); App
+    /// Support fallback per untitled-session ID otherwise. The directory is
+    /// also handed to the SlideGridView palette so the offline-source
+    /// fallback path can read from the same place writes go.
+    func thumbnailRootDirectory() -> URL {
+        if let bundleURL = projectBundleURLProvider() {
+            return bundleURL.appendingPathComponent(
+                ProjectBundleLayout.thumbnailsDirectory,
+                isDirectory: true
+            )
+        }
+        return RootView.untitledThumbnailRoot
+            .appendingPathComponent(untitledSessionID.uuidString, isDirectory: true)
+    }
+
+    private static let untitledThumbnailRoot: URL = {
+        let appSupport = (try? FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )) ?? FileManager.default.temporaryDirectory
+        return appSupport
+            .appendingPathComponent("Simple Playback", isDirectory: true)
+            .appendingPathComponent("Thumbnails", isDirectory: true)
+    }()
 
     private func renderRootDirectory() -> URL {
         if let bundleURL = projectBundleURLProvider() {
