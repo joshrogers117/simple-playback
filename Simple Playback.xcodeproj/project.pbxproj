@@ -63,6 +63,7 @@
 		4DFBDAF88FE91DFD25465621 /* MediaImporterThumbnailTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B48466BEBD802E32083CC7A /* MediaImporterThumbnailTests.swift */; };
 		51CA5DA530C6B560FA1A7989 /* SimplePlaybackProjectDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB740EFC960FD945A655941 /* SimplePlaybackProjectDocument.swift */; };
 		521136DC8B0B2D5FFF8C7474 /* PreShowCheckAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0781CD54E510EE56EFE80A9D /* PreShowCheckAdapters.swift */; };
+		524250895D1631045605F062 /* FilmstripGeneratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55CBCF96BB663B7A4A87D0D5 /* FilmstripGeneratorTests.swift */; };
 		54A9764CA77C6FE799CDDC71 /* WebSocketFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93727D6450DEE3ED3934DA97 /* WebSocketFrame.swift */; };
 		54CEA8F876D2A59653C1D8EE /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 4213C51E238E88088B4700FC /* Sparkle */; };
 		54E5A1988F51C1AE8DE5B42A /* StateSnapshotEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13557C5F98007D62499B140 /* StateSnapshotEncoder.swift */; };
@@ -136,6 +137,7 @@
 		CCCB5A1DDC2A8EF972427BB8 /* MediaImportFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8536D230F07A5A41DD22032 /* MediaImportFailureTests.swift */; };
 		CF0020C246A6F8DF7BC4B6D6 /* VideoOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF2597FFE1CB9927C6CB6395 /* VideoOutput.swift */; };
 		CF2B6D1FC25294D4BA272CA5 /* TakeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB8BD5680FB164FC1D82CBA7 /* TakeHistoryView.swift */; };
+		D1EE64AA6E2B3B97F7A8CD8D /* FilmstripGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 494E2E6E35E9CF59293D1176 /* FilmstripGenerator.swift */; };
 		D2D87259CFD1B81F53DBC0C8 /* ImageSequenceEncodeCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DE55003A493F69B338D09BA /* ImageSequenceEncodeCoordinatorTests.swift */; };
 		D38368F7F25F022BC131466F /* PreShowCheckFixHandlers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C5CF912A93B1EB5CA657689 /* PreShowCheckFixHandlers.swift */; };
 		D93CCBEA7AE13AB4FC44F4F3 /* MediaFlagsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF79938EE267D36AF458C582 /* MediaFlagsTests.swift */; };
@@ -222,10 +224,12 @@
 		474A0C6ABB641B1CA5416495 /* ShowControlHub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlHub.swift; sourceTree = "<group>"; };
 		48D597C7D54010FC1E62D378 /* ImageSequenceDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSequenceDetectorTests.swift; sourceTree = "<group>"; };
 		4938DA35785910BBFF3391DD /* MediaImporterKeynoteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporterKeynoteTests.swift; sourceTree = "<group>"; };
+		494E2E6E35E9CF59293D1176 /* FilmstripGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmstripGenerator.swift; sourceTree = "<group>"; };
 		4FFDD7785740559EEB94F4CA /* SPFrameBlend.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SPFrameBlend.c; sourceTree = "<group>"; };
 		50C07D5C65BD28D34CB0463D /* PlaybackControllerCueFireTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackControllerCueFireTests.swift; sourceTree = "<group>"; };
 		50CF28D157920076A3C82649 /* OutputInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputInspectorView.swift; sourceTree = "<group>"; };
 		532651899A2D97DB1134F636 /* DroppedFrameCounterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DroppedFrameCounterTests.swift; sourceTree = "<group>"; };
+		55CBCF96BB663B7A4A87D0D5 /* FilmstripGeneratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmstripGeneratorTests.swift; sourceTree = "<group>"; };
 		565CD1F5339683D2539E806C /* MediaResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaResolver.swift; sourceTree = "<group>"; };
 		569A548ECCAC07CC9E9B92D2 /* MediaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaModels.swift; sourceTree = "<group>"; };
 		584B35FFA22C0473DD0D81CB /* ShowControllerDroppedFrameLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControllerDroppedFrameLogTests.swift; sourceTree = "<group>"; };
@@ -443,6 +447,7 @@
 				28F1823003EC72E1D46610F5 /* CrashRecoveryDetectorTests.swift */,
 				532651899A2D97DB1134F636 /* DroppedFrameCounterTests.swift */,
 				B09A6E0D2794272C8FBB0987 /* EnergyAssertionTests.swift */,
+				55CBCF96BB663B7A4A87D0D5 /* FilmstripGeneratorTests.swift */,
 				22C8342BEF86901A52B41C81 /* FrameRateConformanceTests.swift */,
 				48D597C7D54010FC1E62D378 /* ImageSequenceDetectorTests.swift */,
 				5DE55003A493F69B338D09BA /* ImageSequenceEncodeCoordinatorTests.swift */,
@@ -587,6 +592,7 @@
 				0D46390F473701690C95CF1E /* CrashRecoveryDetector.swift */,
 				A4758CF8E9891007D793354E /* DroppedFrameCounter.swift */,
 				32E04427E697B0F4238C1C4C /* EnergyAssertion.swift */,
+				494E2E6E35E9CF59293D1176 /* FilmstripGenerator.swift */,
 				6FD2EFC1C287DD9480AF2D2F /* ImageSequenceDetector.swift */,
 				2D06F636A6229A0C418EE285 /* ImageSequenceEncoder.swift */,
 				D2A8691862AC8AE01B87203D /* KeynoteImporter.swift */,
@@ -727,6 +733,7 @@
 				DF9D9D2A7D5D102CC20FCD95 /* DeckLinkSDKDispatch.cpp in Sources */,
 				388AA05ED53476DBD72A4554 /* DroppedFrameCounter.swift in Sources */,
 				0591BDE7845DD83E323D1CC1 /* EnergyAssertion.swift in Sources */,
+				D1EE64AA6E2B3B97F7A8CD8D /* FilmstripGenerator.swift in Sources */,
 				61B1311538DACF01A1A47603 /* FrameRateConformance.swift in Sources */,
 				5602C3EC7F566873E1629051 /* FrameRenderer.swift in Sources */,
 				AD31546ACCAED84FF1D140D4 /* HTTPRequest.swift in Sources */,
@@ -814,6 +821,7 @@
 				A495088FE7143EE70B129749 /* CrashRecoveryDetectorTests.swift in Sources */,
 				71A74B61F50A3AAF221FC2C2 /* DroppedFrameCounterTests.swift in Sources */,
 				0F2D0CF9F6B7620C44F4BFDA /* EnergyAssertionTests.swift in Sources */,
+				524250895D1631045605F062 /* FilmstripGeneratorTests.swift in Sources */,
 				4C060BE294B7C9A97DBA4FBE /* FrameRateConformanceTests.swift in Sources */,
 				EE3870434C944DFB877D89F7 /* ImageSequenceDetectorTests.swift in Sources */,
 				D2D87259CFD1B81F53DBC0C8 /* ImageSequenceEncodeCoordinatorTests.swift in Sources */,
