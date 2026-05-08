@@ -389,29 +389,12 @@ struct RootView: View {
 
     private func addMedia(_ urls: [URL]) {
         guard !(showController.controller?.showMode ?? false) else { return }
-        let keynoteURLs = urls.filter { MediaImporter.isKeynote($0) }
-        if !keynoteURLs.isEmpty, !KeynoteImporter.isKeynoteInstalled() {
-            presentKeynoteNotInstalledAlert()
-        }
         let context = currentMediaImportContext()
         let report = MediaImporter.importSlidesAndReport(from: urls, context: context)
         importStatus.record(report.failures)
         guard !report.slides.isEmpty else { return }
         document.project.slides.append(contentsOf: report.slides)
         selectedSlideID = report.slides.last?.id
-    }
-
-    /// Spec §3.10: "Surface a clear 'Keynote not installed' diagnostic if absent." A modal
-    /// `NSAlert` is the simplest surface; it only fires from Edit Mode (addMedia is
-    /// guarded by `showMode`), so the §3.5 modal-forbidden-in-Show-Mode invariant holds.
-    private func presentKeynoteNotInstalledAlert() {
-        let alert = NSAlert()
-        alert.messageText = "Keynote not installed"
-        alert.informativeText = "Install Keynote from the App Store to import .key files. " +
-            "Other dropped or selected media will still be imported."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
     }
 
     /// Builds the per-import context the importer needs for source formats that require
