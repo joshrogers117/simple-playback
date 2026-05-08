@@ -96,6 +96,7 @@
 		7B00B494199CCC3043F2B607 /* FolderBookmarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A7161E143DF74B913CE363 /* FolderBookmarkTests.swift */; };
 		7C4BF6FFFDA26DABFDAB1DD9 /* BundleForTravelSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D38F9625D50B1A0F19983F41 /* BundleForTravelSheet.swift */; };
 		7D6E9D5D91681AA09335F8F9 /* HTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4EF3D125520DB5F0C1F703 /* HTTPServer.swift */; };
+		84CDBCA4A4740188E158D24E /* AVTrackLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90991D0AB092D3C68FC0B4C1 /* AVTrackLoader.swift */; };
 		851AE7644559671FB09FD2BD /* ShowControlIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E47E51BD45087956CCF2905 /* ShowControlIntegrationTests.swift */; };
 		860485EB83C52AF7C3E0AC37 /* MediaImporterFilmstripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44FE6246D0C933DEF915F45A /* MediaImporterFilmstripTests.swift */; };
 		873129B7192207BD8E22D111 /* ImportStatusBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41F6421D7CBD102AC8875CC6 /* ImportStatusBanner.swift */; };
@@ -277,6 +278,7 @@
 		8C41349B62BEDC6D03ED0DA6 /* AddFolderImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddFolderImporter.swift; sourceTree = "<group>"; };
 		8E99FC3B24835175EF3BD62E /* TakeHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeHistoryTests.swift; sourceTree = "<group>"; };
 		8FD2B422FED7E9102FAEA3D2 /* ShowControlState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlState.swift; sourceTree = "<group>"; };
+		90991D0AB092D3C68FC0B4C1 /* AVTrackLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVTrackLoader.swift; sourceTree = "<group>"; };
 		92D6FAD99797FC3C21DA725E /* AVKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVKit.framework; path = System/Library/Frameworks/AVKit.framework; sourceTree = SDKROOT; };
 		93004BE1F2BECBBF122DB00C /* MediaFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlags.swift; sourceTree = "<group>"; };
 		934A545F270968E04F027F8B /* LTCReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LTCReader.swift; sourceTree = "<group>"; };
@@ -606,6 +608,7 @@
 				A48741BAA260FA2E3B3E93ED /* AssetRelinkPlan.swift */,
 				9FC38AB74DB5321128E72E79 /* AudioDeviceProbe.swift */,
 				18F5B52C774E8E6CC0899D9C /* AutosaveCheckpointer.swift */,
+				90991D0AB092D3C68FC0B4C1 /* AVTrackLoader.swift */,
 				3A0938EC4100E4EC1F247B73 /* BundleForTravelCoordinator.swift */,
 				959E8FA27281A1515AEF705C /* BundleForTravelPlan.swift */,
 				0D46390F473701690C95CF1E /* CrashRecoveryDetector.swift */,
@@ -730,6 +733,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				84CDBCA4A4740188E158D24E /* AVTrackLoader.swift in Sources */,
 				875D909F07AAF19E396A7C69 /* AddFolderImportSheet.swift in Sources */,
 				05124FD2A6536D48F63AD2C9 /* AddFolderImporter.swift in Sources */,
 				E047E0CE35C78C80772F54ED /* AnimatedImageInspector.swift in Sources */,
