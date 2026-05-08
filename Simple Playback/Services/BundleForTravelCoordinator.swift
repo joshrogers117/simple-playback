@@ -169,6 +169,12 @@ final class BundleForTravelCoordinator: ObservableObject {
                 do {
                     try Self.copyFile(op.sourceURL, destination)
                 } catch {
+                    // Out-of-space, source vanished mid-copy, permission, etc.
+                    // FileManager may have written a partial destination before
+                    // throwing; clear it so a retry isn't blocked by the stub
+                    // and the operator's bundle isn't littered with truncated
+                    // files. Mirrors `TranscodeJob.removePartialFileIfNeeded`.
+                    Self.removeItem(destination)
                     let err = BundleForTravelError.copyFailed(
                         op.sourceURL,
                         error.localizedDescription

@@ -135,6 +135,47 @@ final class BundleForTravelCoordinatorTests: XCTestCase {
         }
     }
 
+    func testFailedCopyClearsPartialDestinationBeforeReportingFailure() async {
+        // FileManager.copyItem can leave a partial file at the destination when
+        // it throws (out-of-space, source vanished mid-copy). The coordinator
+        // must call removeItem on the failure path so a retry isn't blocked
+        // and the bundle isn't littered with truncated files.
+        let coordinator = BundleForTravelCoordinator()
+        var removeCalls: [URL] = []
+        BundleForTravelCoordinator.copyFile = { _, _ in
+            throw NSError(domain: "Test", code: 28, userInfo: [NSLocalizedDescriptionKey: "no space left"])
+        }
+        BundleForTravelCoordinator.removeItem = { url in
+            removeCalls.append(url)
+        }
+
+        let plan = BundleForTravelPlanReport(
+            operations: [
+                BundleForTravelOperation(
+                    slideID: UUID(),
+                    sourceURL: URL(fileURLWithPath: "/x/a.mov"),
+                    destinationFilename: "a.mov"
+                )
+            ],
+            alreadyManagedSlideIDs: [],
+            offlineSlideIDs: [],
+            totalBytes: 0
+        )
+
+        let exp = expectation(description: "completion")
+        coordinator.start(plan: plan, mediaDirectoryURL: URL(fileURLWithPath: "/bundle/Media")) { _ in
+            exp.fulfill()
+        }
+        await fulfillment(of: [exp], timeout: 1.0)
+
+        let destination = URL(fileURLWithPath: "/bundle/Media/a.mov")
+        // Pre-copy clear-stale + post-failure cleanup both target the same URL,
+        // so two removeItem calls is the documented contract.
+        XCTAssertEqual(removeCalls.count, 2,
+                       "removeItem must be called pre-copy (clear stale) AND post-failure (clean partial).")
+        XCTAssertEqual(removeCalls.last?.standardizedFileURL, destination.standardizedFileURL)
+    }
+
     func testFailedCopyHaltsRemainingOperations() async {
         let coordinator = BundleForTravelCoordinator()
         var attempts = 0
