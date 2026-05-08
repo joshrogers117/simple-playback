@@ -13,12 +13,18 @@ struct SlideGridView: View {
     /// spec §3.5 — even in Edit Mode, a multi-minute ProRes export should not gate
     /// the operator's other work).
     var transcodeJobs: [TranscodeJob] = []
+    /// Live image-sequence encode jobs (C5c). Same non-modal progress idiom as
+    /// transcodes — the operator sees both kinds of "background ProRes work" stacked
+    /// in one strip just above the transition controls.
+    var encodeJobs: [ImageSequenceEncoder] = []
     /// Transcode menu enablement — passed `false` while the document is in Show Mode.
     var transcodeEnabled: Bool = true
     /// Asks the host to kick off a transcode for the source slide via the coordinator.
     var requestTranscode: (MediaSlide, TranscodePreset) -> Void = { _, _ in }
     /// Asks the host to cancel a running transcode.
     var cancelTranscode: (TranscodeJob) -> Void = { _ in }
+    /// Asks the host to cancel a running image-sequence encode.
+    var cancelEncode: (ImageSequenceEncoder) -> Void = { _ in }
 
     private let columns = [
         GridItem(.adaptive(minimum: 148, maximum: 190), spacing: 12)
@@ -69,9 +75,14 @@ struct SlideGridView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            if !transcodeJobs.isEmpty {
+            if !transcodeJobs.isEmpty || !encodeJobs.isEmpty {
                 Divider()
-                TranscodeProgressStrip(jobs: transcodeJobs, cancel: cancelTranscode)
+                BackgroundJobsStrip(
+                    transcodeJobs: transcodeJobs,
+                    cancelTranscode: cancelTranscode,
+                    encodeJobs: encodeJobs,
+                    cancelEncode: cancelEncode
+                )
             }
 
             Divider()
@@ -99,14 +110,23 @@ struct SlideGridView: View {
 /// MediaSlide appears in the palette grid above as the splice lands. Operators reading
 /// the palette at a glance can tell "X is transcoding" vs "X finished, here's the
 /// sibling" without a modal sheet.
-private struct TranscodeProgressStrip: View {
-    let jobs: [TranscodeJob]
-    let cancel: (TranscodeJob) -> Void
+///
+/// Renders both transcode jobs (C2) and image-sequence encodes (C5c) in one strip so
+/// operators see all background ProRes work in one place. The two job types share the
+/// same row visual; they differ only in the help text on the cancel button.
+private struct BackgroundJobsStrip: View {
+    let transcodeJobs: [TranscodeJob]
+    let cancelTranscode: (TranscodeJob) -> Void
+    let encodeJobs: [ImageSequenceEncoder]
+    let cancelEncode: (ImageSequenceEncoder) -> Void
 
     var body: some View {
         VStack(spacing: 6) {
-            ForEach(jobs) { job in
-                TranscodeProgressRow(job: job, cancel: { cancel(job) })
+            ForEach(transcodeJobs) { job in
+                TranscodeProgressRow(job: job, cancel: { cancelTranscode(job) })
+            }
+            ForEach(encodeJobs) { job in
+                ImageSequenceProgressRow(job: job, cancel: { cancelEncode(job) })
             }
         }
         .padding(.horizontal, 14)
@@ -141,6 +161,41 @@ private struct TranscodeProgressRow: View {
             }
             .buttonStyle(.borderless)
             .help("Cancel transcode")
+        }
+    }
+
+    private var percentLabel: String {
+        let pct = Int((job.progress * 100).rounded())
+        return "\(pct)%"
+    }
+}
+
+private struct ImageSequenceProgressRow: View {
+    @ObservedObject var job: ImageSequenceEncoder
+    let cancel: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "rectangle.stack")
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(job.displayLabel)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                ProgressView(value: job.progress)
+                    .progressViewStyle(.linear)
+            }
+            Text(percentLabel)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(width: 36, alignment: .trailing)
+            Button(action: cancel) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help("Cancel image-sequence encode")
         }
     }
 

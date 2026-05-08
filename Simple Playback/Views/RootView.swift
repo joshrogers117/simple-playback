@@ -181,11 +181,15 @@ struct RootView: View {
                 transitionSettings: $document.project.transitionSettings,
                 takeAction: takeSlide,
                 transcodeJobs: transcodeCoordinator.jobs,
+                encodeJobs: encodeCoordinator.jobs,
                 transcodeEnabled: !(showController.controller?.showMode ?? false),
                 requestTranscode: { slide, preset in
                     requestTranscode(slide: slide, preset: preset)
                 },
                 cancelTranscode: { job in
+                    job.cancel()
+                },
+                cancelEncode: { job in
                     job.cancel()
                 }
             )
