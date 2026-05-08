@@ -100,6 +100,42 @@ final class TranscodeServiceTests: XCTestCase {
         )
     }
 
+    // C8 v1.1 — folder-bookmark fallback rung lights up the eligibility check
+    // when the per-file bookmark + absolute path are dead but the folder
+    // bookmark + relative path resolves. Mirrors the bundle-aware test above
+    // for the rung-2 route.
+    func testCanTranscodeUsesFolderBookmarkFallback() throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CanTranscode-Folder-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let realClip = folder.appendingPathComponent("clip.mov")
+        try Data().write(to: realClip)
+
+        let bookmark = FolderBookmark(folderURL: folder)
+
+        // Slide with a stale per-file path but valid folder-bookmark + relative path.
+        let stalePath = "/tmp/host-A-only-\(UUID().uuidString)/clip.mov"
+        var slide = MediaSlide(url: URL(fileURLWithPath: stalePath), mediaKind: .video)
+        slide.media.bookmarkData = nil
+        slide.media.folderBookmarkID = bookmark.id
+        slide.media.folderRelativePath = "clip.mov"
+
+        XCTAssertFalse(
+            TranscodeService.canTranscode(slide: slide, bundleMediaDirectory: nil, folderBookmarks: [:]),
+            "Without the folder-bookmark lookup, the stale per-file path is the only route and it's dead."
+        )
+        XCTAssertTrue(
+            TranscodeService.canTranscode(
+                slide: slide,
+                bundleMediaDirectory: nil,
+                folderBookmarks: [bookmark.id: bookmark]
+            ),
+            "With the folder-bookmark lookup, the rung-2 fallback resolves so the slide is transcode-eligible."
+        )
+    }
+
     // C4 widening: animated GIF / APNG slides arrive as `.image` but with
     // `flags.animatedImage = true` set by `AnimatedImageInspector`. They should now
     // light up the right-click menu so the operator can convert to ProRes 4444.

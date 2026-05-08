@@ -77,7 +77,31 @@ enum TranscodeService {
     /// recover full motion. AVFoundation reads animated GIFs through `AVURLAsset` on
     /// modern macOS, so the export-session path works the same as the video case.
     static func canTranscode(slide: MediaSlide, bundleMediaDirectory: URL? = nil) -> Bool {
-        guard slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) != nil else { return false }
+        canTranscode(
+            slide: slide,
+            bundleMediaDirectory: bundleMediaDirectory,
+            folderBookmarks: [:]
+        )
+    }
+
+    /// C8 v1.1 — folder-bookmark-aware eligibility check. The bundle-only
+    /// overload forwards here with an empty lookup so legacy callsites that
+    /// don't yet thread folder bookmarks through compile unchanged. Callsites
+    /// that DO have the lookup (RootView's CueInspectorView + SlideGridView
+    /// context menu) pass the real dict so a slide whose per-file path is
+    /// dead but whose folder-bookmark route resolves still classifies as
+    /// transcode-eligible — without this, the inspector's "Transcode to
+    /// ProRes 4444" button would disappear the moment an Add Folder source
+    /// got renamed mid-rehearsal even though playback would still work.
+    static func canTranscode(
+        slide: MediaSlide,
+        bundleMediaDirectory: URL?,
+        folderBookmarks: [UUID: FolderBookmark]
+    ) -> Bool {
+        guard slide.media.resolvedURL(
+            bundleMediaDirectory: bundleMediaDirectory,
+            folderBookmarks: folderBookmarks
+        ) != nil else { return false }
         if slide.mediaKind == .video { return true }
         if slide.mediaKind == .image && slide.flags.animatedImage { return true }
         return false
@@ -281,10 +305,23 @@ final class TranscodeCoordinator: ObservableObject {
         preset: TranscodePreset,
         destinationDirectory: URL,
         bundleMediaDirectory: URL? = nil,
+        folderBookmarks: [UUID: FolderBookmark] = [:],
         completion: @MainActor @escaping (Result<TranscodeOutcome, TranscodeError>) -> Void
     ) -> TranscodeJob? {
-        guard let source = slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) else {
-            completion(.failure(.sourceNotReadable(slide.media.resolvedURL(bundleMediaDirectory: bundleMediaDirectory) ?? URL(fileURLWithPath: ""))))
+        // C8 v1.1 — folder-bookmark fallback consulted as the rung-2 hit so
+        // a re-transcode after a folder-rename still finds its source even
+        // when the per-file bookmark / absolute path are stale. Empty
+        // lookup (default) preserves the legacy bundle-only behavior.
+        guard let source = slide.media.resolvedURL(
+            bundleMediaDirectory: bundleMediaDirectory,
+            folderBookmarks: folderBookmarks
+        ) else {
+            completion(.failure(.sourceNotReadable(
+                slide.media.resolvedURL(
+                    bundleMediaDirectory: bundleMediaDirectory,
+                    folderBookmarks: folderBookmarks
+                ) ?? URL(fileURLWithPath: "")
+            )))
             return nil
         }
         let dest = destinationDirectory

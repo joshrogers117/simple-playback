@@ -457,7 +457,8 @@ struct RootView: View {
                 requestTranscode: { slide, preset in
                     requestTranscode(slide: slide, preset: preset)
                 },
-                bundleMediaDirectory: bundleMediaDirectory()
+                bundleMediaDirectory: bundleMediaDirectory(),
+                folderBookmarks: projectFolderBookmarkLookup()
             )
         } else if let selectedSlideBinding {
             InspectorView(slide: selectedSlideBinding)
@@ -1174,12 +1175,17 @@ struct RootView: View {
     private func requestTranscode(slide: MediaSlide, preset: TranscodePreset) {
         let dest = transcodedRootDirectory()
         let mediaDir = bundleMediaDirectory()
-        let sourceURL = slide.media.resolvedURL(bundleMediaDirectory: mediaDir)
+        let folderBookmarks = projectFolderBookmarkLookup()
+        let sourceURL = slide.media.resolvedURL(
+            bundleMediaDirectory: mediaDir,
+            folderBookmarks: folderBookmarks
+        )
         transcodeCoordinator.transcode(
             slide: slide,
             preset: preset,
             destinationDirectory: dest,
-            bundleMediaDirectory: mediaDir
+            bundleMediaDirectory: mediaDir,
+            folderBookmarks: folderBookmarks
         ) { [self] result in
             switch result {
             case .success(let outcome):
@@ -1268,6 +1274,10 @@ private struct CueInspectorView: View {
     /// Threaded into the inline transcode-eligibility check so a moved bundle's
     /// managed assets don't render as un-transcodable in the cue inspector.
     var bundleMediaDirectory: URL? = nil
+    /// C8 v1.1 — id → `FolderBookmark` lookup; threaded into the inline
+    /// transcode-eligibility check alongside `bundleMediaDirectory` so a
+    /// folder-renamed source still reports as transcode-eligible.
+    var folderBookmarks: [UUID: FolderBookmark] = [:]
 
     private var asset: MediaSlide? {
         slides.first(where: { $0.id == cue.assetID })
@@ -1327,7 +1337,11 @@ private struct CueInspectorView: View {
                             MediaFlagWarningChip(warning: warning)
                         }
                         if let requestTranscode, !showMode,
-                           TranscodeService.canTranscode(slide: asset, bundleMediaDirectory: bundleMediaDirectory),
+                           TranscodeService.canTranscode(
+                               slide: asset,
+                               bundleMediaDirectory: bundleMediaDirectory,
+                               folderBookmarks: folderBookmarks
+                           ),
                            let preferred = TranscodeService.preferredPresetOrder(for: asset).first {
                             Button {
                                 requestTranscode(asset, preferred)
