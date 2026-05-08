@@ -243,6 +243,7 @@ private struct ShowLogRowView: View {
     private var actionColor: Color {
         switch event.action {
         case .panic, .missingMedia, .droppedFrame: .red
+        case .lateTake: .orange
         case .clear, .blackout: .orange
         case .go, .previous: .primary
         case .showModeOn, .showModeOff: .accentColor

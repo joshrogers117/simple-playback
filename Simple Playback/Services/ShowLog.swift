@@ -35,6 +35,7 @@ struct ShowLogEvent: Equatable {
         case showModeOn = "SHOW_MODE_ON"
         case showModeOff = "SHOW_MODE_OFF"
         case droppedFrame = "DROPPED_FRAME"
+        case lateTake = "LATE_TAKE"
         case missingMedia = "MISSING_MEDIA"
         case oscAction = "OSC_ACTION"
         case httpAction = "HTTP_ACTION"
@@ -281,7 +282,8 @@ extension ShowLog {
                  (.remoteActions, .timecodeTrigger):
                 return true
             case (.systemEvents, .missingMedia),
-                 (.systemEvents, .droppedFrame):
+                 (.systemEvents, .droppedFrame),
+                 (.systemEvents, .lateTake):
                 return true
             default:
                 return false
