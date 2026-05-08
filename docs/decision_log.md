@@ -883,3 +883,87 @@ The detector returns leftovers in their original drop order so non-sequence file
 **Reversibility**: easy. Reverting is a one-line change.
 
 **What I'd revisit if**: a real consumer needs the URL even when the file is gone (e.g., to display the operator-visible last-known path). Such a consumer would call into the bookmark resolver directly rather than through `resolvedURL`.
+
+---
+
+## 2026-05-08 — `MediaResolver` short-circuits unfingerprinted references before the search-root walk
+
+**Why**: pre-C7 (legacy) references have nil fingerprint, so `storedHash` AND `storedSize` are both nil. Rung 2 (content hash) requires both; rung 3 (name + size) requires `storedSize`. With nil fingerprint, neither can ever match — yet the resolver was walking every file in every search root anyway, paying O(slides × roots × files) syscalls per legacy slide for a guaranteed-offline outcome. Reviewer finding from session 19 close-out, deferred at the time and fixed in session 20.
+
+**The fix in two lines**:
+```swift
+if storedHash == nil && storedSize == nil {
+    return .offline
+}
+```
+
+**Alternatives considered**:
+- **Break after the first-root iteration when `storedHash` is nil and `nameAndSizeHit` is set** (the literal session-19-prompt suggestion). Doesn't fire in this codebase because `MediaAssetFingerprint` couples `contentHash` and `size` — if hash is nil, size is nil too, so name+size can't match. The complete short-circuit is the right form.
+
+**Reversibility**: trivial. Removing the guard restores the walk.
+
+**What I'd revisit if**: future fingerprint variants add a size-only mode. The contract that "nil hash ⇒ nil size" is stable today; if it loosens, the short-circuit needs to weaken.
+
+---
+
+## 2026-05-08 — Debouncer wraps recomputeAssetLibraryStatus on slide-change bursts
+
+**Why**: `RootView.onChange(of: project.slides)` fired on every individual slide mutation. A drag-reorder of a 500-slide deck triggers 500 sequential `AssetLibraryProbe.evaluate` calls, each making O(slides) `FileManager.fileExists` syscalls. ~250k syscalls per drag — visible UI hitch on slow disks.
+
+**Decision**: extract a small `Services/Debouncer.swift` `@MainActor` class with an injected sleep closure. The debouncer cancels prior pending work and arms a fresh task on each `schedule(_:)`. The asset-library path uses a 250 ms window. `.onAppear` and bundle-URL change still call recompute directly so the banner doesn't lag a Save-As.
+
+**Alternatives considered**:
+- **Inline `@State Task<Void, Never>` directly in `RootView`.** Slightly less code but no testable seam, and the same primitive will likely be wanted elsewhere (e.g., debouncing future autosave hints or Pre-Show recomputes on slide drag).
+- **Memoize on `(slides.count, slides.map(\.media.originalPath).hashValue, bundleMediaDirectory)` instead of debouncing.** A drag-reorder doesn't change the hash set, so memoization would skip the recompute entirely. Cleaner outcome but harder to invalidate correctly (mtime ≠ hash; relink without count change). Debounce is the conservative choice for v1.
+
+**Reversibility**: easy — RootView's slide-change `onChange` reverts to a direct call. The Debouncer file is reusable but trivially deletable if unused.
+
+**What I'd revisit if**: a future test exercises burst-then-immediate-read semantics (the debouncer's coalesce window would bite). Add an explicit `flush()` method to Debouncer at that point.
+
+---
+
+## 2026-05-08 — AssetRelinkPlan.apply infers `.linked` vs `.managed` from bundle-Media URL containment
+
+**Why**: pre-fix, a `.managed` slide relinked via NSOpenPanel to a file outside `<bundle>/Media/` kept its `.managed` kind. Rung 0 of `MediaResolver` then silently failed to find the file at `<bundleMedia>/<basename>` and the bundle-aware online check misclassified the asset. The kind was lying about where the file actually lived.
+
+**Decision**: add an optional `bundleMediaDirectory: URL?` parameter to `apply(...)`. When non-nil, infer kind from URL containment: descendants of `bundleMediaDirectory` become `.managed`, anything else `.linked`. Default-nil parameter preserves backward-compat for untitled-document callers (no bundle URL known) — they keep the existing kind. `inferKind(...)` exposed as a static helper so the per-slide Locate context-menu path applies the same rule.
+
+**Alternatives considered**:
+- **Force `apply` to require `bundleMediaDirectory`.** Cleaner contract, but requires plumbing a `nil` from untitled-doc test callers — the existing `testApplyPreservesMediaReferenceKind` would have to change to pass nil explicitly, and we'd lose the "untitled docs preserve" behavior implicit today.
+- **String-prefix descendant check.** Trips on `Show.spb/MediaCache` vs `Show.spb/Media` (false positive). Path-component comparison after `standardizedFileURL.resolvingSymlinksInPath()` rejects sibling-with-shared-prefix correctly.
+
+**Reversibility**: medium. Reverting drops the parameter and restores the kind-preserves-verbatim behavior; existing pinned tests would still pass.
+
+**What I'd revisit if**: a future workflow legitimately wants to keep `.managed` for files that left the bundle (e.g., "this asset is bundle-tracked but currently checked out to a working folder"). No such use case today; the reverse-mapping (a `.linked` slide relinked into the bundle flips to `.managed`) is the real correctness win and is what Bundle for Travel implicitly relies on.
+
+---
+
+## 2026-05-08 — C11 importer-hook seam: closure on `MediaImportContext`, not a static-var coordinator
+
+**Why**: C10 thumbnail caching uses a static-var seam (`MediaImporter.thumbnailEncoder`) because the encoder is purely stateless. C11 filmstrip generation goes through a per-document `FilmstripCoordinator` (so cancellation, jobs list, and document-close lifetimes are scoped per-window). A static seam would force all RootView instances to share a single global coordinator — broken for multi-document use.
+
+**Decision**: add `enqueueFilmstrip: ((UUID, URL) -> Void)?` to `MediaImportContext`. The host (RootView) builds the closure with its own coordinator captured. The importer fires the closure once per video import (skipped for images and PDF/Keynote-rasterized pages). Default-nil for tests + untitled docs without a fallback.
+
+**Alternatives considered**:
+- **`filmstripDispatcher` static var** mirroring the thumbnail-encoder pattern. Simpler API surface but loses per-document coordinator scoping.
+- **`coordinator: FilmstripCoordinator?` on the context** so the importer enqueues directly. Couples the importer to the coordinator type; closure keeps the importer concurrency-naive.
+
+**Reversibility**: easy — drop the field and the call site. The closure has no escaping side effects beyond the coordinator's own `Task.detached` (which would be cancelled by the document going away).
+
+**What I'd revisit if**: a third "fire on import" hook lands (e.g., audio-waveform pre-render). At that point an array of generic post-import side-effects might be cleaner than three named closures. v1 doesn't need it.
+
+---
+
+## 2026-05-08 — FilmstripGenerator → async AV APIs (Option J commit J1)
+
+**Why**: `tracks(withMediaType:)` (macOS 13), `duration` (macOS 13), and `copyCGImage(at:actualTime:)` (macOS 15) are all deprecated in current SDKs. The next-session prompt called the migration "mostly mechanical" — true for FilmstripGenerator specifically because its only synchronous caller (`FilmstripCoordinator.enqueue`) already runs the work on a `Task.detached`, so adding `await` doesn't ripple.
+
+**Decision**: convert `generateSpriteSheet(...)` to `async throws` and migrate to `loadTracks(withMediaType:)` / `load(.duration)` / `image(at:)`. The per-frame loop now calls `try Task.checkCancellation()` between extractions so a cancelled job aborts mid-loop. CancellationError is caught at the coordinator and silently drops the job (no operator-visible failure). `FilmstripCoordinator.generator` static seam becomes `@Sendable async throws`.
+
+**Alternatives considered**:
+- **Wrap async calls in `DispatchSemaphore` to keep the sync surface.** Anti-pattern; defeats the cancellation benefit and burns a thread.
+- **Migrate ThumbnailGenerator + PlaybackController + MediaImporter at the same time.** Each ripples wider — ThumbnailGenerator is called inline from sync importer paths, PlaybackController is on the video timer, MediaImporter is on the foreground import path. Async migration there is a real refactor, not gardening. Deferred.
+
+**Reversibility**: medium. The async signature is the natural shape; reverting requires a thread-blocking semaphore wait in the coordinator's detached Task.
+
+**What I'd revisit if**: ThumbnailGenerator's `image(at:)` migration goes through later. At that point the FilmstripGenerator + ThumbnailGenerator could share a small "decode one CGImage at time T from URL" async helper.
