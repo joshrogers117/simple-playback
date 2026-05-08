@@ -8,6 +8,7 @@ struct RootView: View {
     @StateObject private var playback = PlaybackController()
     @StateObject private var showController: ShowControllerHolder
     @StateObject private var transcodeCoordinator = TranscodeCoordinator()
+    @StateObject private var importStatus = ImportStatusBanner()
     @State private var selectedSlideID: UUID?
     @State private var selectedCueID: UUID?
     @State private var dropTargeted = false
@@ -178,6 +179,8 @@ struct RootView: View {
                 .background(.bar)
 
                 OutputPreviewView(playback: playback)
+
+                ImportStatusBannerView(banner: importStatus)
 
                 OutputStatusBar(
                     playback: playback,
@@ -391,10 +394,11 @@ struct RootView: View {
             presentKeynoteNotInstalledAlert()
         }
         let context = currentMediaImportContext()
-        let imported = MediaImporter.importSlides(from: urls, context: context)
-        guard !imported.isEmpty else { return }
-        document.project.slides.append(contentsOf: imported)
-        selectedSlideID = imported.last?.id
+        let report = MediaImporter.importSlidesAndReport(from: urls, context: context)
+        importStatus.record(report.failures)
+        guard !report.slides.isEmpty else { return }
+        document.project.slides.append(contentsOf: report.slides)
+        selectedSlideID = report.slides.last?.id
     }
 
     /// Spec §3.10: "Surface a clear 'Keynote not installed' diagnostic if absent." A modal
@@ -483,18 +487,26 @@ struct RootView: View {
     /// by design.
     private func requestTranscode(slide: MediaSlide, preset: TranscodePreset) {
         let dest = transcodedRootDirectory()
+        let sourceURL = slide.media.resolvedURL()
         transcodeCoordinator.transcode(
             slide: slide,
             preset: preset,
             destinationDirectory: dest
         ) { [self] result in
-            guard case .success(let outcome) = result else { return }
-            if let idx = document.project.slides.firstIndex(where: { $0.id == outcome.sourceSlideID }) {
-                document.project.slides.insert(outcome.siblingSlide, at: idx + 1)
-            } else {
-                document.project.slides.append(outcome.siblingSlide)
+            switch result {
+            case .success(let outcome):
+                if let idx = document.project.slides.firstIndex(where: { $0.id == outcome.sourceSlideID }) {
+                    document.project.slides.insert(outcome.siblingSlide, at: idx + 1)
+                } else {
+                    document.project.slides.append(outcome.siblingSlide)
+                }
+                selectedSlideID = outcome.siblingSlide.id
+            case .failure(let error):
+                // Cancelled transcodes are operator-initiated; silent is the right UX.
+                // Other errors land in the banner so the operator sees what failed.
+                if case .cancelled = error { return }
+                importStatus.recordTranscode(url: sourceURL, error: error)
             }
-            selectedSlideID = outcome.siblingSlide.id
         }
     }
 }
