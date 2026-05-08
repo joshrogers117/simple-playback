@@ -411,12 +411,12 @@ enum ThumbnailLoader {
         }
 
         return await Task.detached(priority: .userInitiated) {
-            let asset = AVAsset(url: url)
+            let asset = AVURLAsset(url: url)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
             generator.maximumSize = CGSize(width: 640, height: 360)
-            if let cgImage = try? generator.copyCGImage(at: .zero, actualTime: nil) {
-                return NSImage(cgImage: cgImage, size: .zero)
+            if let result = try? await generator.image(at: .zero) {
+                return NSImage(cgImage: result.image, size: .zero)
             }
             return nil
         }.value
