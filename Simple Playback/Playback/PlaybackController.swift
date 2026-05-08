@@ -19,6 +19,12 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var isPlaying: Bool = false
 
     private let outputDriver: VideoOutputDriver
+    /// Additional `TransportSink`s receiving every composed frame alongside the primary
+    /// `outputDriver`. Used by NDI (B11), Syphon, file-record, and the second DeckLink port
+    /// once those land. The primary path still goes through `outputDriver` for backward
+    /// compatibility with the (deviceID, modeID) UI; the router enables N>1 fan-out today.
+    private let auxiliarySinks = TransportSinkRouter()
+    private var activeSinkStage: TransportSinkStage?
     private let outputQueue = DispatchQueue(label: "SimplePlayback.OutputSubmissions")
     private let outputQueueKey = DispatchSpecificKey<Void>()
     private let audioOutputQueue = DispatchQueue(label: "SimplePlayback.AudioSubmissions")
@@ -194,12 +200,14 @@ final class PlaybackController: ObservableObject {
         drainAudioOutput()
         syncOutput {
             outputDriver.stop()
+            auxiliarySinks.stopAll()
             currentFrame = nil
             latestVideoFrame = nil
             stopActiveTransition()
         }
         outputStartedForDevice = nil
         outputStartedForMode = nil
+        activeSinkStage = nil
         isRunning = false
         status = "Output stopped"
     }
@@ -254,7 +262,53 @@ final class PlaybackController: ObservableObject {
         }
         outputStartedForDevice = deviceID
         outputStartedForMode = modeID
+
+        // Re-arm auxiliary sinks for the new (device, mode) pair so additional transports
+        // (NDI, Syphon, secondary DeckLink) start in lockstep with the primary output.
+        let modeForStage = modes(for: deviceID).first(where: { $0.id == modeID })
+            ?? VideoOutputMode.preview1080p30
+        let stage = TransportSinkStage(
+            width: modeForStage.width,
+            height: modeForStage.height,
+            frameRateNumerator: Int(modeForStage.timeScale),
+            frameRateDenominator: Int(modeForStage.frameDuration)
+        )
+        activeSinkStage = stage
+        startAuxiliarySinks(for: stage)
+
         status = newStatus
+    }
+
+    private func startAuxiliarySinks(for stage: TransportSinkStage) {
+        for sink in auxiliarySinks.allSinks {
+            do {
+                try sink.start(stage: stage)
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    self?.status = "\(sink.label): \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    /// Register a `TransportSink` to receive every composed frame and audio submission. If
+    /// output is already running, the sink is started immediately for the active stage.
+    func register(sink: TransportSink) {
+        auxiliarySinks.addSink(sink)
+        if let activeSinkStage {
+            do {
+                try sink.start(stage: activeSinkStage)
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    self?.status = "\(sink.label): \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    /// Unregister and stop a previously registered `TransportSink`.
+    func unregister(sink: TransportSink) {
+        auxiliarySinks.removeSink(sink)
     }
 
     @discardableResult
@@ -768,6 +822,7 @@ final class PlaybackController: ObservableObject {
                         self?.status = error.localizedDescription
                     }
                 }
+                self.auxiliarySinks.submit(audio: data, sampleFrameCount: sampleFrameCount)
             }
         }
     }
@@ -1125,6 +1180,7 @@ final class PlaybackController: ObservableObject {
 
     private func submitFrame(_ frame: RenderedFrame, cacheAsCurrent: Bool = true) throws {
         try outputDriver.submitVideoFrame(frame.data, width: frame.width, height: frame.height, rowBytes: frame.rowBytes)
+        auxiliarySinks.submit(frame: frame)
         if cacheAsCurrent {
             currentFrame = frame
         }
