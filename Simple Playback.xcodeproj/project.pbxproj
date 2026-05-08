@@ -38,6 +38,7 @@
 		307853A947C458651756A1C8 /* AssetLibraryProbeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64770F5436DE8DAF65E696DF /* AssetLibraryProbeTests.swift */; };
 		3521635B244D202E961AE299 /* AssetLibraryProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6A8BE27C4F2CAA54E827EC3 /* AssetLibraryProbe.swift */; };
 		388AA05ED53476DBD72A4554 /* DroppedFrameCounter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4758CF8E9891007D793354E /* DroppedFrameCounter.swift */; };
+		3D1CF70C2CF630DC443A79BF /* BundleForTravelCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0938EC4100E4EC1F247B73 /* BundleForTravelCoordinator.swift */; };
 		3E21186036951CC387B69F2E /* SlideGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B620D6408556D32380C918 /* SlideGridView.swift */; };
 		42289D3F33304D521AADB51B /* ImageSequenceDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FD2EFC1C287DD9480AF2D2F /* ImageSequenceDetector.swift */; };
 		4402C1426C53FCDF22C994A6 /* TakeHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F70C941729E2A67C95AD9886 /* TakeHistory.swift */; };
@@ -72,6 +73,7 @@
 		66B172846E254E8FCC806D8B /* TranscodeCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 633EE3FAB29225F6222E52AB /* TranscodeCoordinatorTests.swift */; };
 		67058819C3FE046151E4BCAD /* SubscriptionRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 206A8DDCD4F82FF85D3587EC /* SubscriptionRegistry.swift */; };
 		67765CD777AA4E30553D4126 /* SimplePlaybackApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECEAD362FE5313C14713663D /* SimplePlaybackApp.swift */; };
+		6AE31265A9E2FB712498B867 /* BundleForTravelCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 733E939A782AEA845A2B7F10 /* BundleForTravelCoordinatorTests.swift */; };
 		6B7B4C3468690A6CA15DBD56 /* OSCAddressMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00712F270D3EB78020694E87 /* OSCAddressMap.swift */; };
 		6F6A42339FF9969C2E1E73C2 /* PDFKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3A471C6C5C78FE638539C5C7 /* PDFKit.framework */; };
 		71A74B61F50A3AAF221FC2C2 /* DroppedFrameCounterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 532651899A2D97DB1134F636 /* DroppedFrameCounterTests.swift */; };
@@ -193,6 +195,7 @@
 		3901F80946826E57A5B02934 /* CompositorPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositorPipeline.swift; sourceTree = "<group>"; };
 		3906CB66B7CA3652EABFE931 /* AudioPump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPump.swift; sourceTree = "<group>"; };
 		39A90630AF349E25D5676488 /* SPFrameBlend.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SPFrameBlend.h; sourceTree = "<group>"; };
+		3A0938EC4100E4EC1F247B73 /* BundleForTravelCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleForTravelCoordinator.swift; sourceTree = "<group>"; };
 		3A471C6C5C78FE638539C5C7 /* PDFKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = PDFKit.framework; path = System/Library/Frameworks/PDFKit.framework; sourceTree = SDKROOT; };
 		4040F3064AA861BCD17050FB /* ShowListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowListView.swift; sourceTree = "<group>"; };
 		41F6421D7CBD102AC8875CC6 /* ImportStatusBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportStatusBanner.swift; sourceTree = "<group>"; };
@@ -224,6 +227,7 @@
 		6FD2EFC1C287DD9480AF2D2F /* ImageSequenceDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSequenceDetector.swift; sourceTree = "<group>"; };
 		70B339087E0F91F6B7504F6D /* ShowControlDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowControlDispatcher.swift; sourceTree = "<group>"; };
 		7207C062BAE86A22C6BC8983 /* ProjectLockControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectLockControllerTests.swift; sourceTree = "<group>"; };
+		733E939A782AEA845A2B7F10 /* BundleForTravelCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleForTravelCoordinatorTests.swift; sourceTree = "<group>"; };
 		74F6B96FEA30A03C2D3B1FBB /* DeckLinkBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DeckLinkBridge.h; sourceTree = "<group>"; };
 		75B620D6408556D32380C918 /* SlideGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideGridView.swift; sourceTree = "<group>"; };
 		773B6424E99EBEA84CB2027B /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
@@ -408,6 +412,7 @@
 				F992212CAFFC42953E99C15B /* AssetRelinkPlanTests.swift */,
 				6BF01B25D49F0D899EA2AE22 /* AudioDeviceProbeTests.swift */,
 				F0336D644737BA64EE43F017 /* AutosaveCheckpointerTests.swift */,
+				733E939A782AEA845A2B7F10 /* BundleForTravelCoordinatorTests.swift */,
 				BBA2DABFD5EE282A4CC471FC /* BundleForTravelPlanTests.swift */,
 				21271656A4CCF6A5AD4E2940 /* CompositorPipelineTests.swift */,
 				202509882DEF106561761E6D /* CrashRecoveryControllerTests.swift */,
@@ -546,6 +551,7 @@
 				A48741BAA260FA2E3B3E93ED /* AssetRelinkPlan.swift */,
 				9FC38AB74DB5321128E72E79 /* AudioDeviceProbe.swift */,
 				18F5B52C774E8E6CC0899D9C /* AutosaveCheckpointer.swift */,
+				3A0938EC4100E4EC1F247B73 /* BundleForTravelCoordinator.swift */,
 				959E8FA27281A1515AEF705C /* BundleForTravelPlan.swift */,
 				0D46390F473701690C95CF1E /* CrashRecoveryDetector.swift */,
 				A4758CF8E9891007D793354E /* DroppedFrameCounter.swift */,
@@ -675,6 +681,7 @@
 				44E0E08A26F3691D8E7A2C44 /* AuthTokenStore.swift in Sources */,
 				02967ABCE0AAFA316D52DA49 /* AutosaveCheckpointer.swift in Sources */,
 				11F48F224E2E07F3A2CD4894 /* BonjourPublisher.swift in Sources */,
+				3D1CF70C2CF630DC443A79BF /* BundleForTravelCoordinator.swift in Sources */,
 				1347EF040A9255D95C7A5C1A /* BundleForTravelPlan.swift in Sources */,
 				EDB3E5ED1721A22A5B31024C /* CompositorLayers.swift in Sources */,
 				60D24C84B7A425B9412B95C9 /* CompositorPipeline.swift in Sources */,
@@ -763,6 +770,7 @@
 				DCEF69E2DA847BEBC9534552 /* AssetRelinkPlanTests.swift in Sources */,
 				458E7CD285F738A458DE28C1 /* AudioDeviceProbeTests.swift in Sources */,
 				1D2DA3CD426E79C87480A852 /* AutosaveCheckpointerTests.swift in Sources */,
+				6AE31265A9E2FB712498B867 /* BundleForTravelCoordinatorTests.swift in Sources */,
 				1EC3502B7A2008F401A9D081 /* BundleForTravelPlanTests.swift in Sources */,
 				DCABF0FFCC0E6E0596173F64 /* CompositorPipelineTests.swift in Sources */,
 				CA516B0F7DE435ECB02646C6 /* CrashRecoveryControllerTests.swift in Sources */,
