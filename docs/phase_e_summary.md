@@ -1,8 +1,100 @@
 # Phase E — Reliability — Summary
 
-**Status (session 14 — 2026-05-08)**: **Phase E broadly landed**. Sessions 12 / 13 / 14 together took Phase E from "started E1" to "E1+ / E2 / E3 / E3-filter / E6 / E8 all green, plus E1+ energy assertion." 6 commits this session, 430 → 498 tests (+68).
+**Status (session 15 — 2026-05-08)**: **Phase E mostly landed**. Session 15 picked off the four most contained leftovers: E3+ dropped-frame counter, E5 take history (in-memory v1), E7 crash recovery on next launch. 4 commits, 498 → 543 tests (+45).
 
-The pre-show panel now reads as live data, records every operator + remote action with source attribution, persists checkpoints at meaningful operator moments, prevents the show machine from idle-sleeping, and warns on duplicate-open of NAS-shared show files. The remaining Phase E pickups are the deferred long-tail (dropped-frame instrumentation, take history, crash recovery, Director View, Workspaces, brightness adapt key) and a handful of fragile / privacy-blocked macOS-condition adapters.
+The reliability surface now covers: pre-show check (live signals + Fix actions); show log (writer + filter UI); autosave (rolling + checkpoint); project lock (duplicate-open warning); no-idle-sleep (energy assertion); dropped-frame instrumentation (status chip + debounced log entries); take history (last 200 fires, viewer sheet); crash recovery (Restore/Discard banner on autosave-newer-than-Show.json).
+
+Remaining Phase E pickups are the long-tail UX features (Director View, Workspaces, brightness adapt, late-take detection) plus a handful of fragile / privacy-blocked macOS-condition adapters and the E8 read-only-mode banner option.
+
+---
+
+## What shipped in session 15
+
+### E3+ — dropped-frame counter
+
+**`Services/DroppedFrameCounter.swift`** — pure-logic. `record(count:at:)` appends timestamps and accumulates; `observe(now:)` re-prunes the rolling window without recording; `reset()` clears both axes. Window default 10 s. Out-of-order timestamps (host-clock adjustment, batch flush after a stall) are handled via full-list filter rather than monotonic assumption.
+
+`PlaybackController.detectAndRecordDroppedFrames(at:)` runs at the top of `renderCurrentVideoFrame` (gated to non-`forceCurrentTime` paths). Compares `CACurrentMediaTime()` to the prior tick; deficit > 1.5× `activeFrameInterval` records `floor(delta/interval) - 1` drops via `Task { @MainActor }` to satisfy the counter's actor isolation. Counter resets on `stopOutput`; `lastTimerTickHostTime` is reset on every `startVideoTimer` so a take boundary never reads as a drop.
+
+`OutputStatusBar.droppedFrameChip` — hidden when cumulative=0; orange + warning glyph when rolling > 0; secondary + checkmark when cumulative > 0 but rolling = 0 (drops earlier in the session, recovered now). Tooltip explains the two numbers.
+
+`ShowController.handleDropCumulative(_:now:)` is the pure-logic debounce. Combine subscription on `playback.droppedFrameCounter.$cumulative` (with `receive(on: .main)`) calls it with `Date()`. First burst emits a `.droppedFrame` log entry immediately; further publishes within `dropFlushInterval = 1 s` are suppressed and accumulate; the next emission past the window batches the deficit. Counter reset re-baselines without a phantom event.
+
+### E5 — take history (in-memory v1)
+
+**`Services/TakeHistory.swift`** — bounded chronological buffer. `TakeHistoryEntry { id, timestamp, cueID, cueNumber, cueTitle, durationSecondsAtFire? }`. Capacity defaults to 200; clamped to ≥1; `append` drops oldest on overflow. `cueTitle`/`cueNumber` are copied at fire time so renaming or deleting a cue doesn't rewrite history. `recordFire(cue:durationSecondsAtFire:)` is the convenience entry point used by `ShowController.handleCueFired` (samples `playback.videoDuration` — nil for images / pre-resolution).
+
+**`Views/TakeHistoryView.swift`** — read-only sheet. Toolbar button on the main window reveals it; rows render newest-first (`history.latestEntries`) with timestamp / cue number / title / duration. Empty-state uses `ContentUnavailableView`. **Replay scrub deferred** — runtime would need a "fire cue X with original parameters at offset" entry point that doesn't exist.
+
+### E7 — crash recovery on next launch
+
+**`Services/CrashRecoveryDetector.swift`** — pure-logic detector. `findRecoverableCheckpoint(bundleURL:)` lists `<bundle>/Autosave/`, parses each filename via `AutosaveCheckpoint.parse`, and returns the newest checkpoint *strictly newer* than Show.json's mtime. Equal mtimes don't trigger (clean Show-Mode-toggle saves write the checkpoint and Show.json simultaneously). Missing autosave directory / unparseable filenames / older checkpoints all return nil. `readCheckpointData(bundleURL:filename:)` reads bytes; `discardCheckpoints(bundleURL:)` removes the directory.
+
+**`Views/CrashRecoveryBannerView.swift`** holds both the `CrashRecoveryController` (`evaluate / loadRecoverableData / didRestore / discard`) and the banner (yellow background, "Autosave newer than saved project — Snapshot from <date> (<reason>)", Restore / Discard buttons).
+
+**`SimplePlaybackProjectDocument`** owns the controller, KVO-observes `fileURL` (same hook used for E8), implements `restoreProjectFromRecoverableCheckpoint()` that decodes the checkpoint via `JSONDecoder.simplePlayback`, replaces `playbackDocument.project`, marks the doc dirty (so the next save persists the recovered state), and notifies the controller. RootView's banner Restore button calls back into the document via the injected `restoreFromCheckpoint: () -> Bool` closure.
+
+**"What changed" summary deferred** — the v1 banner ships Restore + Discard. A future iteration can compute a diff between the checkpoint and Show.json and surface "5 cues changed, 2 added" in the banner copy.
+
+---
+
+## Tests added (session 15)
+
+| Test file | Tests | What it covers |
+|---|---|---|
+| `DroppedFrameCounterTests` | 12 | Initial state / record / record≤0 noop / cumulative monotone / window-edge inclusive / window-eviction / observe-only prune / reset / sliding window / out-of-order / batched record |
+| `ShowControllerDroppedFrameLogTests` | 7 | First burst emits / debounce inside window / batched delta on next burst / reset re-baselines / new burst after reset / zero-cumulative no-emit / end-to-end via Combine |
+| `TakeHistoryTests` | 9 | Append below capacity / drop oldest at cap / capacity across 400 / capacity ≥1 clamp / latestEntries reverses / reset / recordFire captures / mutated cue not reflected / unique IDs |
+| `CrashRecoveryDetectorTests` | 10 | Missing dir / empty / unparseable / no Show.json / all older / equal mtime / strictly newer / mixed parseable+garbage / read bytes / discard removes dir |
+| `CrashRecoveryControllerTests` | 7 | Nil URL clears / detector candidate / reader plumbing / reader-throws nil / didRestore clears / discard plumbing / discard swallows error |
+
+Total: **543 tests, all green** (was 498 at session start; +45).
+
+---
+
+## Manual verification needed (session-15 deltas)
+
+1. **Dropped-frame chip — clean show**: open a project, take a slide, watch the status bar — chip should remain hidden. Toggle through several cues; chip stays hidden as long as no drops are detected.
+2. **Dropped-frame chip — induced stall**: with a video cue running, deliberately stress the system (open Activity Monitor's "All Processes, Hierarchically" and let it CPU-pin a core; or run `yes >/dev/null` in Terminal). The chip should appear, escalate to orange when a stall happens, and return to secondary checkmark when rolling resets to 0 after 10 seconds.
+3. **Dropped-frame log debounce**: with a video cue running, induce a stall. Open the show log — there should be at most one `.droppedFrame` row per ~1 s of stall, with detail `drops=N cumulative=M`. Long stall → still one row per second, not one per frame.
+4. **Dropped-frame counter resets on output stop**: after drops have accumulated, click "Clear Output". The chip disappears. Take another cue; chip stays hidden until new drops happen.
+5. **Take history — empty / first take**: open a fresh project. Click Take History; sheet shows "No takes yet". Take a cue; reopen — one row with that cue's number/title.
+6. **Take history — capacity**: in a project with at least one cue, fire it 250 times via OSC or by repeated GO. Open Take History; should show exactly 200 rows, most recent at top.
+7. **Take history — title pin**: fire a cue named "Opener". In edit mode, rename the cue to "Renamed". Take History should still show "Opener" for the prior fire.
+8. **Crash recovery — happy path**: open a saved `.spb` project. Toggle Show Mode on (writes a checkpoint), then toggle off (writes another). Force-quit the app (`kill -9 <pid>` from Terminal). Reopen the project. The yellow recovery banner should appear above OutputStatusBar with "Snapshot from <recent date> (Show Mode off)". Click Restore; the project state from the checkpoint loads. Save; the banner stays away on next reopen.
+9. **Crash recovery — Discard path**: same setup as #8 but click Discard on the banner. Verify `<bundle>/Autosave/` is gone (`ls <bundle>/Autosave` → "No such file or directory"). Reopen the project; banner does not appear.
+10. **Crash recovery — equal mtime no banner**: open a saved project. Toggle Show Mode on, then save normally (Cmd-S). Force-quit and reopen. The banner should NOT appear (the autosave timestamp is older than the post-Save Show.json mtime).
+11. **Crash recovery — restored doc is dirty**: Restore from a checkpoint. The window title should show the unsaved-changes dot; Cmd-S writes the recovered state to Show.json.
+
+---
+
+## Still deferred (session 16+)
+
+- **Pre-show E1+ macOS-condition tail** — DND, screensaver, Spotlight, Time Machine. Each is fragile or privacy-blocked on modern macOS. Same status as session 14.
+- **E3+ tail — late-take detection** — show log can record dropped frames now; "GO arrived but cue didn't fire within N ms" is an independent cue-runtime instrumentation that hasn't been wired.
+- **E5 — replay scrub** — sheet shows the history; the runtime can't yet "fire cue X with original parameters at offset Y." Needs a new runtime entry point.
+- **E7 — "what changed" summary** — banner today says "snapshot from <date> (<reason>)". A future iteration could decode the checkpoint and Show.json, diff them, and surface "5 cues changed, 2 added" in the banner.
+- **E8 read-only-mode** — the third banner option from spec §3.16 still needs document-wide read-only enforcement. Same status as session 14.
+- **E9 — Director View tear-off window** — read-only Program + next 3 + notes.
+- **E10 — Saved Workspaces** — Edit / Rehearsal / Show / Single-Screen.
+- **E11 — Brightness adapt key** — booth-dim key separate from system brightness.
+- **E12 — Phase E summary cleanup pass** — the closing summary doc.
+
+---
+
+## Recommended next pick
+
+- **C7 (asset library — linked vs managed media + security-scoped bookmarks)** — Phase C tail. Bigger surface than Phase E pickups but unlocks C8 / C9 / C10 / C11 and the deferred E2 `media.resolution` Fix handler. Multi-session.
+- **B7 (DeckLink format negotiation)** — Phase B leftover; hardware-bound for verification.
+- **E9 Director View** — read-only tear-off window. Needs UX decisions about layout (product blocker territory if not already specified — re-read §3 for guidance).
+
+---
+
+## Session 14 deltas (recap — see git log e129164 for full text)
+
+Session 14 shipped E8 (project lock file at `<bundle>/.lock` with five-state liveness + foreign-lock banner + NSDocument lifecycle wiring), E6 (30s autosave-in-place + Show-Mode checkpoint), E4 (filter UI on the show-log viewer), E1+ (no-idle-sleep IOPM assertion in Show Mode). 6 commits, 430 → 498 tests (+68).
+
+_(See "What shipped in session 15" below for the latest deltas.)_
 
 ---
 

@@ -416,3 +416,87 @@ The detector returns leftovers in their original drop order so non-sequence file
 - Real laptop rehearsals show the system not sleeping when Show Mode is on (what we want) but also not sleeping when Show Mode is off (because the assertion didn't release). Diagnose via `pmset -g assertions` — if our assertion is still listed without Show Mode, the release path didn't fire.
 - Operators want to keep the system awake without committing to Show Mode (e.g., a long rehearsal where they're tweaking cues). Add a separate "Keep awake" toggle alongside Show Mode that drives the assertion independently.
 
+
+---
+
+## 2026-05-08 — E3+: dropped-frame detection via timer-tick host-time deltas
+
+**Decision**: `PlaybackController` measures dropped frames by comparing wall-clock between consecutive video-timer ticks against `activeFrameInterval`. A delta > 1.5× the interval reports `floor(delta/interval) - 1` drops. Detection is gated to non-`forceCurrentTime` paths so operator-driven seeks aren't counted. Counter resets on `stopOutput`.
+
+**Why**:
+- **Wall-clock cadence is the most direct proxy for "frame missed presentation."** AVPlayerItemVideoOutput's pixel-buffer pull doesn't reliably surface drops at the API surface — `hasNewPixelBuffer(forItemTime:)` returns a Bool but doesn't distinguish "buffer not yet decoded" (legitimate cadence) from "decoder fell behind" (a drop). Comparing tick deltas is OS-agnostic and works for both image and video paths.
+- **1.5× threshold absorbs scheduler jitter.** A healthy mac scheduler delivers DispatchSourceTimer events within ~5–20 ms of the requested deadline; the leeway parameter is set to 2 ms. 1.5× of a 33 ms (30 fps) interval is 50 ms — generous enough that normal jitter doesn't fire false positives, tight enough that a real frame deficit lands.
+- **`forceCurrentTime` excluded** because operator scrubs reset the player to a new item-time off-cadence. Counting that as a drop would conflate user actions with output stress.
+- **Counter resets on stopOutput** rather than per-take. Operators read the counter as "how is the system holding up tonight?", not "how did Cue Q3 do?" Per-take stats would need a different surface.
+
+**Alternatives considered**:
+- **AVPlayerItem.AccessLogEvent** — Apple's official API, but only logs once per access event and is asynchronous. Operator-scale latency (events arrive seconds after the drop) makes the rolling-10s chip useless.
+- **Hook the DeckLink driver's "frame submitted vs frame displayed"** — the bridge interface doesn't expose this counter as a signal we can subscribe to. Would require pulling a property each tick.
+- **Skip the threshold and count every late tick** — produces noise on healthy systems. The 1.5× floor matches the operator's intuition ("the output stuttered") rather than the kernel's intuition ("a tick was 6 ms late").
+
+**Reversibility**: easy. The detection path lives in two methods on `PlaybackController` (`detectAndRecordDroppedFrames` + the call site in `renderCurrentVideoFrame`), the counter is one file, and the chip is a `@ViewBuilder` in `OutputStatusBar`. Removing all three reverts to no drop tracking.
+
+**What I'd revisit if**:
+- Real-world rehearsal shows false positives during normal load (e.g., user scrolling the slide grid causes drops to register when output is unimpeded). Tighten the threshold or move detection into the DeckLink sink path.
+- The 10-second rolling window is wrong for multi-hour shows. Consider adding a "since last GO" axis in addition to or instead of rolling-10s.
+
+---
+
+## 2026-05-08 — E3+ debounce: synchronous gate, not Combine `throttle`
+
+**Decision**: `ShowController.handleDropCumulative(_:now:)` is a pure-logic predicate that decides whether to log a `.droppedFrame` event based on time-since-last-emission. The Combine subscription on `playback.droppedFrameCounter.$cumulative` calls it with `Date()`. Tests drive the function directly with synthetic timestamps.
+
+**Why**:
+- **Combine `throttle(for:scheduler:latest:)` is hostile to test pinning.** Tests would need to wait wall-clock time (or run the run loop with a virtual scheduler), and the trailing-edge emission semantics are subtly different from "emit on first burst, suppress within window." A pure function with explicit `now` lets the test own time.
+- **First-burst-emits-immediately + accumulate-during-window** is what operators want. A long stall should land as one log entry, but a single short burst should still register.
+- **Reset re-baselines** by setting `lastReportedDropCumulative = cumulative` and clearing `lastDropLogTime` on a counter-reset (cumulative goes backward). Without this, the next burst after a reset would log the *cumulative-since-reset* delta as if it were the burst since the previous emission.
+- **The `.system` source label** matches the existing convention for runtime-internal events (`.missingMedia`).
+
+**Alternatives considered**:
+- **Combine `throttle`** — see above. The first round of tests sat on real time and produced 3-second test cases.
+- **Emit one event per drop** — drowns the show log; a 2-second stall at 30 fps adds 60 entries.
+- **Emit once at output stop with the total** — too late to be actionable during the show.
+
+**Reversibility**: easy. `handleDropCumulative` is a single function; reverting the wiring is a one-line subscription removal.
+
+**What I'd revisit if**:
+- Operators want the rolling-10s number in the log too (right now we log delta + cumulative; rolling-10s is a snapshot the chip surfaces). Add it to the detail string.
+
+---
+
+## 2026-05-08 — E5: take-history captures cue title at fire time (snapshot, not reference)
+
+**Decision**: `TakeHistoryEntry` stores `cueTitle: String` (a copy) rather than `cueID: UUID` only. Same for `cueNumber`.
+
+**Why**:
+- **History pins what was on screen at the moment of fire.** Renaming a cue later shouldn't rewrite the past.
+- **Cross-document survival.** If the cue is deleted from the show list, the history still shows what played.
+- **`cueID` is also kept** so a future "scroll to this cue" affordance can navigate to the live cue if it still exists.
+
+**Alternatives considered**:
+- **Keep only `cueID`, look up title at render time** — fast for typical use but fails the rename / delete cases.
+- **Look up via a captured `(UUID) -> Cue?` closure** — same look-up problem, plus retain-cycle risk on the controller.
+
+**Reversibility**: easy. The struct is one file; replacing string fields with closures is mechanical.
+
+**What I'd revisit if**:
+- Memory becomes a concern at much larger histories (>10k entries). Strings are small but the natural fix is a deduplicated string table inside `TakeHistory`.
+
+---
+
+## 2026-05-08 — E7: equal-mtime checkpoints don't trigger recovery
+
+**Decision**: `CrashRecoveryDetector.findRecoverableCheckpoint` returns nil when the newest checkpoint's timestamp equals Show.json's mtime (only strictly-newer triggers recovery).
+
+**Why**:
+- **Clean shutdowns commonly have checkpoint timestamp == Show.json mtime.** A Save-on-Show-Mode-toggle workflow writes the checkpoint and the bundle JSON essentially simultaneously. We don't want to surface a recovery banner on every project re-open following a normal Show-Mode session.
+- **The recovery banner is a *suspicion* signal.** False positives drown the operator's attention; we'd rather miss a borderline edge case (where someone genuinely lost work but the autosave timestamp lined up exactly with Show.json) than nag on every open.
+
+**Alternatives considered**:
+- **Newer-or-equal** — produces nuisance banners on routine reopens.
+- **Compare body hashes** — strictly correct (recovery if and only if the bytes differ), but requires reading both files for every open. The mtime fence is cheap and correct enough.
+
+**Reversibility**: easy. One inequality in the detector.
+
+**What I'd revisit if**:
+- A recurring crash leaves checkpoint mtime exactly equal to Show.json mtime (unusual on real file systems with millisecond resolution but possible on networked stores with second-resolution mtime). Bump to `<=` and add a hash check to suppress nuisance banners.
