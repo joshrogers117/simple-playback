@@ -37,6 +37,7 @@
 		497003F120EE87DE50995F6E /* AddFolderImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0989D3568265E79CF99893F5 /* AddFolderImporterTests.swift */; };
 		4986A9905EB62FFA630409BD /* MediaFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93004BE1F2BECBBF122DB00C /* MediaFlags.swift */; };
 		4A94C48FF22B0552314D441E /* DeckLinkDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF97362F36D6ED17D41359D2 /* DeckLinkDiagnostics.swift */; };
+		4ADA7C0AFB853BAE909A2382 /* ProjectLockFileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94369DD345B9DD7E2DEC1F0E /* ProjectLockFileTests.swift */; };
 		4C060BE294B7C9A97DBA4FBE /* FrameRateConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C8342BEF86901A52B41C81 /* FrameRateConformanceTests.swift */; };
 		4D7E6C165E984434FD9A4BB0 /* SPFrameBlend.c in Sources */ = {isa = PBXBuildFile; fileRef = 4FFDD7785740559EEB94F4CA /* SPFrameBlend.c */; };
 		51CA5DA530C6B560FA1A7989 /* SimplePlaybackProjectDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB740EFC960FD945A655941 /* SimplePlaybackProjectDocument.swift */; };
@@ -64,6 +65,7 @@
 		851AE7644559671FB09FD2BD /* ShowControlIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E47E51BD45087956CCF2905 /* ShowControlIntegrationTests.swift */; };
 		873129B7192207BD8E22D111 /* ImportStatusBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41F6421D7CBD102AC8875CC6 /* ImportStatusBanner.swift */; };
 		875D909F07AAF19E396A7C69 /* AddFolderImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB7AC40249EC7B2A4951E24 /* AddFolderImportSheet.swift */; };
+		882EA1E29B7F55A0467B7A44 /* ProjectLockFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = C80C047EF3A91E748BF5DB47 /* ProjectLockFile.swift */; };
 		8BD2A352FC9B61303CA55D19 /* ShowControllerLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBE4B045C1C58A97ED08C4B9 /* ShowControllerLogTests.swift */; };
 		8E0250619812CB053444052C /* OSCServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBA363D1C04A7119011031E /* OSCServer.swift */; };
 		91592F7DACBD58D4C6BBE0F2 /* HTTPRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01C17ADD674250609276D8A4 /* HTTPRoutes.swift */; };
@@ -194,6 +196,7 @@
 		93004BE1F2BECBBF122DB00C /* MediaFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlags.swift; sourceTree = "<group>"; };
 		934A545F270968E04F027F8B /* LTCReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LTCReader.swift; sourceTree = "<group>"; };
 		93727D6450DEE3ED3934DA97 /* WebSocketFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketFrame.swift; sourceTree = "<group>"; };
+		94369DD345B9DD7E2DEC1F0E /* ProjectLockFileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectLockFileTests.swift; sourceTree = "<group>"; };
 		95005D52A657E2A60F9E2008 /* PreShowCheckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreShowCheckView.swift; sourceTree = "<group>"; };
 		96F3960B5C5F817DFB3377D4 /* OSCQueryServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCQueryServer.swift; sourceTree = "<group>"; };
 		9A70EA9D270E7268A7C74D62 /* TranscodeServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscodeServiceTests.swift; sourceTree = "<group>"; };
@@ -221,6 +224,7 @@
 		BBBA363D1C04A7119011031E /* OSCServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSCServer.swift; sourceTree = "<group>"; };
 		BD3490C4BA5C4A09BDBF9415 /* MediaFlagsInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlagsInspector.swift; sourceTree = "<group>"; };
 		C0BC03657660E157633D31C6 /* Timecode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timecode.swift; sourceTree = "<group>"; };
+		C80C047EF3A91E748BF5DB47 /* ProjectLockFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectLockFile.swift; sourceTree = "<group>"; };
 		CA6758AB37C36BC8F192C9C3 /* SimplePlayback-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "SimplePlayback-Bridging-Header.h"; sourceTree = "<group>"; };
 		CAD1EB0DEF2FFFA7B96C902D /* OverlayInspectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayInspectorTests.swift; sourceTree = "<group>"; };
 		CF2597FFE1CB9927C6CB6395 /* VideoOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoOutput.swift; sourceTree = "<group>"; };
@@ -357,6 +361,7 @@
 				6084981086D7D70B8E87C69E /* PendingFolderImportTests.swift */,
 				F69D8058E585303C53CD3E3F /* PreShowCheckFixHandlersTests.swift */,
 				D930FD6914035D4FEAC331A2 /* PreShowCheckTests.swift */,
+				94369DD345B9DD7E2DEC1F0E /* ProjectLockFileTests.swift */,
 				0E47E51BD45087956CCF2905 /* ShowControlIntegrationTests.swift */,
 				DBE4B045C1C58A97ED08C4B9 /* ShowControllerLogTests.swift */,
 				237C1358E779CC8F8EBA839E /* ShowControlTests.swift */,
@@ -470,6 +475,7 @@
 				5B45DD8149F1F904849FDFC2 /* PreShowCheck.swift */,
 				0781CD54E510EE56EFE80A9D /* PreShowCheckAdapters.swift */,
 				0C5CF912A93B1EB5CA657689 /* PreShowCheckFixHandlers.swift */,
+				C80C047EF3A91E748BF5DB47 /* ProjectLockFile.swift */,
 				AE5337B42A540319366F02D3 /* ShowLog.swift */,
 				BB90370BA34D673675815F69 /* TranscodeService.swift */,
 			);
@@ -617,6 +623,7 @@
 				521136DC8B0B2D5FFF8C7474 /* PreShowCheckAdapters.swift in Sources */,
 				D38368F7F25F022BC131466F /* PreShowCheckFixHandlers.swift in Sources */,
 				DE590B021826D8B2C652636D /* PreShowCheckView.swift in Sources */,
+				882EA1E29B7F55A0467B7A44 /* ProjectLockFile.swift in Sources */,
 				020E6C3D173AD7E05AC7A15A /* RootView.swift in Sources */,
 				4D7E6C165E984434FD9A4BB0 /* SPFrameBlend.c in Sources */,
 				976DD722059E40449CB77621 /* ShowControlActions.swift in Sources */,
@@ -670,6 +677,7 @@
 				B0198B8CBF5D9D7897AFAF9F /* PendingFolderImportTests.swift in Sources */,
 				A0C4E2AC793B8B206E6F7128 /* PreShowCheckFixHandlersTests.swift in Sources */,
 				E7E0BCCC5F1B98DD0A582010 /* PreShowCheckTests.swift in Sources */,
+				4ADA7C0AFB853BAE909A2382 /* ProjectLockFileTests.swift in Sources */,
 				851AE7644559671FB09FD2BD /* ShowControlIntegrationTests.swift in Sources */,
 				00EC3572563AA2E459F2489F /* ShowControlTests.swift in Sources */,
 				8BD2A352FC9B61303CA55D19 /* ShowControllerLogTests.swift in Sources */,
