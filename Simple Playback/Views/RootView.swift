@@ -231,6 +231,7 @@ struct RootView: View {
                 cue: selectedCueBinding,
                 slides: document.project.slides,
                 stageFPS: document.project.stages.first?.framesPerSecond,
+                showMode: showController.controller?.showMode ?? false,
                 requestTranscode: { slide, preset in
                     requestTranscode(slide: slide, preset: preset)
                 }
@@ -552,11 +553,15 @@ private struct CueInspectorView: View {
     @Binding var cue: Cue
     let slides: [MediaSlide]
     let stageFPS: Double?
+    /// When true, the inline transcode button is hidden so operators can't kick off
+    /// edits during a live show. Mirrors SlideGridView's `transcodeEnabled` gating.
+    var showMode: Bool = false
     /// Set by RootView's selection inspector (Option B / C-inline-transcode). Optional
     /// because preview-only inspector renders elsewhere may not need to plumb the
-    /// transcode coordinator. When present + the asset is transcode-eligible, the chip
-    /// group renders an inline "Transcode to ProRes …" button so operators can act on
-    /// inspector warnings without hunting through the asset-library context menu.
+    /// transcode coordinator. When present + the asset is transcode-eligible + not in
+    /// Show Mode, the chip group renders an inline "Transcode to ProRes …" button so
+    /// operators can act on inspector warnings without hunting through the asset-library
+    /// context menu.
     var requestTranscode: ((MediaSlide, TranscodePreset) -> Void)? = nil
 
     private var asset: MediaSlide? {
@@ -616,7 +621,8 @@ private struct CueInspectorView: View {
                         ForEach(asset.flags.activeWarnings, id: \.self) { warning in
                             MediaFlagWarningChip(warning: warning)
                         }
-                        if let requestTranscode, TranscodeService.canTranscode(slide: asset),
+                        if let requestTranscode, !showMode,
+                           TranscodeService.canTranscode(slide: asset),
                            let preferred = TranscodeService.preferredPresetOrder(for: asset).first {
                             Button {
                                 requestTranscode(asset, preferred)
