@@ -3,6 +3,7 @@
 **Status (session 1)**: Data model shipped (B1-B4).
 **Status (session 2 — 2026-05-07)**: TransportSink fan-out shipped (B5). DeckLink REF status surfaced (B6 partial). 161 tests, all green.
 **Status (session 3 — 2026-05-07)**: Compositor pipeline shipped (B12 model + pipeline + integration; UI deferred to B12d). 193 tests, all green.
+**Status (session 4 — 2026-05-07)**: B12 finished — Overlays inspector tab + ShowController bridge + composed-frame preview rendering (B12d/e/f). 197 tests, all green. 3 commits on `development`.
 
 The hot path (compositor → driver → device) now goes through a `TransportSinkRouter` that fans every composed frame and audio block out to N sinks. The primary user-selected output (DeckLink or software preview) still flows through the original `VideoOutputDriver` for backward compatibility, but the driver's concrete classes are now thin shims around `DeckLinkTransportSink` / `PreviewTransportSink`. Future B-phase sub-tasks (B11 NDI, second DeckLink port, file-record sink) register additional `TransportSink`s on `PlaybackController` and pick up frames automatically.
 
@@ -83,16 +84,17 @@ These need another session of work; the rendering refactor scaffolding is now in
 - **`submitFrame` runs every frame through `CompositorPipeline.compose(...)` before driver / auxiliary-sink hand-off.** Cached `currentFrame` is the *base* (pre-overlay) frame so transitions don't double-bake the overlay (see decision log "B12: cache base frame, not composed frame").
 - 2 new controller-level tests: defaults-to-empty + accepts updates.
 
-## Still deferred (session 4+)
+## Still deferred (session 5+)
 
-- **B12d** — UI inspector for overlays. Operator-facing controls to enable/disable, pick a bug image, choose corner/size/margin, set message text & countdown target, etc. Requires product decisions on inspector layout, default keyboard shortcuts ("STAND BY" overlay quick-toggle?), and where in the existing inspector hierarchy these controls live. Stop-and-ask territory.
-- **B12e** — Bridge from `ShowController` / `PlayoutProject.stages.first.compositorOverlays` into `PlaybackController.compositorOverlays`. Mechanical wiring (single Combine sink) but no UI to drive changes through yet, so deferred until B12d ships.
-- **B12f** — Render overlays into the in-app preview surface. Today the preview shows raw `NSImage` / `AVPlayer` content, so overlays appear on output but not in the operator's preview tile. The preview view should reuse `CompositorPipeline.compose(...)` against a thumbnail-sized base frame.
 - **B6b / B7 / B8** — DeckLink hardening commit train (REF policy, format negotiation, 10-bit YUV).
 - **B11** — NDI Full sender as a `TransportSink`.
 - **B13** — Color pipeline (sits on top of B5+B12).
 - **B9 / B15 / B10** — long tail.
 - **B16** — final Phase B summary + DeckLink mock layer for tests.
+
+Operator-facing follow-ups not yet scheduled (small):
+- Default keyboard shortcut to quick-toggle a "STAND BY" message overlay (product decision on chord — `M`? `Cmd-M`? `B` is already Blackout). Out of scope for B12 finish; file as a Phase E or "Operator UX" item when it comes up.
+- Live timer ticker for `{time_left}` countdown in the inspector preview — today the inspector shows the raw text; the rendered countdown only updates as new frames hit `submitFrame`. For stills with a static `currentFrame`, the displayed countdown won't tick down. Acceptable for v1; revisit if operators ask for it.
 
 ## Manual verification needed (session 3 deltas)
 
@@ -104,6 +106,56 @@ The session-3 work is pure-logic and operator-invisible until B12d/e ships UI co
 4. Toggle message overlay on with text "STAND BY" → renders at lower-third with translucent background.
 5. Set countdown target 60s in the future, text "Doors in {time_left}" → live-updating countdown.
 6. Crossfade between two video cues while overlays are enabled → bug + message persist crisply through the crossfade (no double-bake, no popping).
+
+---
+
+## What shipped in session 4 (B12d/e/f)
+
+### B12d — Overlays inspector tab
+
+- **`Views/OverlayInspectorView.swift`** — new SwiftUI view bound to a `CompositorOverlays`. Two sections (Bug, Message), each with an enable switch that disables-and-dims the section when off.
+  - Bug controls: enable, image picker (`NSOpenPanel` for PNG/JPEG → `MediaReference`), 4-way corner picker, size %, margin %, opacity sliders.
+  - Message controls: enable, text field with `{time_left}` token hint, 3-way position picker, font size %, opacity sliders, text color and optional background color (`SwiftUI.ColorPicker`), countdown date/time picker.
+- **`Views/RootView.swift`** — segmented picker at the top of the inspector pane (`Selection` / `Overlays`). Selection mode preserves existing cue and slide inspectors. Overlays mode binds to `project.stages[0].compositorOverlays`.
+- **`RGBAColor(color:)`** — SwiftUI `Color` → `RGBAColor` via `NSColor.usingColorSpace(.sRGB)`. Round-trip covered by unit test.
+
+### B12e — `ShowController` bridge
+
+- **`ShowController.applyCompositorOverlays(_:)`** — single forwarding method into `PlaybackController.compositorOverlays`.
+- **`RootView.syncCompositorOverlays()`** — wired via `.onChange(of: document.project.stages.first?.compositorOverlays)` and called once after `configureShowController()` so freshly opened projects pick up persisted overlays.
+
+### B12f — Composed frame in the preview tile
+
+- **`PlaybackController.compositorOverlays.didSet`** now calls `republishComposedPreview()` after invalidating the bug image cache. The helper takes the cached *base* frame, runs it through `CompositorPipeline.compose(...)` with the new overlays, and pushes the result to `transitionPreviewImage`. No-op when there's no current frame.
+- **`firePendingPostDissolveActivation`** no longer nil-clears `transitionPreviewImage`. The composed frame stays visible after a dissolve completes; previously the view fell back to raw `previewImage` / `AVPlayer` and lost overlays.
+- **`OutputPreviewView`** unchanged — already preferred `transitionPreviewImage` over the raw fallbacks; B12f just keeps that channel populated.
+
+## Tests added (session 4)
+
+| Test | What it covers |
+|---|---|
+| `OverlayInspectorTests.testRGBAColorRoundTripFromSwiftUIColor` | `RGBAColor(color:)` faithfully captures sRGB components and alpha. |
+| `OverlayInspectorTests.testInspectorModeCasesAndLabels` | `InspectorMode` enum has the expected cases / display labels. |
+| `OverlayInspectorTests.testShowControllerForwardsOverlaysToPlayback` | `ShowController.applyCompositorOverlays(_:)` writes through to `PlaybackController.compositorOverlays`; resetting to `.empty` clears it. |
+| `TransportSinkTests.testControllerOverlayAssignmentBeforeAnyFrameDoesNotPublishPreview` | Setting overlays before any submit must not synthesize a preview image (republish is a no-op when `currentFrame == nil`). |
+
+Total: 197 tests, all green (was 193 at start of session).
+
+## Manual verification needed (session 4 deltas)
+
+These require human eyeballs — autonomous tests don't drive SwiftUI views or compose against real DeckLink output.
+
+1. Open a fresh project, switch the inspector to **Overlays**.
+2. Enable the bug, click **Choose…**, pick a PNG → bug name appears, bug renders in the in-app preview after the next take.
+3. Cycle the corner picker (TL/TR/BL/BR) → bug repositions on preview without needing another take.
+4. Change size / margin / opacity sliders → preview re-composites live.
+5. Enable the message, type `Doors in {time_left}`, set a target 60s in the future → preview shows `Doors in 1:00` then ticks down (NB: only ticks on stills if a video is playing; for static stills the countdown is currently latched at the time of the last submit — see "Operator-facing follow-ups").
+6. Run a crossfade between two video cues with overlays on → bug + message persist through the dissolve, no double-bake on the trailing frame.
+7. Save the project, reopen → overlays state persists; preview re-composites with the saved bug + message after the first take.
+
+Hardware steps remain (still untested by autonomy):
+- DeckLink output composes overlays at SDI (the bridge submits the composed BGRA frame; visual confirmation requires a card).
+- Frame timing: overlays during 23.976 / 29.97 fractional crossfades.
 
 ---
 

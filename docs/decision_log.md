@@ -91,3 +91,35 @@ This also means the overlay "snaps in" instantly when toggled on (the cached bas
 - `Stage.compositorOverlays` (codable, defaults to `.empty` for legacy projects).
 - `final class CompositorPipeline` in `Playback/CompositorPipeline.swift` — `compose(baseFrame:overlays:canvasSize:nowDate:)`, `formatCountdown`, `renderedMessageText(overlay:nowDate:)`, `invalidateBugImageCache()`.
 - `PlaybackController.compositorOverlays: CompositorOverlays` — mutable, `didSet` flushes the bug image cache on media change.
+
+---
+
+## 2026-05-07 — B12d: Overlays inspector layout (segmented mode picker)
+
+**Decision**: Add a `Selection` / `Overlays` segmented picker at the top of the right-hand inspector pane in `RootView`. Selection mode keeps the existing cue / slide inspectors (whichever is selected). Overlays mode binds to `project.stages[0].compositorOverlays` and shows the new `OverlayInspectorView` (bug + message sections).
+
+**Why**: The session prompt flagged this as "stop-and-ask territory" because operator UX is at stake. Two reasonable options were considered:
+
+- **A: Segmented mode picker (chosen).** One inspector pane, a small picker at the top toggles between selection-driven inspector and overlays-driven inspector. No new tear-off, no new column.
+- **B: Always-visible "Stage Overlays" section appended below the cue/slide inspector.** Simpler discoverability, but pollutes the inspector when the operator is editing a cue and adds vertical pressure.
+
+A went out under Auto Mode because: (a) `Overlays` is project-level state, not selection-level, so blending it with cue/slide inspectors is conceptually muddy; (b) the operator's mental model already has a "what's selected vs what's the project doing" split (the cue inspector vs slide inspector swap is the same pattern); (c) keyboard shortcuts (e.g. quick-toggle "STAND BY") are a separate, larger product decision and weren't bundled into this change.
+
+If operators dislike the discovery cost ("they didn't notice the picker"), the right next move is a status-bar indicator that says "Overlays: bug + message active" with a click-to-jump affordance — not folding overlays into the selection inspector.
+
+**Alternatives considered**:
+
+- **Always-visible section**: rejected, see above.
+- **Tear-off Overlays window**: too heavy for v1; matches the spec's "tear-off" pattern but adds windowing complexity for a panel the operator visits once per show.
+- **Settings sheet**: rejected — modal-ish, and Show Mode forbids modals (spec §3.5).
+
+**Reversibility**: easy. Picker is two states; either could be dropped without affecting the data model.
+
+**What I'd revisit if**: operators ask for one-keystroke "STAND BY" toggling during show — that probably wants a hotkey + status-bar toggle rather than going through the inspector at all. Bundle with a future "Operator UX" task; do not retrofit into the inspector.
+
+**Public API impact**:
+- `OverlayInspectorView(overlays: Binding<CompositorOverlays>)` in `Views/OverlayInspectorView.swift`.
+- `enum InspectorMode { case selection, overlays }` in `Views/RootView.swift`.
+- `RGBAColor(color: SwiftUI.Color)` extension for the inspector's color pickers (sRGB-anchored via `NSColor.usingColorSpace(.sRGB)`).
+- `ShowController.applyCompositorOverlays(_ overlays: CompositorOverlays)` — single forwarder into `PlaybackController.compositorOverlays`. Called by `RootView` on `.onChange` of the first stage's overlays and once at controller configuration.
+
