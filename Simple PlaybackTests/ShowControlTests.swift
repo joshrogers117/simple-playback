@@ -122,4 +122,157 @@ final class ShowControlTests: XCTestCase {
         XCTAssertTrue(json.contains("\"status\":\"error\""))
         XCTAssertTrue(json.contains("\"error\":\"go_failed\""))
     }
+
+    // MARK: - HTTP Routes (D2)
+
+    func testHTTPRoutesDecodeGoFromBody() {
+        let body = #"{"target":"INTRO"}"#.data(using: .utf8)
+        let action = HTTPRoutes.action(method: "POST", path: "/api/v1/go", body: body)
+        guard case let .action(decoded) = action else {
+            XCTFail("expected action"); return
+        }
+        XCTAssertEqual(decoded, .go(target: "INTRO"))
+    }
+
+    func testHTTPRoutesDecodeGoWithoutTarget() {
+        let action = HTTPRoutes.action(method: "POST", path: "/api/v1/go", body: nil)
+        guard case let .action(decoded) = action else {
+            XCTFail("expected action"); return
+        }
+        XCTAssertEqual(decoded, .go(target: nil))
+    }
+
+    func testHTTPRoutesDecodeCueScrubSeconds() {
+        let body = #"{"seconds":12.5}"#.data(using: .utf8)
+        let action = HTTPRoutes.action(method: "POST", path: "/api/v1/cue/INTRO/scrub/seconds", body: body)
+        guard case let .action(decoded) = action else {
+            XCTFail("expected action"); return
+        }
+        XCTAssertEqual(decoded, .cueScrubSeconds(cueNumber: "INTRO", seconds: 12.5))
+    }
+
+    func testHTTPRoutesGetStateMapsToSnapshot() {
+        let action = HTTPRoutes.action(method: "GET", path: "/api/v1/state", body: nil)
+        guard case .stateSnapshot = action else {
+            XCTFail("expected stateSnapshot"); return
+        }
+    }
+
+    func testHTTPRoutesGetCueDetail() {
+        let action = HTTPRoutes.action(method: "GET", path: "/api/v1/cue/INTRO", body: nil)
+        guard case let .cueDetail(num) = action else {
+            XCTFail("expected cueDetail"); return
+        }
+        XCTAssertEqual(num, "INTRO")
+    }
+
+    func testHTTPRequestParserExtractsBearer() {
+        let raw = "GET /api/v1/state HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer abc123\r\n\r\n"
+        let buf = HTTPRequestBuffer()
+        buf.append(Data(raw.utf8))
+        let req = buf.nextRequest()
+        XCTAssertNotNil(req)
+        XCTAssertEqual(req?.bearerToken(), "abc123")
+        XCTAssertEqual(req?.method, "GET")
+        XCTAssertEqual(req?.path, "/api/v1/state")
+    }
+
+    func testHTTPRequestParserHandlesPOSTWithBody() {
+        let body = #"{"target":"INTRO"}"#
+        let raw = "POST /api/v1/go HTTP/1.1\r\nHost: localhost\r\nContent-Length: \(body.count)\r\n\r\n\(body)"
+        let buf = HTTPRequestBuffer()
+        buf.append(Data(raw.utf8))
+        let req = buf.nextRequest()
+        XCTAssertNotNil(req)
+        XCTAssertEqual(req?.method, "POST")
+        XCTAssertEqual(req?.body.flatMap { String(data: $0, encoding: .utf8) }, body)
+    }
+
+    func testHTTPRequestParserHandlesQueryString() {
+        let raw = "GET /api/v1/state?foo=bar&baz=qux HTTP/1.1\r\nHost: localhost\r\n\r\n"
+        let buf = HTTPRequestBuffer()
+        buf.append(Data(raw.utf8))
+        let req = buf.nextRequest()
+        XCTAssertEqual(req?.path, "/api/v1/state")
+        XCTAssertEqual(req?.queryParameters["foo"], "bar")
+        XCTAssertEqual(req?.queryParameters["baz"], "qux")
+    }
+
+    func testHTTPRequestParserDetectsWebSocketUpgrade() {
+        let raw = "GET /api/v1/events HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n"
+        let buf = HTTPRequestBuffer()
+        buf.append(Data(raw.utf8))
+        let req = buf.nextRequest()
+        XCTAssertEqual(req?.isWebSocketUpgrade, true)
+    }
+
+    // MARK: - WebSocket frames (D3)
+
+    func testWebSocketFrameRoundTrips() {
+        let payload = Data("hello".utf8)
+        let encoded = WebSocketFrame.encode(opcode: 0x1, payload: payload)
+        let frames = WebSocketFrame.decode(encoded)
+        XCTAssertEqual(frames.count, 1)
+        XCTAssertEqual(frames[0].opcode, 0x1)
+        XCTAssertEqual(frames[0].payload, payload)
+        XCTAssertTrue(frames[0].fin)
+    }
+
+    func testWebSocketFrameDecodesMaskedClientFrame() {
+        var data = Data([0x81, 0x85])
+        let mask: [UInt8] = [0x37, 0xFA, 0x21, 0x3D]
+        data.append(contentsOf: mask)
+        let plain = Array("Hello".utf8)
+        let masked: [UInt8] = plain.enumerated().map { (idx, b) in b ^ mask[idx % 4] }
+        data.append(contentsOf: masked)
+        let frames = WebSocketFrame.decode(data)
+        XCTAssertEqual(frames.count, 1)
+        XCTAssertEqual(String(data: frames[0].payload, encoding: .utf8), "Hello")
+    }
+
+    func testWebSocketFrameEncodes16BitLength() {
+        let payload = Data(repeating: 0x41, count: 200)
+        let encoded = WebSocketFrame.encode(opcode: 0x1, payload: payload)
+        // header byte 1 should indicate 126 (extended 16-bit length)
+        XCTAssertEqual(encoded[1] & 0x7F, 126)
+        let frames = WebSocketFrame.decode(encoded)
+        XCTAssertEqual(frames.first?.payload.count, 200)
+    }
+
+    // MARK: - State snapshot (D2)
+
+    func testStateSnapshotEncodesPlayheadAndTimecode() throws {
+        let state = ShowControlState()
+        var list = ShowList()
+        let cue = Cue(number: "INTRO", title: "Intro", assetID: UUID())
+        try list.append(cue)
+        state.updateShowList(list)
+        state.updatePlayhead(cueID: cue.id)
+        state.updateTimecode(source: "ltc:input1", engaged: true, locked: true, now: "01:00:00:00")
+
+        let snap = state.snapshot()
+        let json = StateSnapshotEncoder.json(snap)
+        let str = String(data: json, encoding: .utf8) ?? ""
+        XCTAssertTrue(str.contains("\"playhead\":\"INTRO\""))
+        XCTAssertTrue(str.contains("\"now\":\"01:00:00:00\""))
+        XCTAssertTrue(str.contains("\"engaged\":true"))
+    }
+
+    // MARK: - Auth tokens
+
+    func testAuthTokenStoreCRUD() {
+        let store = AuthTokenStore()
+        store.add(token: "tok-1", label: "default", capabilities: [.read, .fire])
+        XCTAssertTrue(store.contains(token: "tok-1"))
+        XCTAssertEqual(store.capabilities(for: "tok-1"), [.read, .fire])
+        store.remove(token: "tok-1")
+        XCTAssertFalse(store.contains(token: "tok-1"))
+    }
+
+    func testAuthTokenGenerateProducesUniqueValues() {
+        let a = AuthTokenStore.generateToken()
+        let b = AuthTokenStore.generateToken()
+        XCTAssertNotEqual(a, b)
+        XCTAssertGreaterThanOrEqual(a.count, 16)
+    }
 }
