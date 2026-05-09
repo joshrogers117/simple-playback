@@ -280,6 +280,7 @@ private struct ShowLogRowView: View {
         case .lateTake: .orange
         case .clear, .blackout: .orange
         case .go, .previous: .primary
+        case .cueEnded: .secondary
         case .showModeOn, .showModeOff: .accentColor
         case .oscAction, .httpAction, .timecodeTrigger: .secondary
         }

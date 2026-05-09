@@ -40,6 +40,13 @@ struct ShowLogEvent: Equatable {
         case oscAction = "OSC_ACTION"
         case httpAction = "HTTP_ACTION"
         case timecodeTrigger = "TC_TRIGGER"
+        /// v2 Post-Show Summary precondition (Q2-A) — the cue-runtime
+        /// `cueDidEnd` callback fires for every cue completion (auto-end,
+        /// PANIC-cleared, CLEAR-cleared, take-superseded). Pairs with `.go`
+        /// to give the post-show reducer a precise per-cue runtime; without
+        /// it, runtime can only be estimated from the next-GO timestamp,
+        /// which is wrong for groups / autoFollow / autoContinue.
+        case cueEnded = "CUE_ENDED"
     }
 
     enum Source: Equatable {
@@ -301,7 +308,8 @@ extension ShowLog {
                  (.runtimeVerbs, .clear),
                  (.runtimeVerbs, .blackout),
                  (.runtimeVerbs, .showModeOn),
-                 (.runtimeVerbs, .showModeOff):
+                 (.runtimeVerbs, .showModeOff),
+                 (.runtimeVerbs, .cueEnded):
                 return true
             case (.remoteActions, .oscAction),
                  (.remoteActions, .httpAction),

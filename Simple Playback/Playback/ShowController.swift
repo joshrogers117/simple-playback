@@ -478,11 +478,20 @@ final class ShowController: ObservableObject {
         )
     }
 
-    private func handleCueEnded(_ cue: Cue) {
+    /// Internal so tests can drive cue-end emission deterministically without
+    /// staging a full cue lifecycle through the runtime + DispatchQueue.main
+    /// hop. Mirrors `handleLiveSlideTransition`'s test seam shape.
+    func handleCueEnded(_ cue: Cue) {
         if liveCueID == cue.id {
             liveCueID = nil
         }
         revision &+= 1
+        // v2 Post-Show Summary precondition (Q2-A) — emit `.cueEnded` so the
+        // reducer can compute per-cue runtime as (cueEnded - go). The detail
+        // matches the `.go` event's descriptor (cue.number when present, else
+        // cue.title) so the reducer pairs them by descriptor.
+        let descriptor = cue.number.isEmpty ? cue.title : cue.number
+        showLog?.appendNow(action: .cueEnded, source: .system, detail: descriptor)
     }
 
     /// Resolve transition settings for a cue: per-cue crossfade duration overrides the project
