@@ -701,4 +701,59 @@ final class ShowControlTests: XCTestCase {
         let result = d.dispatch(.previous, source: .test, capabilities: [.read, .fire])
         guard case .ok = result else { return XCTFail("Expected .ok, got \(result)") }
     }
+
+    /// Pin: even when `dispatch` is called from a network queue (off-main),
+    /// the `onActionDispatched` callback must fire on the main thread. Its
+    /// downstream consumer (`ShowController.recordDispatchedAction` →
+    /// `ShowLog.appendNow`) is `@MainActor`-isolated, so an off-main
+    /// callback is a Swift concurrency hazard. This is the show-log fan-
+    /// out half of the session-25 P0 dispatcher fix.
+    func testDispatchedCallbackFiresOnMainEvenFromOffMainCaller() {
+        let runtime = makeShowControlRuntime()
+        let state = ShowControlState()
+        let d = ShowControlDispatcher(runtime: runtime, state: state)
+        let exp = expectation(description: "callback fires on main")
+        var callbackRanOnMain: Bool?
+        d.onActionDispatched = { _, _, _ in
+            // Capture the thread the callback fired on. This must be main
+            // because consumers downstream (show log + show controller) are
+            // @MainActor.
+            if callbackRanOnMain == nil {
+                callbackRanOnMain = Thread.isMainThread
+                exp.fulfill()
+            }
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            _ = d.dispatch(.previous, source: .test, capabilities: [.read, .fire])
+        }
+        wait(for: [exp], timeout: 2.0)
+        XCTAssertEqual(callbackRanOnMain, true,
+                       "onActionDispatched must run on main even when dispatch is called from a network queue.")
+    }
+
+    /// When `dispatch` is rejected before the runtime hop (capability
+    /// failure or idempotency lockout) the callback still routes through
+    /// `notifyDispatched`, so the same off-main → main hop applies. Pin
+    /// the rejection paths so a future refactor doesn't accidentally fire
+    /// the rejection callback synchronously from the network queue.
+    func testRejectedDispatchCallbackFiresOnMainEvenFromOffMainCaller() {
+        let runtime = makeShowControlRuntime()
+        let state = ShowControlState()
+        let d = ShowControlDispatcher(runtime: runtime, state: state)
+        let exp = expectation(description: "rejection callback fires on main")
+        var callbackRanOnMain: Bool?
+        d.onActionDispatched = { _, _, result in
+            if case .rejected = result, callbackRanOnMain == nil {
+                callbackRanOnMain = Thread.isMainThread
+                exp.fulfill()
+            }
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Empty capability set => capability check rejects.
+            _ = d.dispatch(.previous, source: .test, capabilities: [])
+        }
+        wait(for: [exp], timeout: 2.0)
+        XCTAssertEqual(callbackRanOnMain, true,
+                       "Rejection-path callback must also run on main.")
+    }
 }

@@ -116,7 +116,7 @@ final class ShowControlDispatcher {
         guard effectiveCaps.contains(required) else {
             let reason = "missing_capability:\(required.rawValue)"
             let result = ShowControlActionResult.rejected(reason: reason)
-            onActionDispatched?(action, source, result)
+            notifyDispatched(action, source, result)
             return result
         }
 
@@ -132,7 +132,7 @@ final class ShowControlDispatcher {
         }
         if suppressed {
             let result = ShowControlActionResult.rejected(reason: "retrigger_lockout")
-            onActionDispatched?(action, source, result)
+            notifyDispatched(action, source, result)
             return result
         }
 
@@ -154,7 +154,7 @@ final class ShowControlDispatcher {
             }
             return perform(action, source: source)
         }
-        onActionDispatched?(action, source, result)
+        notifyDispatched(action, source, result)
         return result
     }
 
@@ -163,6 +163,35 @@ final class ShowControlDispatcher {
             return work()
         }
         return DispatchQueue.main.sync(execute: work)
+    }
+
+    /// Invoke `onActionDispatched` on the main thread. The downstream
+    /// consumer is `ShowController.recordDispatchedAction` (a `@MainActor`
+    /// instance method that calls `ShowLog.appendNow` — also `@MainActor`).
+    /// OSC and HTTP arrive on `NWConnection` queues; without this hop
+    /// the callback runs off-main and the `@MainActor`-isolated chain
+    /// becomes a Swift concurrency hazard. Same shape as the runtime
+    /// hop above, just one layer further out — the session-25 P0 fix
+    /// covered the runtime mutation; this closes the show-log fan-out.
+    ///
+    /// Async (not sync) because the OSC/HTTP servers don't depend on
+    /// the callback firing before `dispatch(...)` returns — they build
+    /// their reply envelopes from the returned `ShowControlActionResult`.
+    /// Async also avoids any chance of a network-queue → main deadlock
+    /// when the callback eventually appends to the show log.
+    private func notifyDispatched(
+        _ action: ShowControlAction,
+        _ source: ShowControlSource,
+        _ result: ShowControlActionResult
+    ) {
+        guard let cb = onActionDispatched else { return }
+        if Thread.isMainThread {
+            cb(action, source, result)
+        } else {
+            DispatchQueue.main.async {
+                cb(action, source, result)
+            }
+        }
     }
 
     /// Computes the *effective* capability set for a token in the current
