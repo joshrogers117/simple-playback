@@ -1316,3 +1316,49 @@ The new docs follow the session-27 template exactly: spec source, "why v2 not v1
 - A new spec §4 item moves up the priority list (e.g., Tally inbound becomes near-term because an operator buys an ATEM rig). Add a doc following the same template; link from `docs/v2/README.md`.
 - The dependency map turns out wrong as an actual implementation begins. Update README first; revisit affected docs second.
 - A v2 candidate splits into two (e.g., Output Profile and Looks ship independently with different operator audiences). Split the doc into two; preserve the cross-references.
+
+---
+
+## 2026-05-08 — Session 29: first v2 sub-phase begins — Post-Show Summary pure-logic core
+
+**Decision**: Pick **Option C** from the session-28 next-session-prompt menu and start the v2 Post-Show Summary sub-phase. Ship the pure-logic core in five commits — `.cueEnded` + `.takeLatency` show-log delta (sub-tasks 1 + 2), `PostShowSummary` reducer (sub-task 3), Markdown exporter (sub-task 4), CSV exporter (sub-task 5). Defer the operator-visible sheet UI (sub-task 6) and the REF / audio-device / lock-file system-event log integration (sub-task 7) to a future session that can answer the remaining open product questions with operator input.
+
+**Why**: Among the 13 pre-scoped v2 candidates, Post-Show Summary is the most autonomous-friendly because (a) it builds entirely on existing v1 infrastructure (ShowLog, TakeHistory, ShowController), (b) the bulk is pure-logic reducer + exporters, (c) every open product question in `docs/v2/post_show_summary.md` has a "my recommendation" option that's reasonable to take autonomously without operator input, (d) the resulting code surface is high-coverage at the unit level (60 new tests added, 747 → 807 = +60). Other candidates either need operator UX choice up front (Output Profile / Looks UI placement, Director View layout), depend on hardware (NDI Full sender SDK distribution), or involve foundational refactors that read better with operator review (Group Cues' cue-model expansion, audio sub-phase).
+
+The session adopts these answers to the open product questions:
+
+- **Q2 (cue runtime measurement) — A**: emit `.cueEnded` from `ShowController.handleCueEnded`. Detail field carries the same descriptor (`cue.number` if non-empty, else `cue.title`) the `.go` event uses so the reducer pairs them by descriptor + chronology with FIFO ordering. Cue-id case-insensitivity (per A2) honoured by lowercasing the key.
+- **Q3 (latency-from-GO-to-first-frame) — C**: `.takeLatency` event emitted for every late-take detector verdict (both on-time and late). The existing `.lateTake` event continues to fire only for late verdicts (operator-readable highlight in the show log); `.takeLatency` is the histogram superset. Histogram bucket boundaries match the pre-scope doc — `<50ms`, `50-100ms`, `100-200ms`, `200-500ms`, `>=500ms`.
+- **Q4 (system event filters) — A** for v2.0: just the v1 system events (`.missingMedia`, `.droppedFrame`, `.lateTake`, `.takeLatency`). The Q4-B widening (REF lock-state changes, audio-device flips, lock-file foreign detections) is sub-task 7 and deferred — it requires the relevant subsystems to push events to the show log and that's a delta to four separate Services that's better handled with operator review of which events warrant operator-visible log entries.
+- **Q5 (format) — B**: Markdown for human consumption (paste into post-show email) and CSV for the producer's spreadsheet. PDF / HTML deferred to v2.1 per the doc rationale.
+
+**Q1 (time window) and Q6 (sensitive-data redaction)** are sub-task 6 (sheet UI) territory and are NOT decided here — both depend on operator UX choice (date-picker placement / multi-day file aggregation; default redaction posture and toggle visibility). The reducer takes events as input, so the sheet's date-picker can read whatever slice the operator wants without changing the reducer contract.
+
+**Alternatives considered**:
+
+- **Pick PowerPoint import** (highest "operator-visible immediately" leverage). Rejected — operationally complex (LibreOffice license + binary distribution decision), requires SDK research that's not autonomous-friendly, first slice is much larger than 5-7 commits.
+- **Pick MIDI Show Control + AppleScript dictionary** (the "integrator surface v2" cluster). Rejected — both need a `.sdef` / Core MIDI surface that depends on the existing Phase D MIDI client (which is currently used by D13 MTC chase); requires careful coordination + the LTC/MTC infrastructure overlap research that's better with the operator at the keys for the integration test path.
+- **Pick Output Profile / Looks** (closes the long-promised `/sp/look/recall` ack-only stub). Rejected — UX-heavy (per-project vs per-machine, recall semantics, hotkey scheme, drift detection); even the "safe" recommendations in the doc would lock in operator-visible behaviour autonomously when the answers really need rehearsal feedback.
+- **Bundle the sheet UI (sub-task 6) into this session**. Rejected — Q1 (date picker scope) and Q6 (redaction default) are real UX choices; landing them autonomously would either oversimplify (skip the redaction toggle entirely) or over-build (full multi-day file aggregator). Better to ship the pure-logic core that's invariant under those choices and let a future session pick up the sheet with operator input.
+- **Bundle sub-task 7 (system-event integration)**. Rejected — touches REF state machine (B6b), audio-device probe (E1), lock-file controller (E8) and each push-to-show-log delta needs a "is this verbose enough to operator" judgement call that's better with rehearsal feedback.
+
+**Reversibility**: medium. The two new `ShowLogEvent.Action` cases (`.cueEnded`, `.takeLatency`) become persisted in `<bundle>/Logs/<date>.log` rows once the show runs; reverting would leave the existing log files with rows the new code can't decode (the post-show reducer handles unknown actions by ignoring them, but the show-log viewer's `ActionFilter.matches` switch would break the build if a case is removed — exhaustive switches over the enum are throughout the codebase). Net: keep the action cases even if the post-show feature is later removed; the cost of the rows is a few bytes per cue.
+
+The reducer + exporters are pure-logic Swift with no external dependencies; trivially reversible (`git rm`).
+
+**What I'd revisit if**:
+
+- An operator reports the post-show Markdown / CSV is the wrong shape for their downstream pipeline (e.g., they want one section per CSV file, not eight sections in one file; or they want JSON, not CSV). The exporters are pure-function, so adding a third format is a sibling file with the same `export(_ summary:)` signature.
+- The `.takeLatency` row volume turns out to be too high (one event per cue fire = thousands per show). Mitigation: the existing `.lateTake` event covers the operator-readable subset; `.takeLatency` is the histogram input. If volume becomes a problem, the post-show reducer can sample (every Nth event) at parse time without changing the emit path.
+- Q4-B (REF / audio-device / lock-file system events) becomes load-bearing because operators want a single post-show "did anything go wrong" view. Sub-task 7 is the natural follow-on; the SystemEvent type already accepts arbitrary `ShowLogEvent.Action` values so adding new cases doesn't break the reducer.
+- The sheet UI (sub-task 6) uses `Text(.init(markdown))` and operators report the tables don't render. Two paths: drop tables for SwiftUI-native list rows (rebuild the renderer per-section) or keep the source-rendered Markdown and document the limitation. Either is a sheet-only delta — the export path still produces real Markdown.
+
+**Public API delta (this session)**:
+
+- `ShowLogEvent.Action` adds `.cueEnded` (raw `CUE_ENDED`) and `.takeLatency` (raw `TAKE_LATENCY`). Filter routes: `.cueEnded` under `runtimeVerbs`, `.takeLatency` under `systemEvents`.
+- `ShowController.handleCueEnded(_ cue:)` is now `internal` (was `private`) so tests can drive cue-end emission deterministically, mirroring the existing `handleLiveSlideTransition` test seam shape.
+- `Services/PostShowSummary.swift` — new value type + reducer (`PostShowSummary.from(events:)`). Empty-window sentinel (`.empty`) for nil-free callers.
+- `Services/PostShowMarkdownExporter.swift` — pure-function `export(_:)` + a public `formatDuration(_:)` helper (used by the elapsed-time row in the window header) that's exposed because tests pin the format at boundaries.
+- `Services/PostShowCSVExporter.swift` — pure-function `export(_:)`. No public helpers; section layout is the contract.
+
+**Public API of any of the above is otherwise unchanged.** No protocol changes, no migrations, no entitlements.

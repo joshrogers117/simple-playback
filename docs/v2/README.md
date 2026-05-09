@@ -2,7 +2,7 @@
 
 Planning docs for v2 enablement candidates from `docs/spec/feature_spec.md` §4 and `docs/handoff.md`. Each doc captures: spec-text source, open product questions, dependency map, and a suggested first-slice. **None of the docs commit to scope or order** — they exist so a future planning round arrives at a clear go/no-go decision faster than starting from a cold spec read.
 
-Filed: 2026-05-08, session 27. Doc-only deliverable; no code changes. **Session 28** (2026-05-08) added 6 more candidates from spec §4: Output Profile / Looks, MIDI Show Control, AppleScript dictionary, Group Cues, Post-Show Summary, Watched Drop Folder.
+Filed: 2026-05-08, session 27. Doc-only deliverable; no code changes. **Session 28** (2026-05-08) added 6 more candidates from spec §4: Output Profile / Looks, MIDI Show Control, AppleScript dictionary, Group Cues, Post-Show Summary, Watched Drop Folder. **Session 29** (2026-05-08) began the first v2 sub-phase — Post-Show Summary pure-logic core + Markdown + CSV exporters shipped; see `post_show_summary.md` "Session 29 — what shipped" for the slice manifest.
 
 ---
 
@@ -41,7 +41,7 @@ These docs are **not** the contract — `docs/spec/feature_spec.md` is. These ar
 ### Operational
 
 - **[Bundle for Travel cross-host rehearsal](bundle_for_travel_cross_host.md)** — multi-machine rehearsal protocol + targeted fixes for cross-host bookmark / hostname / output-binding portability. 5-8 commits, mostly contingent on rehearsal findings.
-- **[Post-Show Summary Report](post_show_summary.md)** — reducer over the Show Log + Markdown / CSV exporters. Builds on E3 ShowLog + E5 TakeHistory. 5-7 commits.
+- **[Post-Show Summary Report](post_show_summary.md)** — reducer over the Show Log + Markdown / CSV exporters. Builds on E3 ShowLog + E5 TakeHistory. 5-7 commits. **First slice (sub-tasks 1-5) shipped session 29 — pure-logic core + Markdown + CSV exporters; sheet UI + system-event integration deferred.**
 
 ---
 

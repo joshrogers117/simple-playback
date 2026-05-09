@@ -1,9 +1,41 @@
 # v2 Pre-Scope — Post-Show Summary Report
 
-**Status**: pre-scope (planning only — no code).
-**Filed**: 2026-05-08, session 28.
+**Status**: in progress — first-slice (sub-tasks 1–5) shipped session 29.
+**Filed**: 2026-05-08, session 28. **Updated**: 2026-05-08, session 29.
 **Spec source**: `docs/spec/feature_spec.md` §4 item 18 ("Post-show summary report (CSV + human readable).").
-**Progress source**: not in `docs/progress.md` — v2 spec §4 candidate. Builds on v1 ShowLog (E3) + Take History (E5).
+**Progress source**: `docs/progress.md` G-postShow. Builds on v1 ShowLog (E3) + Take History (E5).
+
+## Session 29 — what shipped
+
+Five pure-logic commits land the data + format core. The operator-visible UI and the system-event integration delta are deferred pending operator input.
+
+| Sub-task | Status | Commit | Tests |
+|---|---|---|---|
+| 1. `.cueEnded` log event + emit (Q2-A) | shipped | `showlog: emit .cueEnded log entry on every cue completion (post-show v2 Q2-A)` | +5 |
+| 2. `.takeLatency` log event + emit (Q3-C) | shipped | `showlog: emit .takeLatency on every late-take verdict (post-show v2 Q3-C)` | +5 |
+| 3. `PostShowSummary` reducer | shipped | `postshow: add PostShowSummary pure-logic reducer (post-show v2 first slice)` | +19 |
+| 4. Markdown exporter | shipped | `postshow: add Markdown exporter for PostShowSummary (post-show v2 second slice)` | +15 |
+| 5. CSV exporter | shipped | `postshow: add CSV exporter for PostShowSummary (post-show v2 third slice)` | +14 |
+| 6. Sheet UI + toolbar wiring | deferred | — | — |
+| 7. REF / audio-device / lock-file system-event log integration (Q4-B) | deferred | — | — |
+
+**Total session delta**: 5 commits, 749 → 807 tests (+58).
+
+**Decisions ratified**:
+
+- **Q2 (cue runtime measurement) — A**: emit `.cueEnded` from `ShowController.handleCueEnded`. Detail field carries the same descriptor (`cue.number` if non-empty else `cue.title`) the `.go` event uses; reducer pairs them by descriptor + chronology FIFO with case-insensitive matching (per A2).
+- **Q3 (latency-from-GO-to-first-frame) — C**: `.takeLatency` event for every late-take detector verdict (both on-time and late). Existing `.lateTake` continues to fire only when verdict crosses threshold (operator-readable highlight); `.takeLatency` is the histogram superset. Buckets: `<50ms`, `50-100ms`, `100-200ms`, `200-500ms`, `>=500ms`.
+- **Q4 (system event filters) — A for v2.0**: just the v1 system events (`.missingMedia`, `.droppedFrame`, `.lateTake`, `.takeLatency`). The Q4-B widening is sub-task 7 and defers to operator review.
+- **Q5 (format) — B**: Markdown for human consumption + CSV for the producer's spreadsheet. PDF / HTML deferred to v2.1.
+
+**Decisions deferred** to a future session (need operator UX input):
+
+- **Q1 (time window)**: D (since-launch with optional date-picker widening) is the my-recommendation default but the date-picker UX shape — single date vs range, multi-day file aggregation — is sheet-only and benefits from operator preview before locking in.
+- **Q6 (sensitive-data redaction)**: C (operator-toggle in export sheet, default A unredacted) is the my-recommendation but defaults are easier to set after seeing one rehearsal's worth of source-attribution rows.
+
+The pure-logic reducer + exporters are invariant under both Q1 and Q6 — Q1 is just "which events to pass to the reducer" (the exporters render whatever slice they're given); Q6 is a per-cell post-processing pass over the rendered output (a `RedactionRule` injection at view time).
+
+## Carryover from session 28 (original pre-scope)
 
 ---
 
