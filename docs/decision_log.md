@@ -1482,4 +1482,59 @@ Architecture polish: `CueStandbyState` + `CueRuntimeRejection` demoted from `pub
 - v2: paused at user direction; 12 of 13 candidates not started.
 - Lower-priority follow-ups: ThumbnailGenerator.Failure naming, `.localHotkey` orphan disposition, ShowControlHub per-doc bind stack, the 4 LTC decoder limitations (need hardware), MTC/LTC reader-level tests.
 
+---
+
+## 2026-05-09 — Polish-pass deferred-follow-up cleanup (continuation): 4 commits closing 4 of 6 deferred items
+
+**Decision**: Continue the same calendar day's polish work by walking the polish-pass deferred-follow-up list from the bottom of the previous entry. Pick the items that are autonomous-friendly (no operator UX choice, no hardware) and ship them in a single longer session per the user's "cover more ground per session" instruction.
+
+**4 commits, 881 → 897 tests (+16)**:
+
+1. **`.localHotkey` source case documented as reserved** (`Services/ShowLog.swift`). Investigation confirmed the case has no production producer: SwiftUI's `Button { … }.keyboardShortcut(…)` model collapses click + shortcut invocation into the same closure with no callsite signal for which input fired, so every transport-bar / Cmd-key shortcut lands as `.operatorButton` today. Removing the case would silently widen `.operatorButton` to cover what was previously a distinct attribution and would break any future log-replay tooling that parses the on-disk "local" label string. Documented in-source with the SwiftUI rationale + the path forward (NSEvent monitor wrapper, or a `Commands { }` migration that splits the menu-driven shortcut path away from the button click path) so a future contributor sees why the case exists. The polish-pass deferral note named `ShowControlSource.localHotkey` but the case actually lives on `ShowLogEvent.Source` — typo noted in the commit message.
+
+2. **`ThumbnailGenerator.Failure` / `FilmstripGenerator.Failure` → top-level `*Error`** (`Services/ThumbnailGenerator.swift`, `Services/FilmstripGenerator.swift`, `Services/FilmstripCoordinator.swift` + tests). Cosmetic alignment with every sibling Services-tier error type (`PDFImportError`, `KeynoteImportError`, `MediaImportError`, `TranscodeError`, `AssetFingerprintError`, `BundleForTravelError`, `ImageSequenceEncodeError`) and ShowControl-tier (`MTCReaderError`, `OSCDecodingError`). Top-level enum so `catch let e as ThumbnailGeneratorError` doesn't need to qualify the generator namespace. `FilmstripCoordinator.Outcome.failed` payload type updated; coordinator's call shape unchanged.
+
+3. **`ShowControlHub` per-document bind stack** (`ShowControl/ShowControlHub.swift` + `Playback/ShowController.swift` + new `ShowControlHubTests.swift`). The hub previously held a single `(runtime, callback)` slot — opening doc B overwrote doc A, and closing doc B left the hub pointing at a stale callback that captured a now-deinitialised ShowController via `[weak self]` (so dispatched actions silently no-op'd instead of routing back to A). Replaced with a per-document bind stack:
+
+   - `bind(runtime:onActionDispatched:) -> BindToken` pushes an entry; the most-recently-bound is the "active" one.
+   - `unbind(token:)` pops the matching entry; if it was active, the next-most-recently-bound becomes active automatically. Open doc B while doc A is bound, close B → control returns to A.
+   - `dispatcher.runtime` tracks the active entry. An installed-once fan-in closure on `dispatcher.onActionDispatched` routes every dispatched action to the active entry's callback, replacing the old per-document direct overwrite of `onActionDispatched`.
+   - `ShowController` stores the token and unbinds from `deinit` (hops to main since `@MainActor` classes don't guarantee main-actor `deinit`).
+   - A `BindToken.placeholder` value lets `ShowController` declare the property as `var` with a sentinel initial value so all stored properties finish initialising before the bind closure captures `self` (Swift's definite-init check rejects passing `self` into the closure otherwise). The placeholder is never inserted into the bindings list so unbinding it is a no-op.
+
+   8 new tests pin: bind/unbind depth + token equality, fan-in routes to most-recent, unbind-active restores previous, unbind-non-active leaves active untouched, empty-stack fan-in is harmless, runtime tracking. The existing test pattern of invoking `ShowControlHub.shared.stack.dispatcher.onActionDispatched?(...)` continues to work — that closure IS the fan-in, which now routes through the active binding's callback.
+
+4. **MTCReader quarter-frame assembly coverage** (`ShowControl/MTCReader.swift` + new `MTCReaderTests.swift`). The CoreMIDI client/port/source surface remains hardware-bound (D13 rehearsal). The 8-piece quarter-frame state machine that turns 0xF1-prefixed System Common bytes into a `TimecodeValue` with the right rate is pure logic on the reader's own state and was untested. Added `ingestQuarterFrameForTesting(byte:)` seam that bypasses CoreMIDI plumbing and feeds the assembler directly. 8 tests cover: 4-rate decoding (24 / 25 / 29.97-NDF / 30 fps), field-7 nibble layout (hours bit 4 + 2 rate bits), incomplete sequence (7 of 8) does not emit, hours >= 24 sanity-rejected, frames >= rate.integerFPS sanity-rejected, resync after a full assembly.
+
+**Why these four (and not the others)**:
+
+The polish-pass list had 6 deferred items. The 2 not picked up:
+
+- **The 4 LTC decoder limitations filed inline in `LTCRoundTripTests.swift`** — every one needs real LTC capture from a hardware generator to validate the synthesised vs real-signal hypothesis. The current synthesis tests in `LTCRoundTripTests` already cover what's testable without hardware.
+- **LTCReader reader-level coverage** — beyond the decoder (which is covered) the reader's surface is just `AVAudioEngine` input-tap orchestration that requires a real input device. The test would either need a synthesised audio device (significant infrastructure) or a real input. Not autonomous-friendly.
+
+Both surface on `docs/manual_verification.md` as hardware rehearsal items.
+
+**Why the per-doc bind stack now and not at the polish pass**: the polish-pass entry described it as "needs operator review for the per-doc stack approach" — implying multiple semantically distinct designs. On revisit, the LIFO (most-recently-bound wins, pop on close) semantics is the unambiguous default that matches how every Mac-native NSDocument app handles document scope (e.g., the menu bar binds to the most-recently-key window, closing it returns binding to the previous). The two operator-visible alternatives — front-window-wins (NSWindow key/main observation) and explicit-active-toggle (per-doc UI) — both require operator UX choices the LIFO default doesn't, and both can be added as orthogonal layers on top of the LIFO base if a future operator pull surfaces. So the LIFO base lands now; the alternatives stay deferred until pulled.
+
+**Reversibility**: each commit is a clean revert. The hub refactor is the only one with non-trivial behaviour implications; the 8 pin tests document the contract so a future revert would visibly break them. The two `*Error` renames are mechanical search-and-replace.
+
+**What I'd revisit if**:
+
+- A future operator runs multi-document workflows in anger and reports the LIFO semantics is wrong (e.g., they want a "this is the show document" toggle rather than implicit binding by recency). The bind stack supports adding an "active override" layer above the LIFO order without breaking the existing API; tests would extend to cover the override.
+- A future hotkey-attribution surface ships (NSEvent monitor or Commands migration) that distinguishes click from shortcut. Then `.localHotkey` becomes producible and the documented "reserved" rationale gets reduced to a one-line history note.
+- LTCReader gets a synthesised-audio-device test infrastructure (either via AVAudioEngine offline mode or a sample-injection seam similar to the MTCReader's). At that point reader-level tests for LTCReader become tractable without hardware.
+
+**Public API delta**:
+
+- `ShowControlHub` — new types `BindToken` (`.placeholder` static), API surface gained `bind(runtime:onActionDispatched:) -> BindToken`, `bind(runtime:) -> BindToken` (no-callback overload, used by tests), `unbind(token:)`. Lost `bind(runtime:)` returning `Void`. The `stack` property is unchanged. `resetBindingsForTesting()` + `bindingDepthForTesting` are test seams documented as such.
+- `ShowController` — gains `private var hubBindToken` (placeholder-initialised) + a `deinit` that hops to main and unbinds. The `init` no longer sets `dispatcher.onActionDispatched` directly; that wiring moves into the hub's `bind(...)` callback parameter.
+- `MTCReader` — gains internal `ingestQuarterFrameForTesting(byte:)` seam. No production API change.
+- `ThumbnailGeneratorError` and `FilmstripGeneratorError` — new top-level types replacing the nested `Failure`. Callers `catch let e as ThumbnailGeneratorError` (was `ThumbnailGenerator.Failure`).
+- `ShowLogEvent.Source.localHotkey` — doc-only update; behaviour unchanged.
+
+**No protocol changes, no migrations, no entitlements.**
+
+---
+
 **The honest recommendation in the next-session prompt**: "ask the user whether they want more code or are ready to move to rehearsal. The code is in genuinely polished shape."
