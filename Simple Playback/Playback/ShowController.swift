@@ -145,6 +145,15 @@ final class ShowController: ObservableObject {
         }
         let descriptor = pendingLateTakeCueDescriptor ?? "?"
         pendingLateTakeCueDescriptor = nil
+        // v2 Post-Show Summary precondition (Q3-C) — every verdict emits a
+        // `.takeLatency` row so the reducer can bin all takes into a histogram.
+        // The existing `.lateTake` row continues to fire only when the verdict
+        // crossed the threshold (operator-readable highlight in the show log).
+        showLog?.appendNow(
+            action: .takeLatency,
+            source: .system,
+            detail: "latency=\(verdict.latencyMS)ms cue=\(descriptor)"
+        )
         if verdict.isLate {
             showLog?.appendNow(
                 action: .lateTake,

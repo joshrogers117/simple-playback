@@ -47,6 +47,15 @@ struct ShowLogEvent: Equatable {
         /// it, runtime can only be estimated from the next-GO timestamp,
         /// which is wrong for groups / autoFollow / autoContinue.
         case cueEnded = "CUE_ENDED"
+        /// v2 Post-Show Summary precondition (Q3-C) — every late-take detector
+        /// verdict emits a `.takeLatency` event, regardless of whether the
+        /// take was on time or late. The post-show reducer bins these into a
+        /// histogram (5 buckets per the pre-scope doc) so operators see the
+        /// shape of the distribution, not just the outliers. The existing
+        /// `.lateTake` event continues to fire only for late verdicts —
+        /// `.takeLatency` is the superset, `.lateTake` is the operator-
+        /// readable highlight.
+        case takeLatency = "TAKE_LATENCY"
     }
 
     enum Source: Equatable {
@@ -317,7 +326,8 @@ extension ShowLog {
                 return true
             case (.systemEvents, .missingMedia),
                  (.systemEvents, .droppedFrame),
-                 (.systemEvents, .lateTake):
+                 (.systemEvents, .lateTake),
+                 (.systemEvents, .takeLatency):
                 return true
             default:
                 return false
