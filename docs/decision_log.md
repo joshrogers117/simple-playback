@@ -1218,3 +1218,24 @@ Session 25 picked the recommended Option B + Option C combo: F1 code-reviewer au
 - A second app or sibling-tool needs to write or read our `.lock` format. Then we'd document the schema as a public contract and pin `gethostname(2)` formally; nothing changes in this app's code.
 
 ---
+
+## 2026-05-08 — F1 P2: AVTrackLoader async-API migration paired with C12 (session 26)
+
+**Decision**: Defer the AVTrackLoader async-API migration to the C12 audio engine refactor. Update the source comment to name C12 as the paired work item and explain why AudioPump (one of the three callers) is the constraint. The deferred item from the session-25 F1 reviewer sweep stays open as a "future-session pickup" but is now scoped to land alongside the v2 audio sub-phase rather than as an isolated Phase F commit.
+
+**Why**: Three call sites consume `AVTrackLoader`'s sync entry points — `MediaImporter.importSlides(...)`, `MediaFlagsInspector.inspect(url:)`, and `AudioPump`'s asset/track resolution path. The first two run at import time and would migrate cleanly to an async entry point with a `Task { await loader.loadFirstVideoTrackInspection(...) }` wrap. The third sits on the AVAssetReader prep path; an async migration there pulls a `Task { … }` boundary into audio prep, which the v2 C12 work (48 kHz / 32-bit float / 8-channel routing matrix) is going to reshape anyway. Migrating in two passes — once at Phase F to satisfy the cooperative-pool footgun, then again at C12 to fit the new audio architecture — is wasted work. The import-time-only call discipline mitigates the footgun in the meantime: no hot render or audio queue calls into AVTrackLoader.
+
+**Alternatives considered**:
+
+- **Migrate the two import callers now, leave AudioPump on sync**: rejected — splits the API surface (some callers see async, some see sync) and forces a second pass at C12 anyway. Marginal benefit for the import callers (they're already off-hot-path).
+- **Migrate everything now and accept the C12 rework**: rejected — the audio prep code that would land at Phase F would be discarded at C12. Two-pass cost without intermediate value.
+- **Add a kCFRunLoop-based sync wrapper instead of DispatchSemaphore**: rejected — same footgun, different shape; doesn't address the underlying "sync entry blocking on a detached Task" concern.
+
+**Reversibility**: easy. The comment update is text-only; no code path changed. Whenever C12 lands, the loader's two static methods get reshaped to `async` and the three call sites migrate at the same time.
+
+**What I'd revisit if**:
+
+- C12 slips out of v2 scope. Then the import-time callers would migrate independently as a Phase F follow-up, and AudioPump would keep the sync wrapper with a more explicit "v2 candidate" callout.
+- A new caller appears outside the import / audio-prep envelope (e.g. a hot-render-path query for track properties). The call discipline that mitigates the footgun would no longer hold; migrate at that point.
+
+---

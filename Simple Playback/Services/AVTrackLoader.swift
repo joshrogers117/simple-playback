@@ -28,6 +28,19 @@ struct AVTrackInspection {
 /// pipeline. The `@unchecked Sendable` carriers are safe because the
 /// semaphore enforces happens-before across the AVF completion / Task
 /// boundary.
+///
+/// **Async-API migration is paired with C12 audio engine refactor**, not a
+/// v1 sub-task. Three call sites would need simultaneous migration —
+/// MediaImporter (import-time, easy), MediaFlagsInspector (also import-time),
+/// and AudioPump (whose `loadFirstAudioTrack(url:)` consumer sits on the
+/// AVAssetReader prep path). AudioPump is the constraint: an async entry
+/// point pulls a `Task { … }` boundary into the audio prep, which the v2
+/// 48 kHz / 32-bit float / 8-channel routing-matrix work is going to
+/// reshape anyway. Migrating now would mean rewriting the prep path twice;
+/// migrating at the C12 boundary lets the new audio path land async-native.
+/// Until then, the cooperative-pool footgun (sync entry blocking on a
+/// detached Task) is mitigated by the import-time-only call discipline:
+/// no caller runs from a hot render or audio queue.
 enum AVTrackLoader {
 
     /// Load the first video track at `url` plus its frame-rate and
