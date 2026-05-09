@@ -36,6 +36,36 @@ final class ShowLogTests: XCTestCase {
         XCTAssertEqual(parts[4], "Q1")
     }
 
+    func testCSVLineFiveFieldShapeSurvivesCommaInDetail() {
+        // Tightening the field-shape pin: the original test split on `,`
+        // without honouring RFC 4180 quoting, so a future detail string
+        // with an embedded comma would silently bump the field count and
+        // pass a different per-cell layout. Re-pin via a quoted-aware
+        // parser (count quote-balance manually).
+        let event = makeEvent(action: .go, source: .localHotkey, detail: "Q,1")
+        let line = event.csvLine()
+        // Walk the line and split only on commas outside of `"..."`.
+        var fields: [String] = []
+        var current = ""
+        var inQuotes = false
+        for ch in line {
+            if ch == "\"" {
+                inQuotes.toggle()
+                current.append(ch)
+            } else if ch == "," && !inQuotes {
+                fields.append(current)
+                current = ""
+            } else {
+                current.append(ch)
+            }
+        }
+        fields.append(current)
+        XCTAssertEqual(fields.count, 5, "Quoted detail must still produce 5 fields.")
+        XCTAssertEqual(fields[2], "GO")
+        XCTAssertEqual(fields[3], "local")
+        XCTAssertEqual(fields[4], "\"Q,1\"")
+    }
+
     func testCSVQuotesFieldsThatContainCommas() {
         let event = makeEvent(detail: "Cue 1, Reload Show")
         XCTAssertTrue(event.csvLine().contains("\"Cue 1, Reload Show\""))

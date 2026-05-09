@@ -501,13 +501,22 @@ final class ShowControlTests: XCTestCase {
     func testDispatcherPingReturnsUptime() {
         let runtime = makeShowControlRuntime()
         let state = ShowControlState()
+        // Note: clockNow drives the dispatcher's idempotency lockout clock,
+        // NOT the uptime — uptime is sampled from `Date()` against
+        // `state.startedAt` (also Date()), so it's real wall-clock elapsed.
         var clockNow: TimeInterval = 0
         let d = ShowControlDispatcher(runtime: runtime, state: state, clock: { clockNow })
         clockNow = 42
         let result = d.dispatch(.ping, source: .test, capabilities: [.read, .fire])
         guard case let .ok(data) = result else { XCTFail(); return }
         guard case let .double(uptime) = data["uptime"] else { XCTFail(); return }
+        // Tightening from `>= 0`: pin a sane upper bound so a regression
+        // that returns absolute-time-since-1970 (or a negative result
+        // from a future arithmetic bug) is caught. The state was created
+        // microseconds ago in this test; 5 seconds is a generous cap.
         XCTAssertGreaterThanOrEqual(uptime, 0)
+        XCTAssertLessThan(uptime, 5,
+                          "Uptime should reflect time since state init, not absolute clock; got \(uptime).")
     }
 
     func testApiVersionAppearsInEveryReply() {

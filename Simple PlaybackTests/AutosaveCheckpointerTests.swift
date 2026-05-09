@@ -15,7 +15,14 @@ final class AutosaveCheckpointerTests: XCTestCase {
             reason: .showModeOn
         )
         XCTAssertTrue(cp.filename.hasSuffix("__show_mode_on.json"))
-        XCTAssertTrue(cp.filename.contains("2023"))
+        // `contains("2023")` would also match year 12023 / 20231 — pin the
+        // exact prefix shape so a future timestamp encoder regression is
+        // caught (the format is `YYYY-MM-DDTHHMMSSZ`).
+        let isoPrefix = cp.filename.components(separatedBy: "__").first ?? ""
+        XCTAssertTrue(isoPrefix.hasPrefix("2023-11-"),
+                      "Timestamp 1_700_000_000 (2023-11-14) should produce an ISO-8601 prefix. Got: \(isoPrefix)")
+        XCTAssertEqual(isoPrefix.count, 18,
+                       "Prefix must be exactly `YYYY-MM-DDTHHMMSSZ` (18 chars).")
     }
 
     func testFilenameRoundTrips() {
