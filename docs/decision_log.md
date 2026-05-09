@@ -1407,3 +1407,45 @@ The decisions taken for sub-task 7 (lock-file portion only):
 - `Views/RootView.swift` — new toolbar Post-Show button + sheet presentation; wires `lockController.onForeignLockDetected` to push a `.lockFileForeign` log row in `.onAppear`.
 
 **Public API of any of the above is otherwise unchanged.** No protocol changes, no migrations, no entitlements.
+
+---
+
+## 2026-05-09 — Squeaky-clean review pass: three parallel reviewers + 11 hardening commits
+
+**Decision**: User requested v1 polish (no v2 work) — "make sure all v1 code is polished, squeaky clean, efficient, and free from errors. Use an agent of teams to review code and tests. Make sure tests are as thorough as possible." Spawned three parallel review agents and acted on the highest-priority findings across two areas — production-code correctness/efficiency and test thoroughness — plus a third architecture/consistency pass.
+
+**Reviewer scope**:
+
+1. **Code-correctness + efficiency** (general-purpose agent against `Simple Playback/`). Surfaced 4 P0 (3 unsynchronised dict-mutation races in network servers + ShowControlState; 1 force-unwrap race in PlaybackController), 14 P1 (DoS bounds, FileHandle leak, dead status mapping, observer self-clear, etc.), 9 P2.
+2. **Test thoroughness** (general-purpose agent against test files vs production code). Surfaced ~12 high-priority production-code untested gaps, ~14 weakly-asserting tests, ~25 missing edge cases.
+3. **Architecture / cross-cutting consistency** (general-purpose agent against `Simple Playback/`). Surfaced 5 inconsistent patterns, 4 documentation gaps, 4 architecture concerns, 4 cross-cutting drift items.
+
+**What shipped this pass** (818 → 858 tests, +40 across 11 commits):
+
+P0 fixes: OSCServer/HTTPServer/ShowControlState dict-mutation races; PlaybackController force-unwrap race; TCPFrameBuffer 1 MiB cap; HTTPServer dead `200 : 200` ternary fixed.
+
+P1 fixes: HTTPRequestBuffer header/body caps + O(n²) header scan replaced with cursor; ShowLog FileHandle leak plugged; AudioPump tail-recursion converted to bounded iterative; AutosaveCheckpointer prune failures surfaced via `WriteResult.pruneFailures`; PlaybackController observer self-clears.
+
+Cross-cutting cleanup: `Cue.descriptor` consolidates 5 inlined copies; `ProjectBundleLayout.logsDirectory` replaces inlined "Logs"; `Support/CSVField.swift` shared RFC 4180 quoter — and **fixed a real CRLF bug**: prior helpers used `String.contains("\r")` which doesn't match a `\r\n` grapheme cluster (Swift treats CRLF as a single grapheme); the new helper walks `unicodeScalars`.
+
+Test additions / tightenings: idempotencyKey collision-detector; LateTakeDetector boundary cases (one-ms-over, negative-latency, zero-latency, custom threshold); PostShowSummary FIFO + negative-runtime guard; LTC round-trip smoke test (with **4 real LTC decoder limitations filed as deferred coverage**); ShowLog CSV parser made quoting-aware; AutosaveCheckpointer ISO-prefix shape exactly pinned; dispatcher-ping uptime upper-bound added; HTTPRequestBuffer bound tests; CSVField.quoted CRLF/CR/LF tests; TCPFrameBuffer + HTTPServer.httpStatus tests.
+
+Architecture polish: `CueStandbyState` + `CueRuntimeRejection` demoted from `public`; `ShowControlSource.test` doc-commented as test-only.
+
+**Deliberately left for follow-up** (lower-priority + scope-bounded):
+
+- **HTTPServer respond-shape end-to-end coverage** — needs a respond-without-NWConnection refactor; ~100 LOC.
+- **MTCReader quarter-frame reassembler** + **LTCReader** — both have zero references in tests; benefits from real hardware capture.
+- **Dispatcher action parametric coverage** — ~20 of ~30 action variants have no direct dispatcher.dispatch test; worth a single parametric test next session.
+- **ThumbnailGenerator.Failure / FilmstripGenerator.Failure** naming inconsistency vs sibling top-level `*Error` enums — cosmetic.
+- **ShowControlSource.localHotkey orphan** — no production producer; tests use it; conservatively kept until a future session wires hotkey-source attribution.
+- **ShowControlHub per-document bind stack** — "most recently bound wins" drops window A when window B opens; needs operator review for the per-doc stack approach.
+- **The 4 LTC decoder limitations** filed inline in `LTCRoundTripTests.swift` — needs hardware-rehearsal validation; LTC chase is feature-flagged off in v1.
+
+**Reversibility**: every fix is local + reversible by `git revert` of its commit. The two API shape changes — `AutosaveCheckpointer.writeCheckpoint` returning `WriteResult` instead of `URL` and the new `Cue.descriptor` computed property — are additive at the type level. The CSV CRLF fix is a strictly-additive behaviour change (more values get quoted now; downstream parsers handle both fine).
+
+**What I'd revisit if**:
+- A future NAS-shared lock-file scenario needs more detail in the foreign-host log row — `host=H pid=N` is easy to extend.
+- A real LTC capture surfaces decoder behaviour different from synthesized samples — investigate the 4 deferred cases.
+- The `unicodeScalars`-based CSV quoter proves too aggressive — tighten by listing exact scalars rather than the broad set.
+- AutosaveCheckpointer NSLog noise becomes a problem in production — route through `Services/ShowLog.swift` when the document has a log handle.
