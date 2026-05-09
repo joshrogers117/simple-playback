@@ -105,11 +105,42 @@ final class HTTPServer {
         }
     }
 
-    private func respond(to req: HTTPRequest, on conn: NWConnection) {
+    /// Outcome of `respond(to:)` — what the connection layer should write.
+    /// Extracting the decision here makes the request-routing logic
+    /// testable without a real `NWConnection`. The IO-side `respond(to:on:)`
+    /// is a thin switch over this outcome.
+    enum RespondOutcome: Equatable {
+        /// Write a normal HTTP response with the given status + body.
+        case write(status: Int, body: Data, contentType: String, keepAlive: Bool)
+        /// Write a structured JSON error envelope (404 unknown_route,
+        /// 401 missing_capability, 503 no_runtime, etc.).
+        case writeError(status: Int, jsonError: String, keepAlive: Bool)
+        /// Begin a WebSocket upgrade — the connection layer writes the
+        /// 101 Switching Protocols response with the precomputed
+        /// accept key, then transitions to the WS receive loop.
+        case upgradeWebSocket(acceptKey: String)
+        /// WebSocket upgrade requested but `Sec-WebSocket-Key` was missing
+        /// — emit 400 missing_ws_key.
+        case rejectWebSocketMissingKey
+    }
+
+    /// Pure-logic decision: given a parsed request + the dispatcher / tokens
+    /// / subscriptions context, what should the connection layer write?
+    /// No `NWConnection`, no IO, no side effects beyond the dispatcher's
+    /// `dispatch(...)` call (which is itself idempotent / lockable).
+    ///
+    /// Operator-facing routes that need an `.read` capability return 401
+    /// here; routes that need a runtime but the dispatcher is nil return
+    /// 503; routes that don't match any HTTPRoutes prefix return 404
+    /// (`unknown_route`). The OSCQuery handler gets first chance at any
+    /// path NOT under `/api/v1`.
+    func computeResponse(to req: HTTPRequest) -> RespondOutcome {
         // WebSocket upgrade for /api/v1/events
         if req.isWebSocketUpgrade, req.path == "/api/v1/events" {
-            handleWebSocketUpgrade(req: req, on: conn)
-            return
+            guard let key = req.headers["sec-websocket-key"] else {
+                return .rejectWebSocketMissingKey
+            }
+            return .upgradeWebSocket(acceptKey: Self.webSocketAcceptKey(for: key))
         }
 
         // Auth: extract bearer token if any.
@@ -121,87 +152,105 @@ final class HTTPServer {
             caps = configuration.defaultCapabilities
         }
 
-        // OSCQuery handler — give first chance to anything not under /api/v1.
+        // OSCQuery handler — first chance at anything not under /api/v1.
         if !req.path.hasPrefix("/api/v1") {
             if let handler = oscQueryHandler,
                let result = handler(req.path, req.queryParameters) {
-                send(on: conn, status: result.status, body: result.body, contentType: result.contentType, keepAlive: req.keepAlive)
-                return
+                return .write(
+                    status: result.status,
+                    body: result.body,
+                    contentType: result.contentType,
+                    keepAlive: req.keepAlive
+                )
             }
         }
 
         guard let httpAction = HTTPRoutes.action(method: req.method, path: req.path, body: req.body) else {
-            send(on: conn, status: 404, jsonError: "unknown_route", keepAlive: req.keepAlive)
-            return
+            return .writeError(status: 404, jsonError: "unknown_route", keepAlive: req.keepAlive)
         }
 
         switch httpAction {
         case let .action(action):
             guard let dispatcher = dispatcher else {
-                send(on: conn, status: 503, jsonError: "no_runtime", keepAlive: req.keepAlive)
-                return
+                return .writeError(status: 503, jsonError: "no_runtime", keepAlive: req.keepAlive)
             }
-            let source: ShowControlSource
-            if let token = token {
-                source = .http(token: token, host: req.host)
-            } else {
-                source = .http(token: "", host: req.host)
-            }
+            let source: ShowControlSource = .http(token: token ?? "", host: req.host)
             let result = dispatcher.dispatch(action, source: source, capabilities: caps)
-            // Subscribe / unsubscribe at HTTP level: register into WebSocket sinks
-            // is handled in handleWebSocketUpgrade rather than here.
             let address = HTTPRoutes.oscAddress(for: action)
             let body = ShowControlReplyEnvelope.json(address: address, result: result)
-            // Status reflects the wire-level outcome: 200 for `.ok`, 400 for
-            // `.rejected` (operator-supplied input failed validation), 401
-            // for capability mismatch (caught here so simple HTTP clients
-            // don't have to parse the JSON envelope to distinguish). The
-            // ShowControlReplyEnvelope body still carries the structured
-            // result for clients that do introspect.
-            let status = httpStatus(for: result)
-            send(on: conn, status: status, body: body, contentType: "application/json", keepAlive: req.keepAlive)
+            return .write(
+                status: httpStatus(for: result),
+                body: body,
+                contentType: "application/json",
+                keepAlive: req.keepAlive
+            )
         case .stateSnapshot:
             guard caps.contains(.read) else {
-                send(on: conn, status: 401, jsonError: "missing_capability:read", keepAlive: req.keepAlive)
-                return
+                return .writeError(status: 401, jsonError: "missing_capability:read", keepAlive: req.keepAlive)
             }
-            let snapshot = dispatcher?.state.snapshot()
-            let body = StateSnapshotEncoder.json(snapshot ?? ShowControlState().snapshot())
-            send(on: conn, status: 200, body: body, contentType: "application/json", keepAlive: req.keepAlive)
+            let snapshot = dispatcher?.state.snapshot() ?? ShowControlState().snapshot()
+            return .write(
+                status: 200,
+                body: StateSnapshotEncoder.json(snapshot),
+                contentType: "application/json",
+                keepAlive: req.keepAlive
+            )
         case .cueList:
             guard caps.contains(.read) else {
-                send(on: conn, status: 401, jsonError: "missing_capability:read", keepAlive: req.keepAlive)
-                return
+                return .writeError(status: 401, jsonError: "missing_capability:read", keepAlive: req.keepAlive)
             }
             let snap = dispatcher?.state.snapshot() ?? ShowControlState().snapshot()
-            let body = StateSnapshotEncoder.cueListJSON(snap)
-            send(on: conn, status: 200, body: body, contentType: "application/json", keepAlive: req.keepAlive)
+            return .write(
+                status: 200,
+                body: StateSnapshotEncoder.cueListJSON(snap),
+                contentType: "application/json",
+                keepAlive: req.keepAlive
+            )
         case let .cueDetail(num):
             guard caps.contains(.read) else {
-                send(on: conn, status: 401, jsonError: "missing_capability:read", keepAlive: req.keepAlive)
-                return
+                return .writeError(status: 401, jsonError: "missing_capability:read", keepAlive: req.keepAlive)
             }
             let snap = dispatcher?.state.snapshot() ?? ShowControlState().snapshot()
             if let body = StateSnapshotEncoder.cueDetailJSON(snap, cueNumber: num) {
-                send(on: conn, status: 200, body: body, contentType: "application/json", keepAlive: req.keepAlive)
-            } else {
-                send(on: conn, status: 404, jsonError: "unknown_cue", keepAlive: req.keepAlive)
+                return .write(
+                    status: 200,
+                    body: body,
+                    contentType: "application/json",
+                    keepAlive: req.keepAlive
+                )
             }
+            return .writeError(status: 404, jsonError: "unknown_cue", keepAlive: req.keepAlive)
+        }
+    }
+
+    /// RFC 6455 Sec-WebSocket-Accept derivation. SHA-1(`key + magic`) →
+    /// base64. Exposed `static` for testing; a malformed implementation
+    /// would silently fail every WS handshake against any compliant
+    /// client and only the canonical example (`dGhlIHNhbXBsZSBub25jZQ==`
+    /// → `s3pPLMBiTxaQ9kYGzzhZRbK+xOo=`) catches it cheaply.
+    static func webSocketAcceptKey(for clientKey: String) -> String {
+        let magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+        let hash = Insecure.SHA1.hash(data: Data((clientKey + magic).utf8))
+        return Data(hash).base64EncodedString()
+    }
+
+    private func respond(to req: HTTPRequest, on conn: NWConnection) {
+        let outcome = computeResponse(to: req)
+        switch outcome {
+        case let .write(status, body, contentType, keepAlive):
+            send(on: conn, status: status, body: body, contentType: contentType, keepAlive: keepAlive)
+        case let .writeError(status, jsonError, keepAlive):
+            send(on: conn, status: status, jsonError: jsonError, keepAlive: keepAlive)
+        case let .upgradeWebSocket(acceptKey):
+            handleWebSocketUpgrade(acceptKey: acceptKey, on: conn)
+        case .rejectWebSocketMissingKey:
+            send(on: conn, status: 400, jsonError: "missing_ws_key", keepAlive: false)
         }
     }
 
     // MARK: - WebSocket
 
-    private func handleWebSocketUpgrade(req: HTTPRequest, on conn: NWConnection) {
-        guard let key = req.headers["sec-websocket-key"] else {
-            send(on: conn, status: 400, jsonError: "missing_ws_key", keepAlive: false)
-            return
-        }
-        let magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-        let combined = key + magic
-        let hash = Insecure.SHA1.hash(data: Data(combined.utf8))
-        let acceptKey = Data(hash).base64EncodedString()
-
+    private func handleWebSocketUpgrade(acceptKey: String, on conn: NWConnection) {
         var response = "HTTP/1.1 101 Switching Protocols\r\n"
         response += "Upgrade: websocket\r\n"
         response += "Connection: Upgrade\r\n"
