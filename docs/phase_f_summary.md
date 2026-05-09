@@ -11,6 +11,47 @@ Phase F is the v1 wrap-up sweep. By spec §4 the v2 items are large enough that 
 
 **Phase F status**: complete for v1 as of session 26. F1 actionable items shipped (1 P0 + 4 P1s; 3 P2 deferred for future-session pickup); F2/F3/F4/F5/F6 all shipped. The v1 build is **code-complete**; production promotion still depends on the rehearsal cycle in `docs/manual_verification.md`.
 
+Session 27 added **Option C v2 enablement pre-scoping** (`docs/v2/`) — doc-only and orthogonal to Phase F's v1 close-out, but recorded here because it's the natural next-after-Phase-F deliverable in the autonomous loop's option menu.
+
+---
+
+## Session 27 (2026-05-08) — Option C v2 enablement pre-scoping
+
+1 commit, doc-only. 747 tests unchanged (no code changes). Phase F itself was untouched; this session ran the Option C "pre-scope a v2 sub-phase" path from the next-session prompt menu, expanded to cover all the major v2 enablement candidates from `docs/handoff.md`'s catalogue.
+
+### What shipped — `docs/v2/`
+
+Seven planning docs + an index (8 files, ~970 lines total):
+
+- `docs/v2/README.md` — index + cross-candidate dependency map + highest-leverage candidate ranking. The dependency map records that Brightness adapt → Director View → Saved Workspaces is the implicit ordering if all three ship (each builds on the previous's window-management infra), and that the audio sub-phase / NDI Full / PowerPoint import are independent of one another.
+- `docs/v2/powerpoint_import.md` — `.pptx` rasterize path mirroring C6 Keynote shape. Covers the bundled-LibreOffice vs detect-installed-Office decision (with operational cost: ~250 MB sub-bundle for LO vs operator-side install friction for Office), the hidden-slide / animation-build / speaker-notes / font-fallback policy questions, and a 5-stage first-slice (PowerPointImporter skeleton → MediaImporter routing → optional LibreOffice fallback → policy commits → C-banner integration). 5-8 commits estimated.
+- `docs/v2/ndi_full_sender.md` — `NDITransportSink` plugged into the existing `protocol TransportSink` router. Pre-conditions: SDK distribution decision (bundle the redistributable vs detect installed NDI Tools — recommend bundle), sender-name configurability, sender-group support, audio-embed default. First-slice walks SDK ingestion → bridge skeleton → BGRA→UYVY pixel converter → sink lifecycle → audio embed → inspector UI → PreShowCheck row → phase summary. 7-9 commits estimated.
+- `docs/v2/audio_subphase.md` — the largest v2 candidate (C12 engine refactor + C13 cue types + C14 per-cue overrides + C15 SRT/WebVTT subtitles). Records the dependency on the F1 P2 AVTrackLoader async-API migration (per the session-26 decision-log entry, that lock-in's "paired work" is here). Decomposes into four sub-phases (mix-bus parity-mode → per-cue overrides → audio cue types → subtitles) plus an optional fifth (multi-device output + SDI embed). Open product questions cover routing-matrix UX surface (recommend: Simple-by-default + Advanced disclosure), background-bed slot count, sample-rate conversion policy, SDI channel mapping default, subtitle burn-in vs out-of-band. 20-26 commits estimated.
+- `docs/v2/director_view.md` — read-only Program + next 3 + notes second-display window. Records the open product questions (information-density baseline, layout, color discipline, hotkey suppression, multi-display fingerprinting, Show Mode interaction). First-slice introduces a reusable `Services/ShowListProjections.swift` pure-logic helper as the leaf-first commit, then SwiftUI scaffold → window scene wiring → hotkey suppression → display-fingerprint persistence → unplug fallback → manual rehearsal section. 5-7 commits estimated.
+- `docs/v2/saved_workspaces.md` — Edit / Rehearsal / Show / Single Screen layout presets with hotkey switching. Records the preset-only-vs-user-defined scope question (recommend: presets only for v2, user-defined for v3), the project-bundle hint stamping question (stamp active-workspace name; restore best-effort on the destination machine), the Show Mode interaction (workspace switches are no-ops in Show Mode). 5-7 commits estimated.
+- `docs/v2/brightness_adapt.md` — booth dimming overlay separate from system brightness; smallest v2 candidate (3-4 commits). Records the open hotkey-chord question, the four-step-cycle vs continuous slider call, the Preview/Program tile-mask discipline (the Preview/Program tiles stay bright while the rest of the operator window dims, via SwiftUI mask rectangles).
+- `docs/v2/bundle_for_travel_cross_host.md` — multi-machine rehearsal protocol + Phase 1 pre-rehearsal infrastructure (4 commits — `lastSavedOnHost` schema field, `CrossHostProbe` pure-logic, import-status banner row, PreShowCheck row), then a Phase 2 rehearsal with 0 commits (operator activity), then Phase 3 targeted fixes contingent on rehearsal findings. 5-8 commits estimated for the autonomous-friendly part; Phase 3 scope depends on what the rehearsal exposes.
+
+### Why this isn't part of Phase F proper
+
+Phase F was scoped per `docs/runbook.md` §4 as the cleanup pass; the v2-roadmap planning is separate. But the autonomous loop's option menu (per `docs/handoff.md`) lists "Option C — Pre-scope a v2 sub-phase" as the next-after-Phase-F move, and the user noted at session-27 kickoff that prior sessions clear and restart at ~15 % context used; pushing for "longer/wider" sessions when the work fits.
+
+The choice to pre-scope **all major candidates in one session** (rather than picking one) is a leverage call. The docs share structure and dependencies; doing them together produces a cohesive v2 menu where the dependency map across candidates can be reasoned about. A separate session per candidate would have duplicated context-reading cost without producing the cross-candidate dependency map.
+
+### What's not in `docs/v2/`
+
+- **C11-4 cue-inspector filmstrip scrub UI** — still an open product blocker in `docs/blockers.md`. It's a v1 punch-list item, not a v2 candidate; pre-scoping it would duplicate the blocker entry. The Option-A static / Option-B drag-scrub / Option-C click-to-set-inPoint analysis already lives there.
+- **F1 P2 deferred items** — closed at session 26 (ProjectLockFile lock-in + AVTrackLoader scoping to C12 + CompositorOverlays redundancy re-eval).
+- **v2 §4 candidates lower in priority stack** — Output Profile / Looks, tally inbound, MIDI Show Control, AppleScript dictionary, group cues, edge-blend, HAP/HAP-Q, AV1, watched-asset folder, browser remote monitor, multiviewer SDI, external watchdog, post-show summary, HDR, Art-Net/sACN, GPI/GPO. Listed in `docs/v2/README.md` "What's deliberately not pre-scoped here" as candidates to add a doc for when one moves up the priority list.
+
+### Test surface session 27
+
+747 tests, unchanged. Doc-only commit; no code paths touched.
+
+### Manual verification session 27
+
+Doc-only; nothing to rehearse.
+
 ---
 
 ## Session 26 (2026-05-08) — F5 fixture audit + F6 handoff doc

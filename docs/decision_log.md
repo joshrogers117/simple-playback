@@ -1239,3 +1239,28 @@ Session 25 picked the recommended Option B + Option C combo: F1 code-reviewer au
 - A new caller appears outside the import / audio-prep envelope (e.g. a hot-render-path query for track properties). The call discipline that mitigates the footgun would no longer hold; migrate at that point.
 
 ---
+
+## 2026-05-08 — Session 27: pre-scope all major v2 enablement candidates in one batch
+
+**Decision**: Run Option C (pre-scope a v2 sub-phase) from the next-session prompt menu, but expand it to cover **all** major v2 enablement candidates from `docs/handoff.md` rather than picking one. Land 7 planning docs + an index under `docs/v2/` as a single doc-only commit. Each doc captures: spec source, open product questions, dependency map, suggested first-slice. The seven docs cover PowerPoint import, NDI Full sender (B11), audio sub-phase (C12-C15), Director View (E9), Saved Workspaces (E10), brightness adapt (E11), and Bundle for Travel cross-host rehearsal.
+
+**Why**: The user noted at session-27 kickoff that prior sessions clear and restart at ~15 % context budget used and asked for longer / wider sessions when the work fits. Phase F is closed for v1; the v1 product blockers in `docs/blockers.md` (C11-4) require operator UX input we don't have; the F1 P2 deferred items are scoped or redundant; hardware-bound items can't be progressed without rehearsal silicon. The remaining autonomous-friendly options were: Option C v2 pre-scoping, Option E reviewer sweep close-out, Option B operator-led rehearsal (out-of-scope autonomously). Option C produces durable artifacts that compound for the next planning round; Option E would surface only P2/P3 items at this point given the thoroughness of the session-25 sweep. The leverage call was therefore: do Option C across all major candidates in one batch, so the dependency map between candidates is itself an artifact of the session.
+
+The shape of the docs is the same shape used elsewhere in the project for planning artifacts — spec source up top so the reader can hop to the canonical text, "why v2 not v1" before solution shape so the reader understands the deferral rationale, "open product questions" with options + a recommendation per question (mirrors `docs/blockers.md` shape), dependency map calling out concrete files / services that get touched, suggested first-slice broken into commit-sized increments, risks / unknowns, when-to-revisit triggers, estimated effort. This shape is duplicated across all seven docs so a future planning round can compare candidates without re-reading each from scratch.
+
+**Alternatives considered**:
+
+- **Pick one candidate (e.g., PowerPoint import) and write a single deeper doc.** Rejected — the cross-candidate dependency map (recorded in `docs/v2/README.md`) is itself useful, and it can only be written if all candidates are pre-scoped together. Single-candidate depth is also achievable in a future session per candidate; cross-candidate breadth is harder to retrofit.
+- **Run Option E (a second F1-style reviewer sweep) instead.** Rejected — last session's F1 sweep was exhaustive; a second sweep at this distance would surface only P2/P3 items, low value for the context budget. Option E becomes more valuable after a bigger code delta lands (e.g., post-v2-sub-phase).
+- **Combine Option C and Option E in one session.** Rejected — they're independent in scope but dependent in context (a reviewer sweep wants fresh focus on the diff; v2 scoping wants fresh focus on the spec). Splitting cleanly produces better artifacts.
+- **Write fewer / shorter docs.** Rejected — each doc is dense (70-160 lines) but the open-product-question section is the load-bearing part for a future session; trimming there would force the future session to re-derive the trade-offs from scratch.
+
+**Reversibility**: easy. Doc-only; revert is `git rm -r docs/v2/` plus undoing the progress.md / phase_f_summary.md / decision_log.md entries. No code paths touched.
+
+**What I'd revisit if**:
+
+- A v2 candidate moves to the front of the priority stack and the operator picks one of the open-product-question options. Then the doc gets updated to reflect the resolution and the first-slice work begins.
+- The spec evolves in §3 / §4 in a way that shifts the v2 menu (e.g., a v3-only candidate gets pulled forward). The doc shape supports incremental updates without a rewrite.
+- A new v2 candidate appears (e.g., spec §4 item not in the current pre-scope list). Add a doc following the same template; link from `docs/v2/README.md`.
+- The dependency map turns out wrong (e.g., Director View and Saved Workspaces actually share nothing, or audio sub-phase needs a v1-only fix that wasn't captured). Update `docs/v2/README.md` first; revisit the affected docs second.
+
