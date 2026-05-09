@@ -133,4 +133,64 @@ final class ShowLogTests: XCTestCase {
         log.appendNow(action: .clear, source: .system)
         XCTAssertEqual(log.events.count, 1)
     }
+
+    // MARK: - Persistence state (F1 P1 session 25)
+
+    func testInitialPersistenceStateIsHealthy() {
+        let log = ShowLog()
+        XCTAssertEqual(log.persistenceState, .healthy)
+    }
+
+    func testFailedSeedWriteFlipsPersistenceStateToSuspended() {
+        struct Boom: Error {
+            var localizedDescription: String { "synthetic boom" }
+        }
+        let log = ShowLog()
+        log.fileWriter = { _, _, _ in throw Boom() }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("seed-fail-\(UUID().uuidString).log")
+        log.setFileURL(url)
+        guard case .suspended = log.persistenceState else {
+            return XCTFail("Expected .suspended, got \(log.persistenceState)")
+        }
+    }
+
+    func testFailedAppendFlipsPersistenceStateToSuspended() {
+        struct Boom: Error {}
+        let log = ShowLog()
+        var allowSeed = true
+        log.fileWriter = { _, _, append in
+            if append || allowSeed {
+                if append { throw Boom() }
+                allowSeed = false
+                return
+            }
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("append-fail-\(UUID().uuidString).log")
+        log.setFileURL(url)
+        XCTAssertEqual(log.persistenceState, .healthy, "Seed should succeed first.")
+        log.appendNow(action: .go, source: .localHotkey)
+        guard case .suspended = log.persistenceState else {
+            return XCTFail("Expected .suspended after append failure")
+        }
+        // In-memory record still grew.
+        XCTAssertEqual(log.events.count, 1)
+        // fileURL was cleared so subsequent appends short-circuit.
+        XCTAssertNil(log.fileURL)
+    }
+
+    func testReArmingFileURLResetsPersistenceStateToHealthy() {
+        struct Boom: Error {}
+        let log = ShowLog()
+        log.fileWriter = { _, _, _ in throw Boom() }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("re-arm-\(UUID().uuidString).log")
+        log.setFileURL(url)
+        guard case .suspended = log.persistenceState else {
+            return XCTFail("Expected .suspended after seed failure")
+        }
+        // Operator points the writer at a healthy seam.
+        log.fileWriter = { _, _, _ in /* succeed */ }
+        let recovered = FileManager.default.temporaryDirectory.appendingPathComponent("recovered-\(UUID().uuidString).log")
+        log.setFileURL(recovered)
+        XCTAssertEqual(log.persistenceState, .healthy)
+    }
 }

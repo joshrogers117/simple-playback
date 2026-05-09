@@ -59,6 +59,12 @@ struct ShowLogView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 10)
 
+            if case let .suspended(reason) = log.persistenceState {
+                persistenceSuspendedBanner(reason: reason)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 10)
+            }
+
             Divider()
 
             if log.events.isEmpty {
@@ -148,6 +154,34 @@ struct ShowLogView: View {
 
     private var isAnyFilterActive: Bool {
         sourceFilter != .all || actionFilter != .all || sinceFilter != .allTime
+    }
+
+    /// Banner shown above the row list when the on-disk log writer has
+    /// suspended persistence after a write failure (read-only volume,
+    /// NAS timeout, full disk, permission flip mid-show). Operators must
+    /// see the gap rather than discover it post-show. Re-arming happens
+    /// when the host points the log at a new (or repaired) URL via
+    /// `setFileURL`, which resets the state back to `.healthy`.
+    @ViewBuilder
+    private func persistenceSuspendedBanner(reason: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Disk log paused — events still captured in memory")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.white)
+                Text(reason)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(2)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.orange)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 
     /// Relative-window time filter rendered as a fixed picker. Storing

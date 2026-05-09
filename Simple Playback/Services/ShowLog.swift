@@ -117,6 +117,21 @@ final class ShowLog: ObservableObject {
     /// also writes the CSV header if the file is empty / does not exist.
     private(set) var fileURL: URL?
 
+    /// On-disk persistence health. `.healthy` while the writer is
+    /// successfully appending; `.suspended` when an append throws (read-
+    /// only volume, NAS timeout, full disk, permission flip mid-show).
+    /// On suspend the in-memory `events` list keeps growing — the operator
+    /// can still export — but the on-disk audit artifact has stopped.
+    /// SwiftUI surfaces this in `ShowLogView` so the operator sees the
+    /// gap rather than discovering it post-show. Spec §3.16 lists the
+    /// on-disk log as a v1 reliability artifact, so a silent drop is
+    /// not acceptable.
+    enum PersistenceState: Equatable {
+        case healthy
+        case suspended(reason: String)
+    }
+    @Published private(set) var persistenceState: PersistenceState = .healthy
+
     /// Test seam — the file writer dependency. Default writes to disk via
     /// `Data.write(to:options:)`; tests can substitute a no-op or a
     /// capturing closure to verify on-disk shape without touching the
@@ -140,9 +155,14 @@ final class ShowLog: ObservableObject {
     static let csvHeader = "timestamp,timecode,action,source,detail\n"
 
     /// Set or clear the on-disk destination. Idempotent — calling with the
-    /// same URL twice does not duplicate the header.
+    /// same URL twice does not duplicate the header. A new non-nil URL
+    /// resets `persistenceState` to `.healthy` so an operator who relinks
+    /// to a different volume after a suspension gets a fresh attempt.
     func setFileURL(_ url: URL?) {
         fileURL = url
+        if url != nil {
+            persistenceState = .healthy
+        }
         guard let url else { return }
         let exists = FileManager.default.fileExists(atPath: url.path)
         if !exists {
@@ -151,10 +171,7 @@ final class ShowLog: ObservableObject {
             do {
                 try fileWriter(url, Data(Self.csvHeader.utf8), false)
             } catch {
-                // If the writer fails (read-only volume, missing parent)
-                // suppress the URL so we don't keep retrying. Events still
-                // accumulate in memory.
-                fileURL = nil
+                suspendPersistence(reason: error.localizedDescription)
             }
         }
     }
@@ -168,10 +185,19 @@ final class ShowLog: ObservableObject {
         do {
             try fileWriter(url, Data(line.utf8), true)
         } catch {
-            // A failed write should not crash the show — drop the URL and
-            // keep going in memory. The viewer flags this on next open.
-            fileURL = nil
+            suspendPersistence(reason: error.localizedDescription)
         }
+    }
+
+    /// Mark the on-disk journal as suspended. The fileURL is cleared so
+    /// subsequent appends short-circuit instead of hammering the failing
+    /// volume on every event; in-memory `events` accumulation continues.
+    /// Operators re-arm by calling `setFileURL` again (e.g. after
+    /// pointing at a writable volume), which resets `persistenceState`
+    /// back to `.healthy`.
+    private func suspendPersistence(reason: String) {
+        persistenceState = .suspended(reason: reason)
+        fileURL = nil
     }
 
     /// Convenience entry point. Stamps the event with `Date()` and the
