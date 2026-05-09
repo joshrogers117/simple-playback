@@ -150,6 +150,6 @@ This phase is intentionally light — by spec §4 the v2 items are large enough 
 - [ ] F1: Code-reviewer subagent against the full v1 diff; act on P0/P1 findings
 - [ ] F2: README.md update — feature list, screenshots, OSC API quickref, Companion install
 - [ ] F3: docs/api.md — OSC + HTTP API reference for integrators
-- [ ] F4: docs/manual_verification.md — consolidated list of every "needs hardware" verification step from phases A–E
+- [x] F4: docs/manual_verification.md — consolidated list of every "needs hardware" verification step from phases A–E (session 24)
 - [ ] F5: Test fixture audit — every fixture committed has a script that regenerates it
 - [ ] F6: Final phase summary + handoff document
