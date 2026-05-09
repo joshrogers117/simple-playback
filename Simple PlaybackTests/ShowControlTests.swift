@@ -656,4 +656,49 @@ final class ShowControlTests: XCTestCase {
         XCTAssertEqual(v.frameCount, start.frameCount)
         gen.stop()
     }
+
+    // MARK: - Off-main dispatch hop (F1 P0 session 25)
+
+    /// Pin the contract: dispatcher.dispatch from a non-main queue still
+    /// returns a synchronous result (the OSC/HTTP servers depend on this
+    /// to build their reply envelopes), and the runtime mutation runs on
+    /// the main thread (not the network queue) so it can't race a local
+    /// operator press.
+    func testDispatcherFromOffMainHopsToMainAndReturnsSynchronously() {
+        let runtime = makeShowControlRuntime()
+        let state = ShowControlState()
+        let d = ShowControlDispatcher(runtime: runtime, state: state)
+
+        let exp = expectation(description: "off-main dispatch returns")
+        var resultIsOk = false
+        // Capture the runtime-touching thread via hostInterceptor —
+        // that closure fires inside the runOnMain block, so its
+        // thread reflects where the mutation would run.
+        var hostInterceptorRanOnMain = false
+        d.hostInterceptor = { _, _ in
+            hostInterceptorRanOnMain = Thread.isMainThread
+            return nil // fall through to perform()
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = d.dispatch(.previous, source: .test, capabilities: [.read, .fire])
+            if case .ok = result { resultIsOk = true }
+            exp.fulfill()
+        }
+        wait(for: [exp], timeout: 2.0)
+        XCTAssertTrue(resultIsOk, "Off-main dispatch must return a synchronous .ok result.")
+        XCTAssertTrue(hostInterceptorRanOnMain, "Runtime-touching closures must run on main so they can't race operator-press paths.")
+    }
+
+    /// XCTest may run the test method itself on main. The dispatcher's
+    /// Thread.isMainThread guard must skip the DispatchQueue.main.sync
+    /// hop in that case — otherwise we'd deadlock and this test would
+    /// hang forever.
+    func testDispatcherFromMainDoesNotDeadlock() {
+        let runtime = makeShowControlRuntime()
+        let state = ShowControlState()
+        let d = ShowControlDispatcher(runtime: runtime, state: state)
+        // If the guard ever regresses, this call hangs the runner.
+        let result = d.dispatch(.previous, source: .test, capabilities: [.read, .fire])
+        guard case .ok = result else { return XCTFail("Expected .ok, got \(result)") }
+    }
 }

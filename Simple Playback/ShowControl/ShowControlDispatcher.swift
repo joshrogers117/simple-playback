@@ -136,15 +136,33 @@ final class ShowControlDispatcher {
             return result
         }
 
-        // Host interceptor first chance.
-        if let hosted = hostInterceptor?(action, source) {
-            onActionDispatched?(action, source, hosted)
-            return hosted
+        // Hop to main for everything that touches `CueRuntime`. OSC/HTTP
+        // arrive on `NWConnection` queues; without this hop a Companion
+        // GO racing an operator-press could mutate `CueRuntime.showList`,
+        // `cueStates`, `panicActive`, and the GO debounce simultaneously
+        // from two threads. CueRuntime is a plain class with no internal
+        // synchronization, so co-locating every mutating + reading call
+        // on main is the smallest correct fix.
+        //
+        // Tests construct a dispatcher and call `dispatch(...)` directly
+        // — sometimes from XCTest's main thread. The Thread.isMainThread
+        // guard avoids a deadlock on `DispatchQueue.main.sync` in that
+        // case while still serialising the off-main network paths.
+        let result = runOnMain { [self] in
+            if let hosted = hostInterceptor?(action, source) {
+                return hosted
+            }
+            return perform(action, source: source)
         }
-
-        let result = perform(action, source: source)
         onActionDispatched?(action, source, result)
         return result
+    }
+
+    private func runOnMain(_ work: () -> ShowControlActionResult) -> ShowControlActionResult {
+        if Thread.isMainThread {
+            return work()
+        }
+        return DispatchQueue.main.sync(execute: work)
     }
 
     /// Computes the *effective* capability set for a token in the current
