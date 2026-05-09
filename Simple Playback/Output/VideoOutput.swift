@@ -115,7 +115,27 @@ enum VideoOutputError: LocalizedError {
 final class CompositeVideoOutputDriver: VideoOutputDriver {
     private let deckLinkDriver = DeckLinkVideoOutputDriver()
     private let previewDriver = PreviewVideoOutputDriver()
-    private var activeDriver: VideoOutputDriver?
+
+    /// `submitVideoFrame` runs on `PlaybackController.outputQueue`;
+    /// `submitAudioPCM16` runs on a separate audio queue. Both read
+    /// `activeDriver`, while `start` / `stop` write it. Without
+    /// synchronization, a half-published reference change is a Swift
+    /// memory-model hazard — same root cause as the
+    /// `CompositorPipeline.bundleMediaDirectory` race fixed in C16.
+    private let driverLock = NSLock()
+    private var _activeDriver: VideoOutputDriver?
+    private var activeDriver: VideoOutputDriver? {
+        get {
+            driverLock.lock()
+            defer { driverLock.unlock() }
+            return _activeDriver
+        }
+        set {
+            driverLock.lock()
+            _activeDriver = newValue
+            driverLock.unlock()
+        }
+    }
 
     var status: String {
         activeDriver?.status ?? deckLinkDriver.status
