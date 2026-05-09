@@ -16,10 +16,12 @@ Five pure-logic commits land the data + format core. The operator-visible UI and
 | 3. `PostShowSummary` reducer | shipped | `postshow: add PostShowSummary pure-logic reducer (post-show v2 first slice)` | +19 |
 | 4. Markdown exporter | shipped | `postshow: add Markdown exporter for PostShowSummary (post-show v2 second slice)` | +15 |
 | 5. CSV exporter | shipped | `postshow: add CSV exporter for PostShowSummary (post-show v2 third slice)` | +14 |
-| 6. Sheet UI + toolbar wiring | deferred | — | — |
-| 7. REF / audio-device / lock-file system-event log integration (Q4-B) | deferred | — | — |
+| 6. Sheet UI + toolbar wiring | shipped | `postshow: add PostShowSummaryView sheet + Post-Show toolbar button (sub-task 6)` | +6 |
+| 7a. Lock-file foreign-host log integration (Q4-B subset) | shipped | `postshow: log foreign-lock detections + collect into systemEvents (sub-task 7 partial)` | +5 |
+| 7b. Audio-device-flip log integration (Q4-B subset) | deferred | — | — |
+| 7c. REF-state-flip log integration (Q4-B subset) | deferred | — | — |
 
-**Total session delta**: 5 commits, 749 → 807 tests (+58).
+**Total session delta**: 8 commits, 749 → 818 tests (+69).
 
 **Decisions ratified**:
 

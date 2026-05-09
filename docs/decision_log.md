@@ -1362,3 +1362,48 @@ The reducer + exporters are pure-logic Swift with no external dependencies; triv
 - `Services/PostShowCSVExporter.swift` — pure-function `export(_:)`. No public helpers; section layout is the contract.
 
 **Public API of any of the above is otherwise unchanged.** No protocol changes, no migrations, no entitlements.
+
+---
+
+## 2026-05-09 — Session 29 continuation: ship the deferred sub-tasks 6 + 7 (partial)
+
+**Decision**: After the initial five-commit pure-logic core landed, continue the same session and ship **sub-task 6 (PostShowSummaryView sheet + toolbar wiring)** and the lock-file portion of **sub-task 7 (Q4-B system-event log integration)** rather than ending. Take the my-recommendation defaults from `docs/v2/post_show_summary.md` for the open product questions Q1 / Q5 / Q6 (sheet) and Q4-B (log integration). Defer the audio-device + REF portions of Q4-B because both need new continuous-monitor surfaces (Core Audio property listener; DeckLinkBridge `referenceState` Combine / polled observer) that don't exist in v1 and would require hardware rehearsal to validate.
+
+**Why**: The user requested a longer session — "keep going and finish." The pure-logic core (sub-tasks 1–5) was complete; the only remaining surfaces were either (a) operator-visible UI with documented my-recommendation defaults that are reasonable to take autonomously, or (b) cross-subsystem integration work whose discrete-state-machine portion (the lock-file controller) was the smallest delta. Both paths fit within the same session window without forcing a fresh-window context budget.
+
+The decisions taken for sub-task 6:
+
+- **Q1 (time window) — D simplified to since-launch only**: the reducer reads `log.events` (every event in the live in-memory log). The date-picker widening (Q1-D's "operator-picked range" half) is deferred to v2.1 — operators rarely want multi-day reports at the time of v2.0 ship; the date picker UX choice (single date vs range; multi-day file aggregation pattern) benefits from operator preview rather than autonomous default-locking. The export path is invariant under this — the same reducer + exporters consume whatever event slice the future date-picker hands them.
+- **Q5 (format) — B as documented**: Markdown for human-paste (Copy + Save), CSV for the producer's spreadsheet (Save). Both saveable through a `Menu("Save…")` with sub-items per format. The sheet renders the Markdown source as `Text(.init(...))` in monospaced font with `.textSelection(.enabled)` — SwiftUI's Markdown renderer doesn't render tables, but the source-rendered preview matches what operators will paste downstream.
+- **Q6 (sensitive-data redaction) — A unredacted by default; redaction toggle deferred**: the redaction toggle ships in v2.1 once an operator explicitly asks. Corporate-AV / broadcast operators typically share post-show reports inside the tour / event team rather than publicly; defaulting unredacted matches the dominant use case. The redaction model (`RedactionRule` enum + per-cell post-process pass) is sketched in the v2 doc for the v2.1 add.
+
+The decisions taken for sub-task 7 (lock-file portion only):
+
+- **Q4-B narrowed to `.lockFileForeign` only for v2.0**: lock-file foreign-host detection has a discrete state-machine transition at the controller level (the `evaluate(...)` function's `.foreignLive` branch). The other Q4-B subjects (audio-device flips, REF lock-state changes) are continuous-state surfaces that need new observers; the operator reviews documented in the original Q4 deferral rationale apply to those (verbosity threshold, what counts as a flip vs noise) but not to the lock-file path which is naturally one event per first detection per bundle open.
+- **De-dup via `foreignBanner != existing` comparison**: re-evaluate against the same lock must NOT re-fire (else SwiftUI re-render or rapid evaluate cycles produce duplicated rows). Pin tested.
+- **Detail format `host=H pid=N`**: ASCII-only key=value pairs that don't need RFC 4180 escaping in the existing CSV writer; matches the dropped-frame / late-take detail style operators are already trained on.
+
+**Alternatives considered**:
+
+- **Keep sub-task 6 deferred + ship a date-picker first**: rejected — the date picker is sheet-only territory; without the sheet itself, the picker has no parent UI. The since-launch default lets operators see the post-show report at all (the dominant use case is end-of-show), and the picker becomes an additive widening when operators ask for it.
+- **Ship sub-task 7 in full (REF + audio + lock-file)**: rejected — the audio-device-flip path needs a Core Audio listener that didn't exist before. The session already covered breadth; introducing a new continuous-monitor surface would push the session past clean-handoff territory. The lock-file portion is the cleanest hook today.
+- **Ship Q6 redaction toggle in sub-task 6 with default A**: rejected — the redaction toggle has UX choices (toggle position in the export sheet vs in the sheet header; whether the toggle persists across opens; default reset on Save). Without operator preview the choice is arbitrary; v2.1 ships the toggle once an operator gives the answer.
+- **Use `Text(.init(markdown:))` rather than monospaced source rendering**: considered — SwiftUI's Markdown renderer handles bold, italic, lists, but not tables. Tables are central to the cue-stats / histogram / drop-events sections; rendering them as broken Markdown ("| Cue | Fires |" appearing as literal text in some renderings, or worse, partial-render with missing rows) would degrade the operator's read of the report. Monospaced source rendering is the clean compromise: the operator sees the export shape verbatim, and the Save / Copy paths produce real Markdown for downstream tools that handle tables.
+
+**Reversibility**: medium for sub-task 6 (the new view + toolbar entry are easy to remove; the new `.lockFileForeign` action is durable in log files like `.cueEnded`/`.takeLatency`). The `onForeignLockDetected` callback in `ProjectLockController` is purely additive — leaving it nil is the v0 behaviour.
+
+**What I'd revisit if**:
+
+- Operators report the post-show sheet renders the wrong shape (tables broken, source rendering hard to scan): swap `Text(.init(...))` for a per-section list-row renderer that parses `PostShowSummary` directly without going through Markdown. The exporters still produce Markdown for downstream consumers.
+- Operators report `.lockFileForeign` is too verbose (appears once per app re-launch with the same colleague's lock present) or under-detailed (missing application version): adjust the de-dup key (per-launch dedup) or extend the detail format.
+- A future session ships the audio-device + REF portions of Q4-B. The reducer's `case .missingMedia, .lockFileForeign:` branch will need extending (mechanical); the post-show summary's systemEvents bucket will continue to work.
+- An operator asks for the redaction toggle. Implement Q6-C with the `RedactionRule` enum sketched in the v2 doc; ship as v2.1.
+
+**Public API delta (this continuation)**:
+
+- `ShowLogEvent.Action` adds `.lockFileForeign` (raw `LOCK_FOREIGN`); routed under `ActionFilter.systemEvents`.
+- `ProjectLockController.onForeignLockDetected: ((ProjectLockFile) -> Void)?` callback added — fires once per first-detection of a live foreign lock for a given bundle.
+- `Views/PostShowSummaryView.swift` — new sheet view. Exposes `ExportFormat` enum (`.markdown` / `.csv`) and the test-seam closures for save / copy actions.
+- `Views/RootView.swift` — new toolbar Post-Show button + sheet presentation; wires `lockController.onForeignLockDetected` to push a `.lockFileForeign` log row in `.onAppear`.
+
+**Public API of any of the above is otherwise unchanged.** No protocol changes, no migrations, no entitlements.
