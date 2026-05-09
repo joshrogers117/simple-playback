@@ -1401,7 +1401,16 @@ final class PlaybackController: ObservableObject {
         )
         try outputDriver.submitVideoFrame(composed.data, width: composed.width, height: composed.height, rowBytes: composed.rowBytes)
         auxiliarySinks.submit(frame: composed)
-        if !hasRenderedAnyFrame { hasRenderedAnyFrame = true }
+        // Flip the @Published flag on main so SwiftUI/Combine observers
+        // are notified on the right thread. The check stays here so the
+        // hop only fires once per session — every subsequent frame skips
+        // the dispatch.
+        if !hasRenderedAnyFrame {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !self.hasRenderedAnyFrame else { return }
+                self.hasRenderedAnyFrame = true
+            }
+        }
         if cacheAsCurrent {
             // Cache the BASE frame, not the composed one. Transitions blend cached frames
             // with new media; if we cached composed frames the bug+message would get blended
