@@ -33,6 +33,14 @@ final class ProjectLockController: ObservableObject {
     /// overwrite.
     private(set) var pendingBundleURL: URL?
 
+    /// v2 Post-Show Summary Q4-B — fires once when `evaluate(...)` first
+    /// detects a live foreign lock for a given bundle. The host wires this
+    /// to push a `.lockFileForeign` row into the show log so the post-show
+    /// summary's systemEvents section includes it. Re-evaluating with the
+    /// same lock does not re-fire (the controller exits the foreign branch
+    /// on the second call once `foreignBanner` is already set).
+    var onForeignLockDetected: ((ProjectLockFile) -> Void)?
+
     /// Test seams.
     private let signalsProvider: () -> ProjectLockFileSignals
     private let isPIDAlive: (Int32) -> Bool
@@ -97,8 +105,12 @@ final class ProjectLockController: ObservableObject {
                 acquire(bundleURL: bundleURL, signals: signals)
                 return
             case .localLive, .foreignLive:
+                let isFirstDetection = (foreignBanner != existing)
                 pendingBundleURL = bundleURL
                 foreignBanner = existing
+                if isFirstDetection {
+                    onForeignLockDetected?(existing)
+                }
                 return
             }
         }

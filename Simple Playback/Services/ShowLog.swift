@@ -56,6 +56,13 @@ struct ShowLogEvent: Equatable {
         /// `.takeLatency` is the superset, `.lateTake` is the operator-
         /// readable highlight.
         case takeLatency = "TAKE_LATENCY"
+        /// v2 Post-Show Summary Q4-B — `ProjectLockController` detected a
+        /// live foreign lock at document open (another machine has the same
+        /// `.spb` open). Operators ask about this post-show ("did anyone
+        /// else open the bundle during rehearsal?"); v1 ships a banner but
+        /// no log row. The post-show summary collects these under
+        /// systemEvents alongside missing-media.
+        case lockFileForeign = "LOCK_FOREIGN"
     }
 
     enum Source: Equatable {
@@ -327,7 +334,8 @@ extension ShowLog {
             case (.systemEvents, .missingMedia),
                  (.systemEvents, .droppedFrame),
                  (.systemEvents, .lateTake),
-                 (.systemEvents, .takeLatency):
+                 (.systemEvents, .takeLatency),
+                 (.systemEvents, .lockFileForeign):
                 return true
             default:
                 return false

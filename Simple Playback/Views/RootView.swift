@@ -231,6 +231,20 @@ struct RootView: View {
             applyOutputDefaults()
             ensureProjectHasShowList()
             configureShowController()
+            // v2 Post-Show Summary Q4-B — push a `.lockFileForeign` row into
+            // the show log on first detection of a live foreign lock so the
+            // post-show summary's systemEvents picks it up. The closure
+            // strongly captures `showLog` (a @StateObject class instance);
+            // the closure dies when `lockController` is released by the
+            // owning NSDocument.
+            let log = showLog
+            lockController.onForeignLockDetected = { lock in
+                log.appendNow(
+                    action: .lockFileForeign,
+                    source: .system,
+                    detail: "host=\(lock.hostname) pid=\(lock.pid)"
+                )
+            }
             lockController.evaluate(bundleURL: projectBundleURLProvider())
             playback.bundleMediaDirectory = bundleMediaDirectory()
             playback.folderBookmarks = projectFolderBookmarkLookup()

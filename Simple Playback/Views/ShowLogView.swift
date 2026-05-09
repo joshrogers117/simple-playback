@@ -279,6 +279,7 @@ private struct ShowLogRowView: View {
         case .panic, .missingMedia, .droppedFrame: .red
         case .lateTake: .orange
         case .clear, .blackout: .orange
+        case .lockFileForeign: .orange
         case .go, .previous: .primary
         case .cueEnded, .takeLatency: .secondary
         case .showModeOn, .showModeOff: .accentColor

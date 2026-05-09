@@ -138,6 +138,7 @@
 		AD31546ACCAED84FF1D140D4 /* HTTPRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189C4C83922BF987A389D797 /* HTTPRequest.swift */; };
 		B015D4752B6E1E5FFA06DC29 /* ShowLogFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29CDDBD1A7CD4394C852378 /* ShowLogFilterTests.swift */; };
 		B0198B8CBF5D9D7897AFAF9F /* PendingFolderImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6084981086D7D70B8E87C69E /* PendingFolderImportTests.swift */; };
+		B2E72319DB37B02D4DB237FA /* ProjectLockForeignLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B58D7C8FFBE036D93ED389A5 /* ProjectLockForeignLogTests.swift */; };
 		B36D00350C08A8A28FF15181 /* ShowLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB5E45F95D97440E499B624D /* ShowLogTests.swift */; };
 		B48DB4DA5F28D7017F2E8EED /* ProjectLockBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 860D5CCBF5209A73B62CBA8F /* ProjectLockBannerView.swift */; };
 		B69CE1461F740680651EFC39 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F1E1F27FCEA1C60E3C601307 /* AppIcon.icon */; };
@@ -328,6 +329,7 @@
 		B328F432BC7CCB991A9A8373 /* MediaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporter.swift; sourceTree = "<group>"; };
 		B3957B7B340D482CC18D8F16 /* ThumbnailGeneratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailGeneratorTests.swift; sourceTree = "<group>"; };
 		B55CC65960D79FA6ECC0214F /* Simple Playback.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Simple Playback.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B58D7C8FFBE036D93ED389A5 /* ProjectLockForeignLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectLockForeignLogTests.swift; sourceTree = "<group>"; };
 		B631D588B2455E3C2C9EE89C /* PDFImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFImporterTests.swift; sourceTree = "<group>"; };
 		B637A693F1741DD785724AAE /* DeckLinkBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DeckLinkBridge.mm; sourceTree = "<group>"; };
 		B9392E6B9D0468959B74A1F9 /* TransportSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportSink.swift; sourceTree = "<group>"; };
@@ -523,6 +525,7 @@
 				D930FD6914035D4FEAC331A2 /* PreShowCheckTests.swift */,
 				7207C062BAE86A22C6BC8983 /* ProjectLockControllerTests.swift */,
 				94369DD345B9DD7E2DEC1F0E /* ProjectLockFileTests.swift */,
+				B58D7C8FFBE036D93ED389A5 /* ProjectLockForeignLogTests.swift */,
 				0E47E51BD45087956CCF2905 /* ShowControlIntegrationTests.swift */,
 				5EFD8088BB2C8E63A2FA6133 /* ShowControllerCueEndedLogTests.swift */,
 				584B35FFA22C0473DD0D81CB /* ShowControllerDroppedFrameLogTests.swift */,
@@ -922,6 +925,7 @@
 				E7E0BCCC5F1B98DD0A582010 /* PreShowCheckTests.swift in Sources */,
 				99869A4B8562CD2A2D1A69B5 /* ProjectLockControllerTests.swift in Sources */,
 				4ADA7C0AFB853BAE909A2382 /* ProjectLockFileTests.swift in Sources */,
+				B2E72319DB37B02D4DB237FA /* ProjectLockForeignLogTests.swift in Sources */,
 				851AE7644559671FB09FD2BD /* ShowControlIntegrationTests.swift in Sources */,
 				00EC3572563AA2E459F2489F /* ShowControlTests.swift in Sources */,
 				A2A3C138DD9526AFA024C868 /* ShowControllerCueEndedLogTests.swift in Sources */,

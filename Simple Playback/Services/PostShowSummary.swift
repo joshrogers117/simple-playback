@@ -246,7 +246,7 @@ struct PostShowSummary: Equatable {
                     histogramBuckets.bump(latencyMS: parsed.latencyMS)
                 }
 
-            case .missingMedia:
+            case .missingMedia, .lockFileForeign:
                 systemEvents.append(SystemEvent(
                     timestamp: event.timestamp,
                     action: event.action,
