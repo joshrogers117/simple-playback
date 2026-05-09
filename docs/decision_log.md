@@ -1115,3 +1115,59 @@ if storedHash == nil && storedSize == nil {
 - Phase F's reviewer audit surfaces P1s in Phase B that the session-24 summary missed (e.g., a B5 race condition the summary doesn't call out). At that point the summary gets a session-N "deferred reviewer findings" addendum, mirroring how Phase C session-19 + 20 handled C16's punch list.
 
 ---
+
+## 2026-05-08 — Session 25: F1 reviewer sweep + F2 README + F3 api.md
+
+**What shipped this session**: 7 commits, 741 → 747 tests (+6).
+
+Session 25 picked the recommended Option B + Option C combo: F1 code-reviewer audit against the cumulative v1 diff plus F2/F3 doc-only deliverables. The reviewer surfaced 1 P0 + 4 P1s + 3 deferred items. All 5 actionable findings shipped as hardening commits, and F2 + F3 landed as doc-only commits in the same window.
+
+**The 5 reviewer findings shipped (in order)**:
+
+1. **F1 P1 #5 — `FilmstripCoordinator.writer` Sendable seam** (`Simple Playback/Services/FilmstripCoordinator.swift:53`). The static `writer` test seam was `nonisolated(unsafe)` but the closure type was plain `(Data, URL) throws -> Void`, captured implicitly inside `Task.detached`. Mismatch with the `@Sendable` shape on the sibling `generator` seam two lines above; closes a Swift 6 strict-concurrency hole. One-character fix: `@Sendable` annotation. Tests already substitute pure closures; no test churn.
+
+2. **F1 P1 #2 — `PlaybackController.hasRenderedAnyFrame` flipped off main** (`PlaybackController.swift:1404`). `submitFrame` runs on `outputQueue`; flipping the `@Published` flag from there published a Combine notification on the wrong thread the first time a session composed a frame. Mirrored the dropped-frame-counter pattern at line 1481: dispatch the flip back to main with a re-check guard so the hop only fires once per session.
+
+3. **F1 P1 #3 — `CompositeVideoOutputDriver.activeDriver` raced between video + audio queues** (`Simple Playback/Output/VideoOutput.swift:118`). `submitVideoFrame` runs on `PlaybackController.outputQueue`; `submitAudioPCM16` runs on a separate audio queue. Both read `activeDriver` while `start`/`stop` write it. Same Swift memory-model hazard the C16 close-out fixed for `CompositorPipeline.bundleMediaDirectory`. Mirrored the same NSLock pattern: backing storage `_activeDriver` + computed `activeDriver` going through `driverLock.lock()`.
+
+4. **F1 P1 #4 — `ShowLog` silently dropped persistence on writer failure** (`ShowLog.swift:168-174`). On a failed CSV write (read-only volume, NAS timeout, full disk, permission flip mid-show) the writer cleared `fileURL = nil` and continued in memory with no operator-visible signal. Spec §3.16 lists the on-disk log as a v1 reliability artifact, so silent drop is not acceptable. Added `@Published var persistenceState: .healthy | .suspended(reason: String)`; failures flip the state and clear `fileURL` so subsequent appends short-circuit. `ShowLogView` renders an orange "Disk log paused — events still captured in memory" banner with the reason text. Operator re-arms by calling `setFileURL` again, which resets state to `.healthy`. 4 new pin tests cover initial state, seed-fail transition, append-fail transition, re-arm reset.
+
+5. **F1 P0 #1 — `CueRuntime` unsynchronized across OSC/HTTP queues vs main** (`Simple Playback/Playback/CueRuntime.swift` consumed by `ShowControlDispatcher.swift:165-326`). The most consequential threading hole in the v1: OSC and HTTP arrive on `NWConnection` queues, while local operator GO/PREV/PANIC/CLEAR runs on main via `ShowController`. Without serialization a Companion fire racing an operator press could mutate `showList`, `cueStates`, `panicActive`, and the GO debounce simultaneously from two threads.
+
+   **Fix path chosen** — wrap the host-interceptor + perform() block inside `dispatch()` in a `Thread.isMainThread` guarded `DispatchQueue.main.sync` hop. Capability check + idempotency lockout stay off main (they already use their own synchronization). The `Thread.isMainThread` guard avoids a deadlock when XCTest's test methods run on main; tests that call `dispatcher.dispatch(...)` synchronously continue working. Two new pin tests in `ShowControlTests`: off-main dispatch hops to main + returns synchronously, and on-main dispatch doesn't deadlock.
+
+   **Alternative considered** — serialize all CueRuntime mutating entry points behind a private DispatchQueue inside the runtime itself. Rejected because the read surface is wide (every dispatcher branch reads `runtime.showList`, `runtime.state(of:)`, etc.) and would need lock guards on the read side too. The dispatcher hop is contained: one method, one indirection, no surface change for callers.
+
+**The 3 deferred items** (logged for a future-session reviewer pass):
+
+- **Project-lock-file hostname source canonicalization** — `ProjectLockFile.swift:198` uses `gethostname(2)` while other macOS apps may record `Host.current().localizedName`. Two writers on the same machine using the two APIs would not see each other's locks as `localLive`. Needs a manual cross-host rehearsal (queue under `docs/manual_verification.md`) before deciding which API is canonical.
+- **`AVTrackLoader.loadFirstVideoTrackInspection` semaphore bridge** — `AVTrackLoader.swift:42-62` issues `Task.detached` then blocks the calling thread on a semaphore. Acceptable today because every caller is import-time / off-render-hot-path, but blocking the cooperative thread pool from a sync entry is a known footgun. Worth migrating to a true async API at the Phase F audio refactor.
+- **`PlaybackController.compositorOverlays.didSet` re-publish ordering** — `PlaybackController.swift:54, 1186-1198`. Two rapid overlay edits during a take can interleave the published preview images out of order. Low real-world risk (operator-paced edits) but worth a small ordering pin if Phase F adds programmatic overlay automation.
+
+**F2 README + F3 docs/api.md** (doc-only):
+- README.md grew from a 36-line stub into a v1 feature surface walkthrough — Phase A/B/C/D/E inventories, OSC quick-reference table, project-bundle layout, hardware-verification cross-reference. Companion module path documented as a sibling-repo deliverable per `docs/phase_d/companion_module_design.md`.
+- `docs/api.md` (new, 441 lines) — full integrator reference: transports + ports + Bonjour, auth + capability semantics, every OSC/HTTP/WS address with sample reply envelopes, OSCQuery handshake, timecode source-spec strings, idempotency keying table, source-attribution mapping, worked curl/websocat/oscsend examples, "not yet wired (v1 ack-only)" appendix calling out scrub / opacity / audio-level / goto / look-recall / output-freeze / workspace-save until host interceptors land.
+
+**Why session 25 picked Option B + C over Option A (resolve C11-4) and the other E11/E9/E10 candidates**: C11-4 is still a product-decision blocker awaiting operator UX input; the briefing said "If the user resolved C11-4, Option A. Otherwise Option B is the highest-leverage gardening pick." E11 (brightness adapt) / E9 (Director View) / E10 (Saved Workspaces) all surface their own product-decision blockers. F1 has no UX questions and the reviewer-sweep punch list is the kind of well-bounded technical work that fits an autonomous session cleanly. F2 + F3 fold in alongside without overlap because they're doc-only.
+
+**Public API impact session 25**:
+- `Services/ShowLog.swift` gains `enum PersistenceState` + `@Published private(set) var persistenceState`. `setFileURL` now resets the state to `.healthy` on a non-nil URL and to `.suspended(reason)` on a seed-write failure. `append(_:)` flips to `.suspended(reason)` on writer throw and clears `fileURL`. New private `suspendPersistence(reason:)` helper.
+- `Services/FilmstripCoordinator.swift` — `writer` static seam typed `@Sendable (Data, URL) throws -> Void`. No call-site change required.
+- `Output/VideoOutput.swift` — `CompositeVideoOutputDriver.activeDriver` becomes a computed property over `_activeDriver` + `driverLock: NSLock`. Public surface unchanged.
+- `Playback/PlaybackController.swift` — `submitFrame` flips `hasRenderedAnyFrame` via a `DispatchQueue.main.async` hop. Public surface unchanged.
+- `ShowControl/ShowControlDispatcher.swift` — `dispatch(...)` runs the host-interceptor + perform block through a private `runOnMain(_:)` helper that's a no-op when on main. Public signature unchanged. Tests that called `dispatch` from the XCTest main thread continue to work.
+- `Views/ShowLogView.swift` — `persistenceSuspendedBanner(reason:)` view builder + a conditional render between the filter toolbar and the row list.
+- README.md — full rewrite (5 → 138 lines).
+- `docs/api.md` — new file (441 lines).
+- `docs/progress.md` — Phase F status updated; F1 marked partial-shipped, F2 + F3 marked done, "Last commit" pointer updated.
+
+**Reversibility**:
+- Each finding's commit is independent; any one can be reverted without touching the others.
+- The README rewrite is git-revert clean; the api.md is a new file (just delete).
+- The dispatcher main-hop is the only change with non-trivial behavior implications; the pin tests document the contract so a future revert would visibly break them.
+
+**What I'd revisit if**:
+- The `DispatchQueue.main.sync` hop introduces noticeable latency in a real Companion preset stress test (8+ button presses/sec). Backup plan: switch to a `runtime.serialQueue` inside CueRuntime so the dispatcher can fan dispatch off-main without main-actor entanglement. Today's hop is the smallest defensible fix; the pin tests give us a clear regression signal if the move-to-runtime-queue alternative becomes necessary.
+- The ShowLog suspension banner gets in operators' way when a brief network blip flips a NAS-backed log to suspended and then immediately recovers. Could add a "retry on next event" mode (write attempt every Nth event) — defer until the operator-feedback signal lands.
+
+---
