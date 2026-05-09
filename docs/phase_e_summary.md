@@ -1,5 +1,11 @@
 # Phase E — Reliability — Summary
 
+**Status (session 24 — 2026-05-08) — codec advisory pre-show row shipped (E1+ tail)**. `PreShowCheck.evaluateCodecAdvisory(project:)` rolls up the C1 codec-inspector flags (`longGOP` / `variableFrameRate` / `untaggedColor`) across all slides in the asset library as a single info-severity Pre-Show row: `Codec advisories: N long-GOP, M VFR, K untagged-color — review the cue inspector and consider Transcode to ProRes.` Suppressed entirely when no clip carries an advisory. `tenBitYUV420` keeps its dedicated row (`output.tenBit`) because it's an output-side recommendation, not a content-side advisory; `animatedImage` is excluded because it surfaces inline as a transcode chip on the cue inspector and doesn't generalize to a roll-up. Wired into `evaluate(...)` between the ten-bit row and the external-reference row. 6 new tests (`testCodecAdvisorySuppressedWhenNoFlags`, `testCodecAdvisorySuppressedWhenOnlyExcludedFlagsPresent`, `testCodecAdvisoryCountsLongGOPClips`, `testCodecAdvisoryRollsUpAllThreeFlags`, `testCodecAdvisoryCountsClipsNotFlags`, `testCodecAdvisoryAppearsInEvaluateOutput`). 735 → 741 tests.
+
+The cue inspector already renders one chip per flagged clip via `MediaFlagWarningChip`; this row gives the operator the project-wide count at the desk before the show starts so the "should I transcode?" decision can happen ahead of doors-open rather than mid-show.
+
+---
+
 **Status (session 19 — 2026-05-08) — E3+ Path 1 callback upgrade shipped**. The session-18 Path-2 limitation (image cues always read as on-time because `liveSlideID` flips synchronously inside `take(...)`) is closed. New `PlaybackController.onFirstComposedFrameForCue` callback fires exactly once per `take(...)` when the first composed frame for that take reaches `submitFrame`. ShowController's `wireLateTakeDetector` now subscribes to that callback instead of `playback.$liveSlideID`. Both image and video cues get accurate first-frame-reached-output latency.
 
 Mechanics:

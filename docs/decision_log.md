@@ -1082,3 +1082,36 @@ if storedHash == nil && storedSize == nil {
 - 5 new pin tests in `AVTrackLoaderTests` (730 → 735 tests).
 
 **Audit (Option H — Path 1 token consumers)**: confirmed at the same time. The token is armed by `take()` direct, `commitPreparedVideoTransition`, and both branches of `commitPreparedImageTransition`; dropped by `clear()` and `stopOutput()`. Other `submitFrame` callsites — `renderCurrentVideoFrame` (video timer), `renderStillTransitionFrame` (still-transition timer), and `renderOutgoingHandoffFrame` (outgoing handoff timer) — intentionally do NOT arm. They consume tokens armed by their take origin (correctly — the still-transition and outgoing-handoff first-frame submits ARE the take's first composed frame after the syncOutput cancel + arm) or run with a nil token. No new arming was added.
+
+---
+
+## 2026-05-08 — Session 24: Phase B summary refresh + codec advisory pre-show row
+
+**What shipped this session**: 2 commits, 735 → 741 tests (+6).
+
+1. **Phase B summary refresh (B16 partial — doc-only)** — `docs/phase_b_summary.md` gains a consolidated session-24 close-out header mirroring `phase_c_summary.md` shape: feature inventory (data model + topology, render hot path + sink fan-out, REF lock state, 10-bit recommendation logic, compositor, frame-rate conformance), test surface inventory (~55 tests across 6 files), consolidated 10-step manual rehearsal checklist (some autonomy-verifiable; most hardware-bound), and explicit scoped-out tail (B7/B9/B10/B11/B13/B15 — all hardware- or UX-blocked, none autonomy-shippable today). The older sessions 1-5 narrative is preserved below as a historical log. progress.md cleanup: `B14` flipped from `[~]` to `[x]` (the "Pre-show check (E1) reuse pending" deferral note was stale once `PreShowCheck.evaluateFrameRateConformance(project:)` landed in session 13). `B16` flipped to `[~]` (summary shipped; `MockDeckLinkSink` test fixture is queued for B7/B9 coupled work and not needed today).
+
+2. **Codec advisory pre-show row (E1+ tail)** — `PreShowCheck.evaluateCodecAdvisory(project:)` rolls up the C1 flags (`longGOP` / `variableFrameRate` / `untaggedColor`) across `project.slides` as a single info-severity row. Suppressed entirely when no clip carries an advisory. `tenBitYUV420` keeps its existing dedicated row (`output.tenBit`) because it's an output-side recommendation; `animatedImage` is excluded because it surfaces inline as a transcode chip on the cue inspector and doesn't generalize to a roll-up message. 6 new tests in `PreShowCheckTests` pin the rule.
+
+**Why session 24 chose Option B (Phase B gardening) + E1+ tail rather than Option H (full reviewer audit) or Option A (resolve C11-4 blocker)**:
+
+- **Option A — C11-4 cue-inspector scrub UI consumer** — the blocker is a product-decision blocker (UX choice between static strip / drag-scrub / click-to-set-inPoint) that needs operator input. Picking autonomously violates the runbook's blocker policy. Skip until the user resolves it.
+- **Option H — full reviewer audit** — the next-session prompt called this "Phase B documentation pass + reviewer audit on full v1 diff so far (Phase F / F1 prep)". F1 belongs to Phase F's wrap-up sweep and the act of generating that audit is sized for a full session of its own. Picking it now would crowd out other work.
+- **Option B + E1+ tail** — the Phase B summary refresh is a runbook §2.5-prescribed deliverable that had been deferred since session 5; getting it done before any Phase F work avoids stale-context-on-summary risk. The E1+ codec advisory was a small, well-bounded coda that uses the same C1 primitives the summary touches (longGOP / VFR / untaggedColor), so it stays coherent with the gardening thread.
+
+**Public API impact session 24**:
+- `Services/PreShowCheck.swift` gains `static func evaluateCodecAdvisory(project: PlayoutProject) -> Row?`. Wired into `evaluate(project:context:)` between the ten-bit row and the external-reference row. Row id `media.codec`, severity `.info`, title "Codec".
+- `Simple PlaybackTests/PreShowCheckTests.swift` gains six new test cases under a `MARK: - Codec advisory (E1+ session 24)` section.
+- `docs/phase_b_summary.md` gains the session-24 close-out header. Older sessions 1-5 narrative is unchanged.
+- `docs/phase_e_summary.md` gains a session-24 entry at the top.
+- `docs/progress.md` flips B14 to done, B16 to partial, and updates the "Last commit" pointer.
+
+**Reversibility**: easy on both threads.
+- The codec advisory row is purely additive — drop the static function and the one-line wire-up in `evaluate(...)` and pre-show is back to its session-22 surface.
+- Doc reverts are git-revert-clean; no behavior couples to the doc updates.
+
+**What I'd revisit if**:
+- The codec advisory row turns out to be too noisy in real-world projects (e.g., every iPhone-imported clip flags untaggedColor, and the row becomes a "yes, we noticed" click-to-dismiss). Alternative: gate the untaggedColor count behind a `>= N` threshold or fold it into a single-pass "transcode-eligible content count" row. Defer the redesign until operator feedback.
+- Phase F's reviewer audit surfaces P1s in Phase B that the session-24 summary missed (e.g., a B5 race condition the summary doesn't call out). At that point the summary gets a session-N "deferred reviewer findings" addendum, mirroring how Phase C session-19 + 20 handled C16's punch list.
+
+---
