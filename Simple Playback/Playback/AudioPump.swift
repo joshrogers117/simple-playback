@@ -359,26 +359,42 @@ final class AudioPump {
         }
 
         func nextData() -> Data? {
-            guard let output else { return nil }
+            // The original implementation recursed (`return prepareReader()
+            // ? nextData() : nil`) into the loop branch, which on a zero-
+            // sample (corrupt or empty) audio file would either stack-
+            // overflow or spin-loop the audio queue. The fix: iterative
+            // loop with a small retry bound — if the reader rebuilds and
+            // still yields no samples, we treat the track as exhausted
+            // and fall through to `stop()`. The bound is small because
+            // the legitimate "loop wraps to start" case completes in a
+            // single rebuild; any retry beyond that is a sign the file
+            // is unreadable and we shouldn't hammer it.
+            let maxLoopRebuilds = 3
+            var loopRebuilds = 0
+            while true {
+                guard let output else { return nil }
 
-            if let sampleBuffer = output.copyNextSampleBuffer(),
-               let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) {
-                let byteCount = CMBlockBufferGetDataLength(blockBuffer)
-                var data = Data(count: byteCount)
-                data.withUnsafeMutableBytes { bytes in
-                    guard let baseAddress = bytes.baseAddress else { return }
-                    CMBlockBufferCopyDataBytes(blockBuffer, atOffset: 0, dataLength: byteCount, destination: baseAddress)
+                if let sampleBuffer = output.copyNextSampleBuffer(),
+                   let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) {
+                    let byteCount = CMBlockBufferGetDataLength(blockBuffer)
+                    var data = Data(count: byteCount)
+                    data.withUnsafeMutableBytes { bytes in
+                        guard let baseAddress = bytes.baseAddress else { return }
+                        CMBlockBufferCopyDataBytes(blockBuffer, atOffset: 0, dataLength: byteCount, destination: baseAddress)
+                    }
+                    return data
                 }
-                return data
-            }
 
-            if loop {
-                startTime = .zero
-                return prepareReader() ? nextData() : nil
-            }
+                if loop && loopRebuilds < maxLoopRebuilds {
+                    loopRebuilds += 1
+                    startTime = .zero
+                    if !prepareReader() { stop(); return nil }
+                    continue
+                }
 
-            stop()
-            return nil
+                stop()
+                return nil
+            }
         }
 
         func stop() {

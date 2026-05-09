@@ -162,9 +162,13 @@ final class ShowLog: ObservableObject {
     var fileWriter: (URL, Data, _ append: Bool) throws -> Void = { url, data, append in
         if append, FileManager.default.fileExists(atPath: url.path) {
             let handle = try FileHandle(forWritingTo: url)
+            // `defer` so a throw from seekToEnd / write doesn't leak the
+            // file descriptor — every show log error during a multi-hour
+            // run would otherwise burn one fd, eventually hitting the
+            // process file-handle ceiling on long-running shows.
+            defer { try? handle.close() }
             try handle.seekToEnd()
             try handle.write(contentsOf: data)
-            try handle.close()
         } else {
             try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(),
