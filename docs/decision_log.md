@@ -1264,3 +1264,55 @@ The shape of the docs is the same shape used elsewhere in the project for planni
 - A new v2 candidate appears (e.g., spec §4 item not in the current pre-scope list). Add a doc following the same template; link from `docs/v2/README.md`.
 - The dependency map turns out wrong (e.g., Director View and Saved Workspaces actually share nothing, or audio sub-phase needs a v1-only fix that wasn't captured). Update `docs/v2/README.md` first; revisit the affected docs second.
 
+
+---
+
+## 2026-05-08 — F1 P2: hop dispatcher's onActionDispatched callback to main (session 28)
+
+**Decision**: Add a `notifyDispatched(...)` helper in `ShowControlDispatcher` that dispatches the `onActionDispatched` closure to the main thread when called from off-main, and route the three callback fire sites (capability rejection, idempotency rejection, post-perform) through it. Async (not sync) to avoid any chance of a network-queue → main deadlock when the callback eventually appends to the show log. Pin tests for both the success and rejection callback paths exercising the off-main → main hop.
+
+**Why**: The session-25 P0 fix moved CueRuntime mutation onto main via `runOnMain`, but the `onActionDispatched` callback was still invoked on the calling thread (a network queue for OSC/HTTP). Its sole production consumer is `ShowController.recordDispatchedAction`, a `@MainActor`-isolated method that calls `ShowLog.appendNow` (also `@MainActor`). Off-main → @MainActor is the same Swift concurrency hazard as the just-fixed runtime hop, just one layer further out — covers the show-log fan-out of every remote-driven verb. Without strict-concurrency mode the build silently allows this; with it the compiler would surface the violation.
+
+The async-not-sync choice avoids a class of deadlock: the show-log writer's `setFileURL` / `append` paths can take `FileManager` IO that may block on a NAS round-trip; while the callback runs there, a separate thread waiting on a `DispatchQueue.main.sync` from the dispatcher would deadlock until the IO completes. Async fire-and-forget keeps the dispatcher responsive.
+
+**Alternatives considered**:
+
+- **Sync hop**: simpler, mirrors `runOnMain` shape exactly. Rejected — adds the deadlock surface above; the OSC/HTTP servers don't depend on the callback firing before `dispatch(...)` returns (they build their reply envelopes from the returned `ShowControlActionResult`).
+- **Move the hop into the consumer (ShowController)**: rejected — would put the hop in every callback consumer that ever exists, scattering the contract. Centralising at the dispatcher boundary is cleaner.
+- **Mark the callback signature as @MainActor**: rejected — would force every test that invokes the closure directly (ShowControllerLogTests) onto main, a constraint the tests already meet but would lock in. The `Thread.isMainThread` guard preserves both production correctness and test ergonomics.
+- **Leave it deferred to a "strict-concurrency adoption" phase**: rejected — the fix is small (one helper + 3 line replacements + 2 pin tests), the hazard is concrete, and a future strict-concurrency adoption would have to fix this anyway.
+
+**Reversibility**: easy. The helper + 3 line replacements are mechanical; revert by inlining `onActionDispatched?(action, source, result)` again. The pin tests would need to be kept (they document an invariant operators benefit from regardless of strict concurrency).
+
+**What I'd revisit if**:
+
+- A future consumer of `onActionDispatched` is itself non-isolated (e.g., a server-side metrics emitter that runs on a background queue). The hop is harmless to it (still gets the callback, just on main); no change.
+- Strict concurrency lands as a project-wide default. The hop is a precondition for the build to succeed at the dispatcher boundary; no further change needed here.
+- A new dispatch path arrives that needs synchronous callback firing (e.g., OSC reply built from the callback result rather than the return value). Then we'd reshape the dispatcher to return `(result, didFire)` and let the consumer build its envelope; the hop would still apply to the closure invocation.
+
+---
+
+## 2026-05-08 — Session 28: continued v2 pre-scoping with 6 more candidates (Option F)
+
+**Decision**: Run Option F from the session-27 next-session-prompt menu — pre-scope additional v2 candidates from spec §4 not covered by the session-27 batch. Land 6 more planning docs under `docs/v2/`: Output Profile / Looks (#1), MIDI Show Control (#4), AppleScript dictionary (#5), Group Cues (#7), Post-Show Summary (#18), Watched Drop Folder (#14). Update `docs/v2/README.md` to extend the cross-candidate dependency map, expand the highest-leverage ranking to cover all 13 candidates, and enumerate per-item "what's deliberately not pre-scoped" rationale for the remaining spec §4 items. Same template shape as the session-27 batch.
+
+**Why**: The user noted at session-28 kickoff that prior sessions clear at ~15 % context budget; Option F is doc-only and well-suited to a longer autonomous run. The session-27 batch covered 7 candidates the handoff doc explicitly named; spec §4 lists 21 v2 items, of which 6 were sized + characteristic enough to pre-scope as durable artifacts. The remaining ~8 spec §4 items are either (a) hardware-bound (Fill+Key, edge-blend, multiviewer-as-SDI, GPI/GPO bridge, codec-specific work like HAP/NotchLC/AV1), (b) covered as out-of-scope per spec §5 (Watchout-class network-clustered display), or (c) too narrow without an operator pull-request (Tally inbound, Art-Net/sACN inbound, hardware control surface mapper beyond the Companion path). Pre-scoping those without a near-term ask would produce stale docs.
+
+The new docs follow the session-27 template exactly: spec source, "why v2 not v1", what the candidate means in v1+ terms, open product questions with options + recommendation per question, dependency map naming concrete files / services touched, suggested first-slice broken into commit-sized increments, risks / unknowns, when-to-revisit triggers, estimated effort. The cross-candidate dependency map in `docs/v2/README.md` was updated to cover all 13 pre-scoped candidates with explicit "what runs first" orderings (Brightness adapt → Director View → Saved Workspaces; MSC + AppleScript can ship in either order; Output Profile / Looks unblocks /sp/look/recall; Post-Show Summary gated on cueEnded + per-take latency events).
+
+**Alternatives considered**:
+
+- **Pick one of the new candidates and write a single deeper doc** (e.g., MIDI Show Control with full SysEx parser sketch). Rejected — the leverage is in covering breadth so a future planning round can compare candidates without re-reading each from scratch. Depth is a future-session concern per candidate.
+- **Skip Output Profile / Looks** (it's already half-shipped in the v1 OutputBindingProfile schema). Rejected — the schema is the easy half; the UX (named profiles, drift detection, Look recall fade semantics) is the hard half and unblocks the long-promised /sp/look/recall ack-only stub. Worth its own doc.
+- **Combine MSC + AppleScript into a single "integrator surface v2" doc**. Rejected — they share zero infrastructure beyond the dispatcher itself, and operators interested in one are usually not interested in the other (lighting-console operators vs. Mac-native automation scripters). Two docs is right.
+- **Defer Group Cues** to a v3 conversation since it touches the cue model. Rejected — spec §4 explicitly lists it as v2; the doc captures the open product questions that need answering before any code lands, which is exactly what pre-scoping is for. The runtime concurrency interactions with the compositor (B12) are real but well-isolated; documented in the risks section.
+- **Run a second F1-style reviewer sweep instead**. Rejected for the second time (session-27 logged the same rejection). The session-25 sweep was thorough; revisiting at this distance surfaces only P2/P3 items. The session-28 sweep DID surface one P2 (off-main onActionDispatched callback) which we shipped — but that was a quick scan of just the session 25-27 code diff, not a full re-sweep.
+
+**Reversibility**: easy. Doc-only; revert is `git rm` the 6 new files plus undo the README index update.
+
+**What I'd revisit if**:
+
+- A v2 candidate moves to the front of the priority stack and the operator picks one of the open-product-question options. The doc gets updated to reflect the resolution and the first-slice work begins.
+- A new spec §4 item moves up the priority list (e.g., Tally inbound becomes near-term because an operator buys an ATEM rig). Add a doc following the same template; link from `docs/v2/README.md`.
+- The dependency map turns out wrong as an actual implementation begins. Update README first; revisit affected docs second.
+- A v2 candidate splits into two (e.g., Output Profile and Looks ship independently with different operator audiences). Split the doc into two; preserve the cross-references.

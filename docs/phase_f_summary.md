@@ -9,9 +9,54 @@ Phase F is the v1 wrap-up sweep. By spec §4 the v2 items are large enough that 
 - F5 — test fixture audit (every committed fixture has a regeneration script)
 - F6 — final phase summary + handoff document
 
-**Phase F status**: complete for v1 as of session 26. F1 actionable items shipped (1 P0 + 4 P1s; 3 P2 deferred for future-session pickup); F2/F3/F4/F5/F6 all shipped. The v1 build is **code-complete**; production promotion still depends on the rehearsal cycle in `docs/manual_verification.md`.
+**Phase F status**: complete for v1 as of session 26. F1 actionable items shipped (1 P0 + 4 P1s; 3 P2 deferred — one of those P2s shipped opportunistically in session 28). F2/F3/F4/F5/F6 all shipped. The v1 build is **code-complete**; production promotion still depends on the rehearsal cycle in `docs/manual_verification.md`.
 
-Session 27 added **Option C v2 enablement pre-scoping** (`docs/v2/`) — doc-only and orthogonal to Phase F's v1 close-out, but recorded here because it's the natural next-after-Phase-F deliverable in the autonomous loop's option menu.
+Sessions 27-28 added **v2 enablement pre-scoping** (`docs/v2/`) — doc-only and orthogonal to Phase F's v1 close-out, but recorded here because it's the natural next-after-Phase-F deliverable in the autonomous loop's option menu. Session 28 also shipped a tiny F1 P2 follow-up to close a Swift-concurrency hazard in the dispatcher's show-log fan-out.
+
+---
+
+## Session 28 (2026-05-08) — Option D reviewer sweep + Option F more v2 pre-scoping
+
+2 commits, 747 → 749 tests (+2). Session ran two of the autonomous-friendly options from the session-27 next-session prompt menu in one batch: Option D (reviewer sweep against the session 25-27 cumulative diff) and Option F (pre-scope additional v2 candidates not in the session-27 batch).
+
+### What shipped — F1 P2 follow-up: dispatcher onActionDispatched main hop
+
+The reviewer sweep against `git diff development~10..HEAD` flagged one P2 finding in the session-25 P0 dispatcher fix: `runOnMain` moved CueRuntime mutation onto main, but the `onActionDispatched` callback was still invoked on the calling thread (network queue for OSC/HTTP). Its production consumer is `ShowController.recordDispatchedAction`, a `@MainActor`-isolated method that calls `ShowLog.appendNow` (also `@MainActor`). Same Swift concurrency hazard as the just-fixed runtime hop, one layer further out.
+
+Shipped a `notifyDispatched(...)` helper that hops to main when called from off-main; routed the three callback fire sites (capability rejection, idempotency rejection, post-perform) through it. Async (not sync) to avoid a class of network-queue → main deadlock when the callback eventually appends to the show log. Two new pin tests in `ShowControlTests.swift` cover both the success-path and rejection-path callback firing on main from an off-main caller.
+
+Decision-log entry covers the alternatives considered (sync hop / consumer-side hop / @MainActor signature) + the leverage call.
+
+### What shipped — `docs/v2/` 6 more candidates
+
+Six additional planning docs + a refreshed README index covering the highest-leverage spec §4 items not pre-scoped in session 27:
+
+- `docs/v2/output_profile_looks.md` (spec §4 #1) — closes the loop on Phase B's schema-only `OutputBindingProfile`. Addresses the per-project-vs-per-machine question (recommend: both, with project carrying defaults + machine overriding), the Look-recall fade semantics (recommend: gamma-aware crossfade default, per-Look configurable), the active-profile drift detection, the recall-failure-fallback banner. Unblocks the long-promised `/sp/look/recall` ack-only stub. 5-7 commits estimated.
+- `docs/v2/midi_show_control.md` (spec §4 #4) — inbound MSC SysEx → `ShowControlAction` translator, "thin layer over OSC" per spec. Addresses the device-ID configuration question (recommend: configurable, default `0x10`), the command-format filter (recommend: any with operator-toggleable strict mode), the cue-ID prefix-stripping convention, and the MSC capability default (recommend: `read + fire`). 4-6 commits estimated.
+- `docs/v2/applescript_dictionary.md` (spec §4 #5) — `.sdef`-defined macOS-native automation surface. Addresses the Show Mode interaction (recommend: AS edits stripped in Show Mode same as OSC), element-specifier scope (recommend: numeric index + by-ID for v2.0), synchronous return semantics (recommend: return immediately mirror OSC). 5-7 commits estimated.
+- `docs/v2/group_cues.md` (spec §4 #7) — `.startFirst` / `.startAll` / `.startRandom` / `.timeline` group fire modes. Addresses nesting depth (recommend: one level only for v2.0), cue-id namespacing (recommend: flat global per A2), PANIC scope (recommend: blanket safety), `.startAll` pre-wait policy, `.timeline` continuation. Touches cue model + runtime + Show List view + OSC. 6-9 commits estimated; flagged as the highest-risk surface for compositor concurrency interactions with B12.
+- `docs/v2/post_show_summary.md` (spec §4 #18) — reducer over the Show Log + Markdown / CSV exporters. Addresses time-window scope (recommend: since-launch default + operator-picked range), cue-runtime measurement (recommend: emit `.cueEnded` events as a delta on E3), latency-distribution shape (recommend: histogram), system-event coverage (recommend: REF flips + audio device flips + lock-file detections), redaction toggle for sharing. 5-7 commits estimated.
+- `docs/v2/watched_drop_folder.md` (spec §4 #14) — content-runner workflow built on C8 folder bookmarks + C9 missing-media UX. Addresses drop-folder location (recommend: bundle default + configurable override), watch-trigger granularity (recommend: 2-second stability window), Show Mode interaction (recommend: watch continues, Accept disabled), auto-transcode policy, reject behaviour. 5-7 commits estimated.
+
+`docs/v2/README.md` updated:
+- Index entries for the 6 new candidates.
+- Cross-candidate dependency map extended to cover all 13 candidates (with explicit "what runs first" orderings).
+- Highest-leverage ranking expanded to call out Output Profile / Looks + the MSC / AppleScript "integrator surface v2" cluster.
+- "Deliberately not pre-scoped" section enumerated per-item rationale for the remaining ~8 spec §4 items (Confidence/Stage screen role, Tally inbound, Outbound network-cue mirroring, Edge blend, Fill+Key, codec-specific work, Hardware control surface mapper, Browser remote monitor, Multiviewer SDI, External watchdog, Art-Net/sACN, GPI/GPO bridge).
+
+### Why this batch isn't part of Phase F proper
+
+Same reasoning as session 27: Phase F was scoped per `docs/runbook.md` §4 as the v1 cleanup pass; v2-roadmap planning is separate. The autonomous loop's option menu lists "Option F — pre-scope an additional v2 candidate not in the current menu" as the next-after-Phase-F follow-up move; the user noted at session-28 kickoff that prior sessions clear at ~15 % context used and asked for longer / wider runs when the work fits. The 13 v2 candidates now pre-scoped cover essentially every spec §4 item that's both autonomous-friendly to plan and plausible-near-term; the remaining 8 are deliberate non-pre-scopes per the README rationale.
+
+### Test surface session 28
+
+747 → 749 tests (+2). The two new tests are the dispatcher off-main → main pin tests (success-path and rejection-path callback). All 749 pass.
+
+### Manual verification session 28
+
+The dispatcher fix has no operator-visible behaviour change — same callback semantics, same show-log entries, same OSC reply envelopes. Manual rehearsal step: verify that an OSC GO from a remote Companion controller still produces a Show Log entry with `osc h:p` source attribution (covered by `docs/manual_verification.md` Phase D rehearsal section already; no new step needed).
+
+The v2 doc batch is doc-only; nothing to rehearse.
 
 ---
 
