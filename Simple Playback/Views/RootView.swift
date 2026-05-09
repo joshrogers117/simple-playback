@@ -567,7 +567,7 @@ struct RootView: View {
     /// in memory until the operator saves. Idempotent.
     private func bindShowLogFile() {
         guard let bundleURL = projectBundleURLProvider() else { return }
-        let logsURL = bundleURL.appendingPathComponent("Logs", isDirectory: true)
+        let logsURL = bundleURL.appendingPathComponent(ProjectBundleLayout.logsDirectory, isDirectory: true)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let stamped = formatter.string(from: Date())

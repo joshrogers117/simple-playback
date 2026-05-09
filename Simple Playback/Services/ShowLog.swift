@@ -59,9 +59,10 @@ struct ShowLogEvent: Equatable {
         /// v2 Post-Show Summary Q4-B — `ProjectLockController` detected a
         /// live foreign lock at document open (another machine has the same
         /// `.spb` open). Operators ask about this post-show ("did anyone
-        /// else open the bundle during rehearsal?"); v1 ships a banner but
-        /// no log row. The post-show summary collects these under
-        /// systemEvents alongside missing-media.
+        /// else open the bundle during rehearsal?"). RootView's
+        /// `lockController.onForeignLockDetected` callback emits this row
+        /// once per first-detection per bundle; the post-show summary
+        /// collects it under systemEvents alongside missing-media.
         case lockFileForeign = "LOCK_FOREIGN"
     }
 
@@ -105,11 +106,11 @@ struct ShowLogEvent: Equatable {
         let ts = showLogISO8601Formatter.string(from: timestamp)
         let tc = chaseTimecode ?? ""
         return [
-            csvField(ts),
-            csvField(tc),
-            csvField(action.rawValue),
-            csvField(source.label),
-            csvField(detail ?? "")
+            CSVField.quoted(ts),
+            CSVField.quoted(tc),
+            CSVField.quoted(action.rawValue),
+            CSVField.quoted(source.label),
+            CSVField.quoted(detail ?? "")
         ].joined(separator: ",")
     }
 }
@@ -364,11 +365,6 @@ extension ShowLog {
     }
 }
 
-/// RFC 4180 field quoting — wrap in `"` if the field contains a comma, a
-/// quote, or a newline; double any embedded `"`.
-private func csvField(_ value: String) -> String {
-    let needsQuote = value.contains(",") || value.contains("\"") || value.contains("\n")
-    guard needsQuote else { return value }
-    let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
-    return "\"\(escaped)\""
-}
+// RFC 4180 field quoting moved to `Support/CSVField.swift` (`CSVField.quoted`)
+// during the squeaky-clean review pass — the helper is now shared with
+// `PostShowCSVExporter.swift` so both writers handle CR / LF identically.

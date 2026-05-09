@@ -471,6 +471,18 @@ struct Cue: Identifiable, Codable, Hashable {
         notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
         overrides = try container.decodeIfPresent(CueOverrides.self, forKey: .overrides) ?? .none
     }
+
+    /// Operator-readable identifier for log rows / status overlays / banner
+    /// detail strings. Prefers the cue number ("Q.1", "INTRO") when set;
+    /// falls back to the title for cues authored without a number. Used
+    /// by ShowController log emit sites and the post-show summary's pairing
+    /// key (`Services/PostShowSummary.swift` lowercases this when keying).
+    /// Consolidated from five inlined copies during the review pass; keeping
+    /// the rule in one place ensures the log emit sites and the reducer
+    /// stay byte-identical.
+    var descriptor: String {
+        number.isEmpty ? title : number
+    }
 }
 
 /// Reasons an attempt to add or rename a cue can fail.

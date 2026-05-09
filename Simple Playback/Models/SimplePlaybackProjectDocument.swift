@@ -34,6 +34,13 @@ enum ProjectBundleLayout {
     /// auto-enqueued at video-import time via `FilmstripCoordinator`.
     /// Derived-from-source so safe to delete; regenerated lazily.
     static let filmstripsDirectory = "Cache/Filmstrips"
+
+    /// E3 — per-day CSV show log written by `Services/ShowLog.swift`'s
+    /// file writer. One file per `<yyyy-MM-dd>`. The viewer
+    /// (`ShowLogView`) and the post-show summary export read from here.
+    /// **Not** a derived-from-source cache — these are the persistent
+    /// audit artifacts and must survive Bundle for Travel.
+    static let logsDirectory = "Logs"
 }
 
 /// Tiny ObservableObject that mirrors `NSDocument.fileURL` into a SwiftUI

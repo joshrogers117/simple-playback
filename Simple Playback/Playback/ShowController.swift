@@ -345,9 +345,7 @@ final class ShowController: ObservableObject {
     /// Build a CSV-friendly detail string from a fired cue. Empty for nil
     /// (GO rejected — the runtime separately publishes lastGoRejection).
     private func detailString(for cue: Cue?) -> String? {
-        guard let cue else { return nil }
-        let id = cue.number.isEmpty ? cue.title : cue.number
-        return id
+        cue?.descriptor
     }
 
     // MARK: - Compositor overlays bridge (B12e)
@@ -464,8 +462,7 @@ final class ShowController: ObservableObject {
             // exists in the library. Phase C will treat this as a non-blocking warning and
             // surface it in the inspector. For now, end the cue immediately so the runtime
             // returns to idle and chains can advance.
-            let detail = cue.number.isEmpty ? cue.title : cue.number
-            showLog?.appendNow(action: .missingMedia, source: .system, detail: detail)
+            showLog?.appendNow(action: .missingMedia, source: .system, detail: cue.descriptor)
             runtime.cueDidEnd(cueID: cue.id)
             return
         }
@@ -477,7 +474,7 @@ final class ShowController: ObservableObject {
         // we can capture inside the controller. The detector matches on
         // slideID; cache the cue's human descriptor for the log detail.
         let goFiredAt = Date()
-        pendingLateTakeCueDescriptor = cue.number.isEmpty ? cue.title : cue.number
+        pendingLateTakeCueDescriptor = cue.descriptor
         lateTakeDetector.recordGoFired(cueID: cue.id, slideID: asset.id, at: goFiredAt)
         playback.take(
             slide: asset,
@@ -499,8 +496,7 @@ final class ShowController: ObservableObject {
         // reducer can compute per-cue runtime as (cueEnded - go). The detail
         // matches the `.go` event's descriptor (cue.number when present, else
         // cue.title) so the reducer pairs them by descriptor.
-        let descriptor = cue.number.isEmpty ? cue.title : cue.number
-        showLog?.appendNow(action: .cueEnded, source: .system, detail: descriptor)
+        showLog?.appendNow(action: .cueEnded, source: .system, detail: cue.descriptor)
     }
 
     /// Resolve transition settings for a cue: per-cue crossfade duration overrides the project

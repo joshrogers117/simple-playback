@@ -141,16 +141,11 @@ enum PostShowCSVExporter {
     /// post-show CSV match the raw log a producer might also be reading.
     private static let timestampFormatter: ISO8601DateFormatter = showLogISO8601Formatter
 
-    /// RFC 4180 field quoting. Mirrors the show-log writer's helper (kept
-    /// local so the exporter has no dependency on a private file-scope
-    /// helper).
+    /// RFC 4180 field quoting. Delegates to the shared `Support/CSVField.swift`
+    /// helper so a future operator-supplied detail string with `\r\n` line
+    /// endings (Windows-pasted notes, e.g.) gets identical quoting in both
+    /// the live show log and the post-show export.
     private static func csvField(_ value: String) -> String {
-        let needsQuote = value.contains(",")
-            || value.contains("\"")
-            || value.contains("\n")
-            || value.contains("\r")
-        guard needsQuote else { return value }
-        let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
-        return "\"\(escaped)\""
+        CSVField.quoted(value)
     }
 }

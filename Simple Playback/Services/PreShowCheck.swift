@@ -141,7 +141,7 @@ enum PreShowCheck {
         var missing: [String] = []
         for list in project.showLists {
             for cue in list.cues where !slideIDs.contains(cue.assetID) {
-                missing.append(cue.number.isEmpty ? cue.title : cue.number)
+                missing.append(cue.descriptor)
             }
         }
         if missing.isEmpty {
