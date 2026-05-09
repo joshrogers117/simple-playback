@@ -69,6 +69,8 @@ struct RootView: View {
     @State private var showLogPresented: Bool = false
     /// Toggle for the Phase E5 take-history sheet.
     @State private var takeHistoryPresented: Bool = false
+
+    @State private var postShowSummaryPresented: Bool = false
     /// C7d — non-nil while the Bundle for Travel sheet is on-screen. Holds the
     /// pre-computed plan so summary + progress + result all read off the same
     /// snapshot.
@@ -197,6 +199,13 @@ struct RootView: View {
                 .help("Open the take history — the last 200 cue fires in this session.")
 
                 Button {
+                    postShowSummaryPresented = true
+                } label: {
+                    Label("Post-Show", systemImage: "doc.text.below.ecg")
+                }
+                .help("Open the post-show summary — totals, per-cue runtime, latency histogram, drop / late-take detail.")
+
+                Button {
                     presentBundleForTravelSheet()
                 } label: {
                     Label("Bundle for Travel", systemImage: "shippingbox")
@@ -292,6 +301,9 @@ struct RootView: View {
         }
         .sheet(isPresented: $takeHistoryPresented) {
             TakeHistoryView(history: takeHistory, onClose: { takeHistoryPresented = false })
+        }
+        .sheet(isPresented: $postShowSummaryPresented) {
+            PostShowSummaryView(log: showLog, onClose: { postShowSummaryPresented = false })
         }
         .sheet(isPresented: bundleForTravelSheetBinding) {
             if let plan = pendingBundleForTravel,
