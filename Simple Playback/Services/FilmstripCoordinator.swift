@@ -50,7 +50,7 @@ final class FilmstripCoordinator: ObservableObject {
     /// exists and writes atomically so a crash mid-write doesn't leave
     /// a truncated PNG. Tests substitute a stub that records the
     /// (data, url) pair without touching disk.
-    nonisolated(unsafe) static var writer: (Data, URL) throws -> Void = { data, url in
+    nonisolated(unsafe) static var writer: @Sendable (Data, URL) throws -> Void = { data, url in
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
