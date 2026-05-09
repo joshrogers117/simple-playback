@@ -118,6 +118,16 @@ final class MTCReader {
         }
     }
 
+    /// Test seam — feed a single quarter-frame data byte directly into the
+    /// reader's assembly state, bypassing CoreMIDI client/port setup. Used
+    /// by `MTCReaderTests` to drive the 8-quarter-frame sequence
+    /// synthetically without a real MIDI source. Production callers (the
+    /// `handle(eventList:)` path above) should keep using `handle(word:)`
+    /// which routes 0xF1 status bytes here naturally.
+    func ingestQuarterFrameForTesting(byte: UInt8) {
+        handleQuarterFrame(byte: byte)
+    }
+
     private func handleQuarterFrame(byte: UInt8) {
         let field = Int((byte >> 4) & 0x07)
         let nibble = Int(byte & 0x0F)
