@@ -68,6 +68,25 @@ struct ShowLogEvent: Equatable {
 
     enum Source: Equatable {
         /// Operator pressed a registered keyboard shortcut.
+        ///
+        /// **Reserved / not currently produced by production code.** SwiftUI's
+        /// `Button { … } .keyboardShortcut(…)` model collapses click and
+        /// shortcut invocations into the same closure with no signal at the
+        /// callsite for which input fired it; every transport-bar / Cmd-key
+        /// shortcut today therefore lands as `.operatorButton`. The case is
+        /// kept (a) so existing CSV log files that record `local` remain
+        /// semantically interpretable, (b) so a future hotkey-attribution
+        /// surface (e.g., a NSEvent monitor wrapper or a `Commands { … }`
+        /// migration that splits the menu-driven shortcut path away from the
+        /// button click path) has a stable enum case to write to. The
+        /// `SourceFilter.local` filter intentionally accepts *both* this
+        /// case and `.operatorButton` so the operator-facing "Local" filter
+        /// reads correctly today regardless of attribution precision.
+        ///
+        /// Tests use this case directly as a fixture; production code does
+        /// not. Removing it would silently widen `.operatorButton` to cover
+        /// what was previously a distinct attribution and break any future
+        /// log-replay tooling that depends on the label.
         case localHotkey
         /// Operator clicked a button in the app's UI.
         case operatorButton
