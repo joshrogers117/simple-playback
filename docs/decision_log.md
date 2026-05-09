@@ -1171,3 +1171,29 @@ Session 25 picked the recommended Option B + Option C combo: F1 code-reviewer au
 - The ShowLog suspension banner gets in operators' way when a brief network blip flips a NAS-backed log to suspended and then immediately recovers. Could add a "retry on next event" mode (write attempt every Nth event) — defer until the operator-feedback signal lands.
 
 ---
+
+## 2026-05-08 — F5 fixture-policy guard + F6 handoff doc + CompositorOverlays ordering pin re-evaluated (session 26)
+
+**Decision**: F5 ships as a policy guard plus a synthesis-pattern catalogue, not as a regeneration script for committed binaries. F6 ships as `docs/handoff.md` pointing at three audiences (integrators, operators, future autonomy). The CompositorOverlays didSet ordering pin from session 25's deferred list is re-classified as redundant for v1; documented in `phase_f_summary.md` rather than committed as a test.
+
+**Why**:
+
+- **F5**: the audit found zero committed binary fixtures. Every test under `Simple PlaybackTests/` synthesizes its inputs at runtime — five canonical patterns (CGPDFContext PDFs, AVAssetWriter tiny .mov, CGContext bitmap PNGs, CGImageDestination GIFs/APNGs, sentinel Data blobs). Writing per-fixture regeneration scripts for fixtures that don't exist would be obviously redundant. The right shape was a guard that defends the policy + a catalogue documenting the synthesis patterns so a future contributor knows the canonical helper to copy from. `Scripts/regenerate-fixtures.sh` walks `Simple PlaybackTests/` and exits 1 if any non-Swift file appears. Reserves an `ALLOWED_FIXTURES` array for documented exceptions if synthesis genuinely won't work for a future test.
+- **F6**: the runbook spec is "final phase summary + handoff document"; the natural shape is a single document a new collaborator reads first, with everything else in `docs/` referenced from there. Three explicit audiences (integrator / operator / future autonomy) avoids the "who is this for" ambiguity. Lists the deferred items + v2 candidates in one place so the next planning round can scope without re-reading the per-phase summaries.
+- **CompositorOverlays didSet ordering pin**: session-25's deferred entry described "two rapid overlay edits during a take can interleave the published preview images out of order" as a low-risk Phase F concern. Tracing the publish path on session 26 — `compositorOverlays = …` on main → `syncOutput` → `compositor.compose` back on main → `publishTransitionPreview` does `DispatchQueue.main.async { transitionPreviewImage = image }` — confirms the order is FIFO-preserved by construction (main-thread writes enqueue async blocks in arrival order; main runloop drains FIFO). A meaningful pin test would need pixel-content assertion to confirm the second image actually reflects the second overlays state, which pulls in a full pipeline (CompositorPipeline is private; would need a test seam). The cost outweighs the marginal coverage; the contract is now documented in `docs/handoff.md` so a future Phase-F entry-point that adds programmatic overlay automation has the FIFO assumption pinned in prose.
+
+**Alternatives considered**:
+
+- **F5 as per-fixture regen scripts**: rejected — fixtures don't exist; would be writing scripts that produce nothing. Equivalent of writing `cd /tmp && true` and committing it.
+- **F5 with a CI hook for the guard**: rejected per runbook §5 (no CI changes from autonomous sessions). The guard runs manually; future operators can wire it into a pre-commit hook locally if desired.
+- **F6 as "Phase F summary v2"**: rejected — `phase_f_summary.md` already exists and grew session-by-session; a separate handoff document with audience-specific entry points reads better than a single chronological summary.
+- **CompositorOverlays pin via test seam**: feasible if `CompositorPipeline` exposes an injectable hook, but adding test seams to passing code for an issue that's structurally non-existent is the kind of speculative-design abstraction the runbook (and `tone and style` rules) explicitly warn against.
+
+**Reversibility**: easy. The guard script + catalogue + handoff doc are doc-only / script-only commits; reverting them costs nothing. The CompositorOverlays decision is text-only.
+
+**What I'd revisit if**:
+
+- A future test legitimately requires a real-world fixture (operator-supplied PowerPoint export, malformed PDF the inspector should reject, real-camera ProRes file with embedded metadata AVAssetWriter can't reproduce). Then the fixture-add checklist in `docs/test_fixtures.md` kicks in: `Simple PlaybackTests/Fixtures/<area>/<name>.<ext>` placement, per-fixture script under `Scripts/regenerate-fixtures/<name>.sh`, `ALLOWED_FIXTURES` update, decision-log rationale.
+- Phase F adds programmatic overlay automation (e.g., an OSC-driven overlay edit that arrives off main). At that point the CompositorOverlays didSet ordering contract becomes load-bearing; the FIFO guarantee documented in `phase_f_summary.md` would need to either be re-verified for the new entry path, or hardened with a seam + pin.
+
+---

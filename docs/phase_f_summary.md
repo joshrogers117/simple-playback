@@ -9,7 +9,54 @@ Phase F is the v1 wrap-up sweep. By spec §4 the v2 items are large enough that 
 - F5 — test fixture audit (every committed fixture has a regeneration script)
 - F6 — final phase summary + handoff document
 
+**Phase F status**: complete for v1 as of session 26. F1 actionable items shipped (1 P0 + 4 P1s; 3 P2 deferred for future-session pickup); F2/F3/F4/F5/F6 all shipped. The v1 build is **code-complete**; production promotion still depends on the rehearsal cycle in `docs/manual_verification.md`.
+
 ---
+
+## Session 26 (2026-05-08) — F5 fixture audit + F6 handoff doc
+
+2 commits (this session), 747 tests unchanged (doc / script-only). Phase F closes for v1.
+
+### F5 — `Scripts/regenerate-fixtures.sh` + `docs/test_fixtures.md`
+
+The audit confirmed **zero committed binary fixtures** under `Simple PlaybackTests/`. Every test synthesizes its inputs at runtime — five canonical patterns:
+
+- **PDF** via `CGDataConsumer` + `CGPDFContext` (canonical: `PDFImporterTests.makeTestPDF`).
+- **Tiny H.264 `.mov`** via `AVAssetWriter` + `AVAssetWriterInputPixelBufferAdaptor` (canonical: `AVTrackLoaderTests.makeTinyH264Movie`; extended-with-codec variant in `MediaFlagsTests`).
+- **Still PNG** via `CGContext` bitmap → `NSBitmapImageRep` → `.representation(using: .png, …)` (canonical: `MediaImporterPDFTests.makeStillPNG`).
+- **Animated GIF / APNG** via `CGImageDestinationCreateWithURL` + per-frame `CGImageDestinationAddImage` (canonical: `AnimatedImageInspectorTests.makeGIF` / `makeAPNG`).
+- **Sentinel `Data` blobs** for format-detection / failure-path tests (`Data()`, `Data([0x00, 0x01, 0x02])`, `Data("x".utf8)`).
+
+`Scripts/regenerate-fixtures.sh` is the policy guard. It walks `Simple PlaybackTests/`, exits 0 if every file is `.swift` (with a `.DS_Store` exception), and exits 1 listing offenders if any non-Swift file appears. The script reserves an `ALLOWED_FIXTURES` array for future documented exceptions; today the array is empty. Manual run; not wired into CI per the runbook prohibition. Both polarities verified — clean repo emits "policy intact"; a planted `_fake.bin` flips it to exit 1 with the offender printed.
+
+`docs/test_fixtures.md` documents the policy, catalogues the synthesis patterns, names the canonical helper for each, and lists the tests that use it. The "Adding a fixture if you must" section is the checklist a future contributor should follow if synthesis genuinely won't work — placement under `Simple PlaybackTests/Fixtures/<area>/`, per-fixture script under `Scripts/regenerate-fixtures/<name>.sh`, `ALLOWED_FIXTURES` update, doc update here, decision-log rationale entry.
+
+### F6 — `docs/handoff.md`
+
+Single-document handoff for the v1 build. Three audiences:
+
+- **Integrators** → `docs/api.md`. Transports, ports, Bonjour, auth, every OSC/HTTP/WS/OSCQuery address with sample replies, OSCQuery handshake, timecode source-spec, idempotency keying, source-attribution mapping, worked examples, "not yet wired (v1 ack-only)" appendix.
+- **Operators** → `docs/manual_verification.md` for the rehearsal protocol; README at the repo root for the feature surface walkthrough. Plus a "behaviour you should know about before the first show" list (Show Mode gating, PreShow check fix actions, crash recovery banner semantics, project-lock-file foreign-live banner, show-log persistence-suspended banner).
+- **Future autonomy sessions** → `docs/runbook.md` + `docs/progress.md` + the per-phase summaries + `docs/decision_log.md` + `docs/blockers.md`. Read-order for picking up the loop.
+
+Also catalogues:
+- The open product blocker (C11-4 cue-inspector filmstrip scrub UI).
+- Hardware-bound items (B6 REF format mismatch, B7/B9/B10/B11/B13/B15, C8 cross-host rehearsal, D12–D14 LTC/MTC/internal-TC verification, E1+ macOS-condition adapters).
+- F1 P2 deferred items (project-lock-file hostname canonicalization, AVTrackLoader semaphore bridge, CompositorOverlays didSet ordering pin).
+- Audio sub-phase explicitly out of scope for v1 (C12–C15).
+- v2 enablement candidates (PowerPoint import, audio sub-phase, NDI Full sender, Director View, Saved Workspaces, brightness adapt key, Bundle for Travel cross-host rehearsal).
+
+### CompositorOverlays didSet ordering pin — re-evaluated, dropped from session-26 scope
+
+The session-25 deferred list called this out as a "low real-world risk" pin for Phase F. In session 26 I re-read `PlaybackController.republishComposedPreview()` (line 1186) and traced the publish path: `compositorOverlays = …` on main → `syncOutput` to read the snapshot → `compositor.compose(...)` back on main → `publishTransitionPreview(...)` which does `DispatchQueue.main.async { self.transitionPreviewImage = image }`. Two rapid writes from main enqueue their async-publish blocks in arrival order, and the main runloop drains FIFO from the same thread, so the order is preserved by construction. A meaningful pin would need pixel-content assertion to confirm the second image actually reflects the second overlays state, which pulls in a full pipeline — not a cheap test. Re-classified as redundant for v1; the deferred-item entry in `docs/handoff.md` notes the contract is FIFO-preserved but a Phase F entry-point that adds programmatic overlay automation should re-evaluate. No commit needed; this paragraph is the close-out.
+
+### What's left in Phase F
+
+Nothing for v1 close. The three F1 P2 deferred items remain as future-session pickup; they are documented in `docs/handoff.md`.
+
+---
+
+
 
 ## Session 25 (2026-05-08) — F1 reviewer sweep + F2 README + F3 api.md
 
