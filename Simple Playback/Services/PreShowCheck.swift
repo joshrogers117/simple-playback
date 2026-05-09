@@ -103,6 +103,9 @@ enum PreShowCheck {
         if let ten = evaluateTenBitRecommendation(project: project) {
             rows.append(ten)
         }
+        if let codec = evaluateCodecAdvisory(project: project) {
+            rows.append(codec)
+        }
         if let ref = evaluateExternalReference(project: project, context: context) {
             rows.append(ref)
         }
@@ -234,6 +237,51 @@ enum PreShowCheck {
             severity: .info,
             title: "Output",
             summary: "Project contains 10-bit content — 10-bit YUV output recommended."
+        )
+    }
+
+    /// Roll up the C1 codec-inspector advisories (long-GOP / variable frame rate /
+    /// untagged color) across the project as a single pre-show row. The cue inspector
+    /// already renders one chip per flagged clip; this row tells the operator how many
+    /// clips collectively carry each advisory before the show starts so the "should I
+    /// transcode?" decision happens at the desk, not mid-show.
+    ///
+    /// Returns nil when no clip carries any of the three advisories — pre-show panels
+    /// degrade fast with noise rows. Severity is `.info` because none of these flags
+    /// block playback (AVFoundation handles long-GOP and VFR; untagged color falls back
+    /// to sRGB), they only inform a transcode-or-accept decision.
+    ///
+    /// `tenBitYUV420` is intentionally excluded — it has its own dedicated row above
+    /// (`evaluateTenBitRecommendation`) because it's an output-side recommendation, not
+    /// a content-side advisory. `animatedImage` is also excluded — it's a "first frame
+    /// only without transcode" hint that already surfaces as an inline transcode chip on
+    /// the cue inspector and doesn't generalize to a roll-up message.
+    static func evaluateCodecAdvisory(project: PlayoutProject) -> Row? {
+        var longGOPCount = 0
+        var variableFrameRateCount = 0
+        var untaggedColorCount = 0
+        for slide in project.slides {
+            if slide.flags.longGOP { longGOPCount += 1 }
+            if slide.flags.variableFrameRate { variableFrameRateCount += 1 }
+            if slide.flags.untaggedColor { untaggedColorCount += 1 }
+        }
+        guard longGOPCount + variableFrameRateCount + untaggedColorCount > 0 else { return nil }
+        var fragments: [String] = []
+        if longGOPCount > 0 {
+            fragments.append("\(longGOPCount) long-GOP")
+        }
+        if variableFrameRateCount > 0 {
+            fragments.append("\(variableFrameRateCount) VFR")
+        }
+        if untaggedColorCount > 0 {
+            fragments.append("\(untaggedColorCount) untagged-color")
+        }
+        let summary = "Codec advisories: \(fragments.joined(separator: ", ")) — review the cue inspector and consider Transcode to ProRes."
+        return Row(
+            id: "media.codec",
+            severity: .info,
+            title: "Codec",
+            summary: summary
         )
     }
 

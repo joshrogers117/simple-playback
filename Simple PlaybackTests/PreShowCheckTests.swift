@@ -109,6 +109,78 @@ final class PreShowCheckTests: XCTestCase {
         XCTAssertEqual(row?.id, "output.tenBit")
     }
 
+    // MARK: - Codec advisory (E1+ session 24)
+
+    func testCodecAdvisorySuppressedWhenNoFlags() {
+        let slide = MediaSlide(url: URL(fileURLWithPath: "/tmp/clean.mov"), mediaKind: .video)
+        let project = PlayoutProject(slides: [slide])
+        XCTAssertNil(PreShowCheck.evaluateCodecAdvisory(project: project),
+                     "Suppress the row entirely when no clips carry an advisory — pre-show panels degrade fast with noise rows.")
+    }
+
+    func testCodecAdvisorySuppressedWhenOnlyExcludedFlagsPresent() {
+        // tenBit and animatedImage have dedicated surfaces; the advisory row should
+        // ignore them and return nil if those are the only flags set.
+        var ten = MediaSlide(url: URL(fileURLWithPath: "/tmp/ten.mov"), mediaKind: .video)
+        ten.flags.tenBitYUV420 = true
+        var anim = MediaSlide(url: URL(fileURLWithPath: "/tmp/anim.gif"), mediaKind: .image)
+        anim.flags.animatedImage = true
+        let project = PlayoutProject(slides: [ten, anim])
+        XCTAssertNil(PreShowCheck.evaluateCodecAdvisory(project: project))
+    }
+
+    func testCodecAdvisoryCountsLongGOPClips() {
+        var a = MediaSlide(url: URL(fileURLWithPath: "/tmp/a.mov"), mediaKind: .video)
+        a.flags.longGOP = true
+        var b = MediaSlide(url: URL(fileURLWithPath: "/tmp/b.mov"), mediaKind: .video)
+        b.flags.longGOP = true
+        let project = PlayoutProject(slides: [a, b])
+        let row = PreShowCheck.evaluateCodecAdvisory(project: project)
+        XCTAssertEqual(row?.id, "media.codec")
+        XCTAssertEqual(row?.severity, .info)
+        XCTAssertTrue(row?.summary.contains("2 long-GOP") == true,
+                      "Summary must include the long-GOP count so the operator can locate it.")
+    }
+
+    func testCodecAdvisoryRollsUpAllThreeFlags() {
+        var lg = MediaSlide(url: URL(fileURLWithPath: "/tmp/lg.mov"), mediaKind: .video)
+        lg.flags.longGOP = true
+        var vfr = MediaSlide(url: URL(fileURLWithPath: "/tmp/vfr.mov"), mediaKind: .video)
+        vfr.flags.variableFrameRate = true
+        var ut = MediaSlide(url: URL(fileURLWithPath: "/tmp/ut.mov"), mediaKind: .video)
+        ut.flags.untaggedColor = true
+        let project = PlayoutProject(slides: [lg, vfr, ut])
+        let row = PreShowCheck.evaluateCodecAdvisory(project: project)
+        XCTAssertNotNil(row)
+        XCTAssertTrue(row?.summary.contains("1 long-GOP") == true)
+        XCTAssertTrue(row?.summary.contains("1 VFR") == true)
+        XCTAssertTrue(row?.summary.contains("1 untagged-color") == true)
+    }
+
+    func testCodecAdvisoryCountsClipsNotFlags() {
+        // A single clip with multiple flags counts once per flag fragment, not once
+        // overall — so the row tells the operator how many clips carry each advisory
+        // independently. A clip with both long-GOP and untagged color contributes to
+        // both counts.
+        var combo = MediaSlide(url: URL(fileURLWithPath: "/tmp/combo.mov"), mediaKind: .video)
+        combo.flags.longGOP = true
+        combo.flags.untaggedColor = true
+        let project = PlayoutProject(slides: [combo])
+        let row = PreShowCheck.evaluateCodecAdvisory(project: project)
+        XCTAssertTrue(row?.summary.contains("1 long-GOP") == true)
+        XCTAssertTrue(row?.summary.contains("1 untagged-color") == true)
+    }
+
+    func testCodecAdvisoryAppearsInEvaluateOutput() {
+        // Wire-up pin: the codec row reaches the panel via the top-level evaluate(...).
+        var slide = MediaSlide(url: URL(fileURLWithPath: "/tmp/lg.mov"), mediaKind: .video)
+        slide.flags.longGOP = true
+        let project = PlayoutProject(slides: [slide])
+        let rows = PreShowCheck.evaluate(project: project, context: PreShowCheck.Context())
+        XCTAssertTrue(rows.contains { $0.id == "media.codec" },
+                      "evaluate(...) must emit the media.codec row when codec advisories are present.")
+    }
+
     // MARK: - External reference
 
     func testReferenceRowSuppressedWhenNotExpected() {
