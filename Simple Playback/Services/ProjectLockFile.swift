@@ -191,10 +191,19 @@ struct ProjectLockFileSignals {
         #endif
     }
 
-    /// Prefer `gethostname(2)` — it's the kernel's canonical identifier and
-    /// matches what other processes on the same machine see. `Host.current()`
-    /// is the AppKit alternative but it's `@MainActor`-bound and overkill
-    /// for a string we just need at write time.
+    /// Use `gethostname(2)` — the kernel's canonical identifier (e.g.
+    /// `Joshs-Mac.local`). Locks written by this app and read back by this
+    /// app see a stable string across runs.
+    ///
+    /// **API choice is load-bearing for backwards-compatibility of `.lock`
+    /// records.** If a future revision swaps to `Host.current().localizedName`
+    /// (returns the user-visible "Josh's Mac" form) two app versions would
+    /// disagree about whether a foreign-host lock matches the local hostname,
+    /// and `localStale` checks would mis-classify. Keep `gethostname` until
+    /// a cross-host rehearsal (manual_verification.md "Lock-file behaviour
+    /// against real NAS-shared multi-host scenarios") demonstrates a concrete
+    /// reason to switch — e.g. operator surveys show `Joshs-Mac.local`-style
+    /// names confuse the foreign-host banner copy.
     static func currentHostname() -> String {
         #if canImport(Darwin)
         var buf = [CChar](repeating: 0, count: 256)

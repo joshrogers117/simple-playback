@@ -1197,3 +1197,24 @@ Session 25 picked the recommended Option B + Option C combo: F1 code-reviewer au
 - Phase F adds programmatic overlay automation (e.g., an OSC-driven overlay edit that arrives off main). At that point the CompositorOverlays didSet ordering contract becomes load-bearing; the FIFO guarantee documented in `phase_f_summary.md` would need to either be re-verified for the new entry path, or hardened with a seam + pin.
 
 ---
+
+## 2026-05-08 — F1 P2: ProjectLockFile hostname API lock-in (session 26)
+
+**Decision**: Lock in `gethostname(2)` as the canonical hostname source for `.lock` records. Document the load-bearing nature of the choice in the source comment + manual-verification rehearsal step. The deferred item from the session-25 F1 reviewer sweep ("project-lock-file hostname canonicalization") closes here — no API swap, but the rationale is now load-bearing in the code.
+
+**Why**: This app is the only writer of `<bundle>/.lock`. The hazard the deferred item flagged was hypothetical — two writers using two different APIs (`gethostname(2)` vs `Host.current().localizedName`) would disagree about whether a foreign lock matches the local hostname, mis-classifying `localStale` as `foreignStale`. Since no other process writes our lock format, the only way that hazard materializes is if a future revision of this app swaps the API and then meets a `.lock` written by an older version. The right close-out is therefore not a code change but a comment that locks in the choice with the backwards-compatibility rationale, plus a manual-verification entry pointing at the lock-in. `Host.current()` (legacy `NSHost`) is also `@MainActor`-bound on modern macOS, has been deprecated in spirit, and returns a user-visible form ("Josh's Mac") that's not what other Darwin processes see — `gethostname(2)` is the kernel's canonical answer and what every other Unix `hostname`-using tool sees.
+
+**Alternatives considered**:
+
+- **Swap to `Host.current().localizedName`**: rejected — adds main-actor entanglement, returns a less-stable string, and would require migrating in-flight lock files. No operator-visible upside.
+- **Add a runtime hostname-source override field to the `.lock` schema** (e.g. `hostnameSource: "gethostname(2)"`): rejected — over-engineering for a hazard that doesn't exist today and could be addressed later without breaking compatibility (read-side only needs to decode current files).
+- **Leave the comment as-is and move on**: rejected — the original comment said "kernel's canonical identifier" but didn't explain why an alternative would be unsafe. A future contributor reading just the comment might reasonably swap to `Host.current()` for "modernization" reasons.
+
+**Reversibility**: easy — revert the comment + manual_verification text. The code path is unchanged.
+
+**What I'd revisit if**:
+
+- A cross-host NAS rehearsal surfaces operator confusion about the `.local` suffix in the foreign-host banner copy. The right fix then is to format the banner string (e.g. strip `.local` for display only) rather than swap the underlying API — keep the lock comparison stable.
+- A second app or sibling-tool needs to write or read our `.lock` format. Then we'd document the schema as a public contract and pin `gethostname(2)` formally; nothing changes in this app's code.
+
+---

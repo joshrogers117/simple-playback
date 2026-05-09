@@ -174,7 +174,7 @@ Most of these need induced failures (CPU stalls, force-quit, lock-file rewrites)
 
 ### Multi-host / NAS-specific (cannot verify autonomously)
 
-- **Lock-file behaviour against real NAS-shared multi-host scenarios** — two machines opening the same `.spb` from a SMB share, foreign-host stale-window timing on networked filesystem mtime drift.
+- **Lock-file behaviour against real NAS-shared multi-host scenarios** — two machines opening the same `.spb` from a SMB share, foreign-host stale-window timing on networked filesystem mtime drift. Confirm the foreign-host banner copy reads naturally with the `gethostname(2)` form (`Joshs-Mac.local`); if operators find the trailing `.local` confusing, file a UX issue rather than swapping the API — see the lock-in rationale in `Services/ProjectLockFile.swift:currentHostname()`.
 - **Asset-library fingerprinting against multi-GB ProRes files** — SHA-256 streaming on GB-scale sources.
 - **Show-log persistence over multi-hour shows** — file rotation, concurrent log appends, log-file integrity on a long uninterrupted run.
 
