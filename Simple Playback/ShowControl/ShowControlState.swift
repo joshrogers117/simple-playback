@@ -78,8 +78,14 @@ final class ShowControlState {
         queue.sync {
             _showList = list
             // Reseed cue states for any new cues; drop stale.
+            //
+            // Snapshot the dead keys first — Dictionary's `.keys` view is
+            // backed by the live storage, and `removeValue(forKey:)` mid-
+            // iteration is undefined behaviour. Materializing the dead set
+            // up front decouples the mutation from the iteration.
             let live = Set(list.cues.map(\.id))
-            for cueID in _cueStates.keys where !live.contains(cueID) {
+            let dead = _cueStates.keys.filter { !live.contains($0) }
+            for cueID in dead {
                 _cueStates.removeValue(forKey: cueID)
                 _cueElapsed.removeValue(forKey: cueID)
                 _cueRemaining.removeValue(forKey: cueID)

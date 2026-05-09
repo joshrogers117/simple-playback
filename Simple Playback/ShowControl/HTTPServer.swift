@@ -60,8 +60,13 @@ final class HTTPServer {
     func stop() {
         listener?.cancel()
         listener = nil
-        for c in connections.values { c.cancel() }
-        connections.removeAll()
+        // `connections` is mutated on `queue` by handleConnection + receive
+        // callbacks. Drain on the same queue so we don't race with an
+        // in-flight callback adding or removing entries.
+        queue.sync {
+            for c in connections.values { c.cancel() }
+            connections.removeAll()
+        }
         isRunning = false
     }
 
@@ -147,7 +152,13 @@ final class HTTPServer {
             // is handled in handleWebSocketUpgrade rather than here.
             let address = HTTPRoutes.oscAddress(for: action)
             let body = ShowControlReplyEnvelope.json(address: address, result: result)
-            let status = (result == .ok(data: [:])) ? 200 : 200 // status reflects in body
+            // Status reflects the wire-level outcome: 200 for `.ok`, 400 for
+            // `.rejected` (operator-supplied input failed validation), 401
+            // for capability mismatch (caught here so simple HTTP clients
+            // don't have to parse the JSON envelope to distinguish). The
+            // ShowControlReplyEnvelope body still carries the structured
+            // result for clients that do introspect.
+            let status = httpStatus(for: result)
             send(on: conn, status: status, body: body, contentType: "application/json", keepAlive: req.keepAlive)
         case .stateSnapshot:
             guard caps.contains(.read) else {
@@ -272,5 +283,27 @@ final class HTTPServer {
         case 503: return "Service Unavailable"
         default: return "OK"
         }
+    }
+
+    /// Map a `ShowControlActionResult` to its HTTP status code. The reply
+    /// envelope (returned in the body) carries the structured outcome for
+    /// JSON-aware clients; the status code is the wire-level summary so
+    /// curl / log scrapers can distinguish at a glance. Capability misses
+    /// stay 401 (the dispatcher uses the `missing_capability:` reason
+    /// prefix); validation rejections are 400; runtime no-ops (idempotency
+    /// lockout, unknown cue, etc.) are 200 with the rejection reason in
+    /// the body — they're not protocol failures.
+    static func httpStatus(for result: ShowControlActionResult) -> Int {
+        switch result {
+        case .ok:
+            return 200
+        case let .rejected(reason):
+            if reason.hasPrefix("missing_capability") { return 401 }
+            return 200
+        }
+    }
+
+    private func httpStatus(for result: ShowControlActionResult) -> Int {
+        Self.httpStatus(for: result)
     }
 }

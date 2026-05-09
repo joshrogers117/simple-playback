@@ -49,10 +49,15 @@ final class OSCServer {
         tcpListener?.cancel()
         udpListener = nil
         tcpListener = nil
-        for c in udpConnections.values { c.cancel() }
-        for c in tcpConnections.values { c.cancel() }
-        udpConnections.removeAll()
-        tcpConnections.removeAll()
+        // Connection dicts are mutated on `queue` by handleUDP/TCPConnection +
+        // receive callbacks. Drain on the same queue so we don't race with an
+        // in-flight callback adding or removing entries while we iterate.
+        queue.sync {
+            for c in udpConnections.values { c.cancel() }
+            for c in tcpConnections.values { c.cancel() }
+            udpConnections.removeAll()
+            tcpConnections.removeAll()
+        }
         isRunning = false
     }
 
@@ -264,6 +269,20 @@ func framedSize(for transport: OSCTransportKind, packet: Data) -> Data {
 
 /// Reassembles size-prefixed OSC frames from a TCP byte stream.
 final class TCPFrameBuffer {
+
+    /// Hard ceiling on a single OSC packet's payload (excluding the 4-byte
+    /// size prefix). 1 MiB is far above any plausible OSC message — typical
+    /// /sp/* dispatches are <1 KiB. A peer announcing a much larger size is
+    /// either misbehaving or malicious; without a cap, `nextPacket()` would
+    /// silently buffer up to ~4 GiB before delivering anything.
+    static let maxPacketSize: Int = 1 << 20
+
+    /// Set when `nextPacket()` rejected a frame whose announced size
+    /// exceeded `maxPacketSize`. The server drops the connection on the
+    /// next receive callback rather than continuing to read attacker-
+    /// controlled bytes.
+    private(set) var didRejectOversizedFrame: Bool = false
+
     private var buffer = Data()
 
     func append(_ data: Data) { buffer.append(data) }
@@ -276,6 +295,11 @@ final class TCPFrameBuffer {
                 _ = dest.copyBytes(from: ptr.bindMemory(to: UInt8.self).prefix(4))
             }
             return UInt32(bigEndian: be)
+        }
+        if Int(size) > Self.maxPacketSize {
+            didRejectOversizedFrame = true
+            buffer.removeAll(keepingCapacity: false)
+            return nil
         }
         let total = 4 + Int(size)
         guard buffer.count >= total else { return nil }

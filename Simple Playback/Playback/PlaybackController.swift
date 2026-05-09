@@ -1275,14 +1275,26 @@ final class PlaybackController: ObservableObject {
             return targetFrame
         }
 
-        if activeTransition!.scratchFrame == nil {
-            activeTransition!.scratchFrame = renderer.blankFrame(matching: targetFrame)
+        // Snapshot scratch buffer as a non-optional local for the blend call.
+        // Re-binding `&activeTransition!.scratchFrame!` is fragile (two
+        // force-unwraps and an inout into an optional), and would crash if
+        // the only-on-this-queue invariant ever cracks. Locals make the
+        // contract obvious: blend writes into `scratch`, then we re-stamp
+        // `activeTransition.scratchFrame` with the result before returning.
+        var scratch = transition.scratchFrame ?? renderer.blankFrame(matching: targetFrame)
+        let startFrame = transitionStartFrame(for: transition)
+        let success = renderer.blend(from: startFrame, to: targetFrame, into: &scratch, progress: progress)
+
+        // Persist the (possibly newly-allocated) scratch frame back onto the
+        // transition. Guard against `activeTransition` being cleared by a
+        // concurrent stopActiveTransition — extremely unlikely on the
+        // output queue, but the optional check keeps the bind safe.
+        if activeTransition != nil {
+            activeTransition!.scratchFrame = scratch
         }
 
-        let startFrame = transitionStartFrame(for: transition)
-        if renderer.blend(from: startFrame, to: targetFrame, into: &activeTransition!.scratchFrame!, progress: progress),
-           let scratchFrame = activeTransition!.scratchFrame {
-            return scratchFrame
+        if success {
+            return scratch
         }
 
         stopActiveTransition()
