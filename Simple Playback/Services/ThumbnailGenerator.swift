@@ -13,6 +13,15 @@ import Foundation
 /// at quality 0.75). The grid uses `aspectRatio(16/9, contentMode: .fit)`,
 /// so this matches the visible cell aspect — operators don't see a stretched
 /// thumbnail when the asset's native aspect differs.
+/// Errors raised by `ThumbnailGenerator`. Top-level (mirrors sibling
+/// `PDFImportError`, `KeynoteImportError`, `TranscodeError`, etc.) so a
+/// `catch` clause doesn't need to qualify the generator namespace.
+enum ThumbnailGeneratorError: Error, Equatable {
+    case sourceNotReadable
+    case generatorFailed
+    case encodingFailed
+}
+
 enum ThumbnailGenerator {
 
     /// Default cached-thumbnail size. Operators' preview tiles are 16:9 +
@@ -23,12 +32,6 @@ enum ThumbnailGenerator {
     /// JPEG quality. 0.75 strikes a balance between size (~10 KB) and the
     /// palette legibility of low-contrast posters.
     static let defaultJPEGQuality: CGFloat = 0.75
-
-    enum Failure: Error, Equatable {
-        case sourceNotReadable
-        case generatorFailed
-        case encodingFailed
-    }
 
     /// Generate JPEG `Data` for `url`. `mediaKind` selects the producer:
     /// image URLs go through `NSImage(contentsOf:)`; video URLs through
@@ -52,14 +55,14 @@ enum ThumbnailGenerator {
     /// composition snapshot) that already hold the bitmap in memory.
     static func encodeJPEG(image: NSImage, size: CGSize, quality: CGFloat) throws -> Data {
         guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            throw Failure.generatorFailed
+            throw ThumbnailGeneratorError.generatorFailed
         }
         return try encodeJPEG(cgImage: cg, size: size, quality: quality)
     }
 
     private static func generateJPEGFromImage(url: URL, size: CGSize, quality: CGFloat) throws -> Data {
         guard let image = NSImage(contentsOf: url) else {
-            throw Failure.sourceNotReadable
+            throw ThumbnailGeneratorError.sourceNotReadable
         }
         return try encodeJPEG(image: image, size: size, quality: quality)
     }
@@ -91,7 +94,7 @@ enum ThumbnailGenerator {
         }
         semaphore.wait()
 
-        guard let cg = box.image else { throw Failure.generatorFailed }
+        guard let cg = box.image else { throw ThumbnailGeneratorError.generatorFailed }
         return try encodeJPEG(cgImage: cg, size: size, quality: quality)
     }
 
@@ -110,7 +113,7 @@ enum ThumbnailGenerator {
             using: .jpeg,
             properties: [.compressionFactor: quality]
         )
-        guard let representation else { throw Failure.encodingFailed }
+        guard let representation else { throw ThumbnailGeneratorError.encodingFailed }
         return representation
     }
 }

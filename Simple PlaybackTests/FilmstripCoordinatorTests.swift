@@ -110,7 +110,7 @@ final class FilmstripCoordinatorTests: XCTestCase {
 
     func testGeneratorFailureReportsFailedOutcomeAndDropsJob() async {
         FilmstripCoordinator.generator = { _, _, _, _ in
-            throw FilmstripGenerator.Failure.durationUnknown
+            throw FilmstripGeneratorError.durationUnknown
         }
 
         let coordinator = FilmstripCoordinator()

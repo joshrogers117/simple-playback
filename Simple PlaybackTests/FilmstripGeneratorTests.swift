@@ -72,7 +72,7 @@ final class FilmstripGeneratorTests: XCTestCase {
         } catch {
             // Either sourceNotReadable (no video tracks) or durationUnknown
             // is acceptable — observationally equivalent for a missing file.
-            switch error as? FilmstripGenerator.Failure {
+            switch error as? FilmstripGeneratorError {
             case .sourceNotReadable, .durationUnknown:
                 break
             default:
@@ -87,7 +87,7 @@ final class FilmstripGeneratorTests: XCTestCase {
             _ = try await FilmstripGenerator.generateSpriteSheet(for: bogusURL, frameCount: 0)
             XCTFail("Expected throw")
         } catch {
-            XCTAssertEqual(error as? FilmstripGenerator.Failure, .frameCountInvalid)
+            XCTAssertEqual(error as? FilmstripGeneratorError, .frameCountInvalid)
         }
     }
 
@@ -97,7 +97,7 @@ final class FilmstripGeneratorTests: XCTestCase {
             _ = try await FilmstripGenerator.generateSpriteSheet(for: bogusURL, columns: 0)
             XCTFail("Expected throw")
         } catch {
-            XCTAssertEqual(error as? FilmstripGenerator.Failure, .columnsInvalid)
+            XCTAssertEqual(error as? FilmstripGeneratorError, .columnsInvalid)
         }
     }
 
@@ -106,7 +106,7 @@ final class FilmstripGeneratorTests: XCTestCase {
         // per-frame extraction loop instead of running every extraction
         // to completion. Spawn a task, cancel it before it hits await,
         // and confirm the throw is CancellationError rather than a
-        // FilmstripGenerator.Failure.
+        // FilmstripGeneratorError.
         let url = try makeH264Movie(frameCount: 30)
         defer { try? FileManager.default.removeItem(at: url) }
 

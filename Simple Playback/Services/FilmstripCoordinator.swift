@@ -29,7 +29,7 @@ final class FilmstripCoordinator: ObservableObject {
 
     enum Outcome: Equatable {
         case completed(URL)
-        case failed(FilmstripGenerator.Failure)
+        case failed(FilmstripGeneratorError)
     }
 
     /// Test seam — the pure-logic generator. Default delegates to
@@ -125,7 +125,7 @@ final class FilmstripCoordinator: ObservableObject {
                     self?.removeJob(forSlide: captureSlideID)
                 }
                 return
-            } catch let failure as FilmstripGenerator.Failure {
+            } catch let failure as FilmstripGeneratorError {
                 outcome = .failed(failure)
             } catch {
                 // Non-FilmstripGenerator throw means the writer raised —

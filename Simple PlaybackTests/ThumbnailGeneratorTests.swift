@@ -39,7 +39,7 @@ final class ThumbnailGeneratorTests: XCTestCase {
     func testGenerateJPEGForUnreadableSourceThrowsSourceNotReadable() {
         let missing = URL(fileURLWithPath: "/tmp/nope-\(UUID().uuidString).png")
         XCTAssertThrowsError(try ThumbnailGenerator.generateJPEG(for: missing, mediaKind: .image)) { error in
-            XCTAssertEqual(error as? ThumbnailGenerator.Failure, .sourceNotReadable)
+            XCTAssertEqual(error as? ThumbnailGeneratorError, .sourceNotReadable)
         }
     }
 

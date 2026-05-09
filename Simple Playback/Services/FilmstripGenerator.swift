@@ -20,6 +20,18 @@ import Foundation
 /// `[0, duration)`, centered (the i-th of N is at `D × (i + 0.5)/N`)
 /// so neither endpoint is sampled exactly — avoids decode-at-EOF
 /// failure modes and makes the visual mid-points legible.
+/// Errors raised by `FilmstripGenerator`. Top-level (mirrors sibling
+/// `PDFImportError`, `KeynoteImportError`, `TranscodeError`, etc.) so a
+/// `catch` clause doesn't need to qualify the generator namespace.
+enum FilmstripGeneratorError: Error, Equatable {
+    case sourceNotReadable
+    case durationUnknown
+    case frameCountInvalid
+    case columnsInvalid
+    case frameExtractionFailed(timestamp: Double)
+    case encodingFailed
+}
+
 enum FilmstripGenerator {
 
     /// Default total frame count. 24 is enough for a recognizable scrub
@@ -35,15 +47,6 @@ enum FilmstripGenerator {
     /// scrub UI's frame is legible without scaling, but small enough to
     /// keep the sprite-sheet image under 100 KB.
     static let defaultFrameSize = CGSize(width: 160, height: 90)
-
-    enum Failure: Error, Equatable {
-        case sourceNotReadable
-        case durationUnknown
-        case frameCountInvalid
-        case columnsInvalid
-        case frameExtractionFailed(timestamp: Double)
-        case encodingFailed
-    }
 
     /// Pure-logic helper — the centered-sample timestamps for a video of
     /// `durationSeconds` carved into `frameCount` slots. Returns the
@@ -90,8 +93,8 @@ enum FilmstripGenerator {
         columns: Int = defaultColumns,
         frameSize: CGSize = defaultFrameSize
     ) async throws -> Data {
-        guard frameCount > 0 else { throw Failure.frameCountInvalid }
-        guard columns > 0 else { throw Failure.columnsInvalid }
+        guard frameCount > 0 else { throw FilmstripGeneratorError.frameCountInvalid }
+        guard columns > 0 else { throw FilmstripGeneratorError.columnsInvalid }
 
         let asset = AVURLAsset(url: url)
         // `loadTracks(withMediaType:)` is the macOS 13+ async equivalent
@@ -102,21 +105,21 @@ enum FilmstripGenerator {
         do {
             videoTracks = try await asset.loadTracks(withMediaType: .video)
         } catch {
-            throw Failure.sourceNotReadable
+            throw FilmstripGeneratorError.sourceNotReadable
         }
         guard !videoTracks.isEmpty else {
-            throw Failure.sourceNotReadable
+            throw FilmstripGeneratorError.sourceNotReadable
         }
 
         let duration: CMTime
         do {
             duration = try await asset.load(.duration)
         } catch {
-            throw Failure.durationUnknown
+            throw FilmstripGeneratorError.durationUnknown
         }
         let durationSeconds = CMTimeGetSeconds(duration)
         guard durationSeconds.isFinite, durationSeconds > 0 else {
-            throw Failure.durationUnknown
+            throw FilmstripGeneratorError.durationUnknown
         }
 
         let generator = AVAssetImageGenerator(asset: asset)
@@ -136,7 +139,7 @@ enum FilmstripGenerator {
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
-                throw Failure.frameExtractionFailed(timestamp: ts)
+                throw FilmstripGeneratorError.frameExtractionFailed(timestamp: ts)
             }
         }
 
@@ -157,7 +160,7 @@ enum FilmstripGenerator {
     ) throws -> Data {
         let width = Int(canvasSize.width)
         let height = Int(canvasSize.height)
-        guard width > 0, height > 0 else { throw Failure.encodingFailed }
+        guard width > 0, height > 0 else { throw FilmstripGeneratorError.encodingFailed }
 
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
@@ -170,7 +173,7 @@ enum FilmstripGenerator {
             space: colorSpace,
             bitmapInfo: bitmapInfo
         ) else {
-            throw Failure.encodingFailed
+            throw FilmstripGeneratorError.encodingFailed
         }
 
         // Black opaque background so non-extracted cells (if any) read as
@@ -192,11 +195,11 @@ enum FilmstripGenerator {
         }
 
         guard let outputCGImage = context.makeImage() else {
-            throw Failure.encodingFailed
+            throw FilmstripGeneratorError.encodingFailed
         }
         let bitmap = NSBitmapImageRep(cgImage: outputCGImage)
         guard let pngData = bitmap.representation(using: .png, properties: [:]) else {
-            throw Failure.encodingFailed
+            throw FilmstripGeneratorError.encodingFailed
         }
         return pngData
     }
