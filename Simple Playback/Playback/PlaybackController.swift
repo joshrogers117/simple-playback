@@ -1013,6 +1013,17 @@ final class PlaybackController: ObservableObject {
     }
 
     private func installVideoEndObserver(for item: AVPlayerItem, settings: SlideSettings) {
+        // Self-clear any prior observer first. Pre-review, callers had to
+        // remember to remove the old observer before installing a new one;
+        // a stacked GO that took a different code path could leak the
+        // prior observer (NotificationCenter holds it strongly via the
+        // returned token), and the leak would pile up across a multi-hour
+        // show. Centralising the cleanup here makes the contract robust
+        // against future call-site refactors.
+        if let existing = videoEndObserver {
+            NotificationCenter.default.removeObserver(existing)
+            videoEndObserver = nil
+        }
         videoEndObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: item,

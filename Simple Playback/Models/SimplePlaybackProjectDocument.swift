@@ -83,11 +83,20 @@ final class SimplePlaybackProjectDocument: NSDocument {
         guard let bundleURL = fileURL else { return }
         do {
             let data = try JSONEncoder.simplePlayback.encode(playbackDocument.project)
-            try AutosaveCheckpointer.writeCheckpoint(
+            let result = try AutosaveCheckpointer.writeCheckpoint(
                 projectData: data,
                 bundleURL: bundleURL,
                 reason: reason
             )
+            // Prune failures are non-fatal but worth surfacing — silent
+            // unbounded growth in `<bundle>/Autosave/` was the pre-review
+            // behaviour. NSLog rather than show-log for now (no document
+            // accessor here); a future refactor can route this through
+            // `Services/ShowLog.swift` once the doc has a log handle.
+            for failure in result.pruneFailures {
+                NSLog("AutosaveCheckpointer prune failed for %@: %@",
+                      failure.filename, "\(failure.error)")
+            }
         } catch {
             // Best-effort. A failed checkpoint should never abort the
             // operator action that triggered it (Show Mode toggle).

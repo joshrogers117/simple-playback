@@ -119,7 +119,7 @@ final class AutosaveCheckpointerTests: XCTestCase {
         var createdDirs: [URL] = []
         var writes: [(URL, Data)] = []
 
-        let url = try AutosaveCheckpointer.writeCheckpoint(
+        let result = try AutosaveCheckpointer.writeCheckpoint(
             projectData: Data("project".utf8),
             bundleURL: bundle,
             timestamp: Date(timeIntervalSince1970: 1_700_000_000),
@@ -134,7 +134,8 @@ final class AutosaveCheckpointerTests: XCTestCase {
         XCTAssertEqual(writes.count, 1)
         XCTAssertTrue(writes[0].0.lastPathComponent.contains("show_mode_on.json"))
         XCTAssertEqual(writes[0].1, Data("project".utf8))
-        XCTAssertEqual(url.deletingLastPathComponent().lastPathComponent, "Autosave")
+        XCTAssertEqual(result.url.deletingLastPathComponent().lastPathComponent, "Autosave")
+        XCTAssertTrue(result.pruneFailures.isEmpty)
     }
 
     func testWriteCheckpointPrunesAfterListing() throws {
@@ -187,5 +188,57 @@ final class AutosaveCheckpointerTests: XCTestCase {
                 fileRemover: { _ in throw Boom() }
             )
         )
+    }
+
+    func testWriteCheckpointSurfacesPruneFailures() throws {
+        // Pre-review the prune step swallowed errors via `try?`, leaving the
+        // operator unable to see why `<bundle>/Autosave/` kept growing.
+        // The WriteResult now reports each failed remove so the host can
+        // log + surface.
+        let stale = (0..<25).map { offset in
+            AutosaveCheckpoint(
+                timestamp: Date(timeIntervalSince1970: TimeInterval(offset * 60)),
+                reason: .manual
+            ).filename
+        }
+        let bundle = URL(fileURLWithPath: "/tmp/show.spb")
+        struct Boom: Error {}
+        let result = try AutosaveCheckpointer.writeCheckpoint(
+            projectData: Data(),
+            bundleURL: bundle,
+            timestamp: Date(),
+            reason: .manual,
+            directoryCreator: { _ in },
+            directoryLister: { _ in stale },
+            fileWriter: { _, _ in },
+            fileRemover: { _ in throw Boom() }
+        )
+        // 25 → keep 20 → 5 prune attempts, all failing.
+        XCTAssertEqual(result.pruneFailures.count, 5)
+        XCTAssertTrue(result.pruneFailures.first?.error is Boom)
+    }
+
+    func testWriteCheckpointReportsEmptyFailureListOnSuccess() throws {
+        // When prune succeeds, the result's pruneFailures must be empty —
+        // hosts read this list and surface non-empty cases; a stray entry
+        // would produce false alarms.
+        let stale = (0..<22).map { offset in
+            AutosaveCheckpoint(
+                timestamp: Date(timeIntervalSince1970: TimeInterval(offset * 60)),
+                reason: .manual
+            ).filename
+        }
+        let bundle = URL(fileURLWithPath: "/tmp/show.spb")
+        let result = try AutosaveCheckpointer.writeCheckpoint(
+            projectData: Data(),
+            bundleURL: bundle,
+            timestamp: Date(),
+            reason: .manual,
+            directoryCreator: { _ in },
+            directoryLister: { _ in stale },
+            fileWriter: { _, _ in },
+            fileRemover: { _ in }
+        )
+        XCTAssertTrue(result.pruneFailures.isEmpty)
     }
 }

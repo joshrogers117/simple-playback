@@ -95,8 +95,20 @@ enum AutosaveCheckpointer {
         return sorted.prefix(pruneCount).map { $0.0 }
     }
 
+    /// Result of a writeCheckpoint call. Carries the URL of the new
+    /// checkpoint plus any non-fatal prune failures (read-only volume,
+    /// permission flip, NAS unmount). Pre-review the prune errors were
+    /// silently swallowed via `try?`, which would let the autosave
+    /// directory grow unboundedly while the operator never saw it.
+    /// The checkpointer now surfaces them so the caller can decide
+    /// whether to log them and / or fail the document save.
+    struct WriteResult {
+        let url: URL
+        let pruneFailures: [(filename: String, error: Error)]
+    }
+
     /// Write a checkpoint to disk and prune older ones to fit the retention
-    /// limit. Returns the URL written.
+    /// limit. Returns the URL written + any prune failures.
     @discardableResult
     static func writeCheckpoint(
         projectData: Data,
@@ -116,7 +128,7 @@ enum AutosaveCheckpointer {
         fileRemover: (URL) throws -> Void = { url in
             try FileManager.default.removeItem(at: url)
         }
-    ) throws -> URL {
+    ) throws -> WriteResult {
         let dir = directory(in: bundleURL)
         try directoryCreator(dir)
         let checkpoint = AutosaveCheckpoint(timestamp: timestamp, reason: reason)
@@ -126,11 +138,22 @@ enum AutosaveCheckpointer {
         // Prune. Read the directory *after* the write so the new checkpoint
         // counts toward the retention limit (a 21-deep history immediately
         // drops the oldest, keeping disk footprint bounded).
+        //
+        // Prune failures are non-fatal — the new checkpoint is already on
+        // disk, the document is in a recoverable state, and the operator
+        // doesn't need to re-author the show because of a flaky NAS. But
+        // we DO want to surface them so the host can decide whether to
+        // log + warn (silent unbounded growth was the prior behaviour).
         let existing = (try? directoryLister(dir)) ?? []
         let toPrune = filenamesToPrune(existing: existing, retentionLimit: retentionLimit)
+        var pruneFailures: [(filename: String, error: Error)] = []
         for name in toPrune {
-            try? fileRemover(dir.appendingPathComponent(name))
+            do {
+                try fileRemover(dir.appendingPathComponent(name))
+            } catch {
+                pruneFailures.append((filename: name, error: error))
+            }
         }
-        return url
+        return WriteResult(url: url, pruneFailures: pruneFailures)
     }
 }
