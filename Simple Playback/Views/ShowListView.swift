@@ -160,15 +160,6 @@ struct ShowListView: View {
             .help("Fire the cue at the playhead")
             .keyboardShortcut(.space, modifiers: [])
             .disabled(showController.panicActive || showController.activeShowList.cues.isEmpty)
-
-            Button {
-                showController.panic()
-            } label: {
-                Label("Panic", systemImage: "exclamationmark.octagon.fill")
-            }
-            .tint(.red)
-            .keyboardShortcut(.escape, modifiers: [])
-            .help("Fade everything to black")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)

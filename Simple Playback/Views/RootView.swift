@@ -400,6 +400,15 @@ struct RootView: View {
 
             VStack(spacing: 0) {
                 HStack(spacing: 10) {
+                    Button {
+                        showController.controller?.panic()
+                    } label: {
+                        Label("FTB", systemImage: "exclamationmark.octagon.fill")
+                    }
+                    .tint(.red)
+                    .keyboardShortcut(.escape, modifiers: [])
+                    .help("Fade to Black — fade everything currently on Program down to black (Esc)")
+
                     Spacer()
 
                     Button {
