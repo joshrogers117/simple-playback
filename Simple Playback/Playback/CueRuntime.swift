@@ -6,7 +6,11 @@ import Foundation
 /// - `loaded`: cue has been pre-rolled (decoder warmed, GPU upload primed) and is ready to fire instantly.
 /// - `running`: cue is currently producing video/audio frames on outputs.
 /// - `tail`: cue has been requested to stop and is in its post-fire fade-out window.
-public enum CueStandbyState: String, Codable, Equatable, Hashable, CaseIterable {
+// Demoted from `public` during the review pass — Simple Playback ships as a
+// single-target app so no other module imports this; `public` was a no-op
+// here and inconsistent with the rest of the codebase (everything else is
+// internal). Easy to re-promote if the runtime ever splits into a library.
+enum CueStandbyState: String, Codable, Equatable, Hashable, CaseIterable {
     case idle
     case loaded
     case running
@@ -14,7 +18,7 @@ public enum CueStandbyState: String, Codable, Equatable, Hashable, CaseIterable 
 }
 
 /// Reasons a `go()` request can be rejected without firing a cue.
-public enum CueRuntimeRejection: Equatable {
+enum CueRuntimeRejection: Equatable {
     /// A previous `go()` arrived within the debounce window. The caller may retry after the debounce expires.
     case debounced
     /// The playhead is past the end of the list, or the list is empty. Nothing to fire.

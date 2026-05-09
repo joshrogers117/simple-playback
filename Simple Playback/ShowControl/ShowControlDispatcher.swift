@@ -16,6 +16,13 @@ enum ShowControlSource: Equatable {
     case osc(host: String, port: UInt16, transport: OSCTransportKind)
     case http(token: String, host: String)
     case timecode
+    /// Test-only source — exercised by `Simple PlaybackTests/ShowControlTests`
+    /// when driving the dispatcher with synthetic actions. Maps to
+    /// `ShowLogEvent.Source.system` in `toShowLogSource()` so log rows from
+    /// test runs are filed alongside real system events; this is fine
+    /// because (a) production code never produces `.test`, and (b) tests
+    /// don't run with a real ShowLog file URL set, so the mapping never
+    /// hits the on-disk audit log.
     case test
 
     var label: String {
