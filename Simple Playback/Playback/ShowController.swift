@@ -76,6 +76,16 @@ final class ShowController: ObservableObject {
     /// Spec §3.16 calls for debounced reporting; this is the floor.
     private let dropFlushInterval: TimeInterval = 1.0
 
+    /// Hub bind token, returned by `ShowControlHub.shared.bind(...)` at init
+    /// and handed back to `unbind(token:)` from `deinit` so the per-document
+    /// bind stack pops cleanly when the document closes. See
+    /// `ShowControlHub` doc-comment for the stack semantics. `var` (with a
+    /// placeholder initial value) so all stored properties finish
+    /// initialising before the bind closure captures `self` — Swift's
+    /// definite-initialisation check rejects passing `self` into the
+    /// closure while any stored property is still un-assigned.
+    private var hubBindToken = ShowControlHub.BindToken.placeholder
+
     init(
         showList: ShowList,
         playback: PlaybackController,
@@ -89,17 +99,30 @@ final class ShowController: ObservableObject {
         self.transitionSettingsLookup = transitionSettings
         self.outputBindingLookup = outputBinding
         wireRuntime()
-        // Hand this document's runtime to the process-wide show-control hub so
-        // OSC/HTTP/Companion route GO/PANIC/etc. to this show list. Also pipe
-        // the dispatcher's `onActionDispatched` callback into our show log so
-        // every remote-driven action lands with its source attribution (host,
-        // port, transport, etc.).
-        ShowControlHub.shared.bind(runtime: runtime)
-        ShowControlHub.shared.stack.dispatcher.onActionDispatched = { [weak self] action, source, _ in
+        // Hand this document's runtime + dispatched-action callback to the
+        // process-wide show-control hub. The hub's per-document bind stack
+        // routes remote-driven actions to whichever document was bound most
+        // recently — opening doc B then closing it returns control to doc A
+        // automatically. Every remote-driven action lands here with its
+        // source attribution (host, port, transport, etc.) so the show log
+        // captures it with the correct provenance.
+        self.hubBindToken = ShowControlHub.shared.bind(runtime: runtime) { [weak self] action, source, _ in
             self?.recordDispatchedAction(action, source: source)
         }
         wireDroppedFrameLog()
         wireLateTakeDetector()
+    }
+
+    deinit {
+        // Pop our entry off the hub's bind stack. `deinit` may run off the
+        // main actor (Swift's @MainActor classes don't guarantee main-actor
+        // deinit) — the hub's `unbind` is main-isolated, so hop. Capture
+        // the token by value so the closure doesn't pin a (now-deinitting)
+        // self.
+        let token = hubBindToken
+        Task { @MainActor in
+            ShowControlHub.shared.unbind(token: token)
+        }
     }
 
     /// E3+ tail — pipe `playback.onFirstComposedFrameForCue` into the
