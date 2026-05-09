@@ -1,10 +1,132 @@
 # Phase B — Output pipeline rework — Summary
 
+**Status (session 24 — 2026-05-08) — Phase B holding pattern**. Phase B ships v1's renderer + compositor + REF policy + 10-bit recommendation logic + frame-rate conformance evaluator. The remaining tail (B7 format negotiation, B9 output-in-use detection, B10 audio routing UI, B11 NDI sender, B13 color pipeline, B15 hot-unplug) all sit on either real DeckLink hardware or large pure-logic surfaces that warrant their own pickup; none is autonomy-shippable today without a hardware spike or a UX product blocker. This file is the **B16 phase summary** — the v1 Phase B inventory + test surface + manual rehearsal checklist + the explicit "scoped-out" list. The session-by-session log below it is the historical narrative from sessions 1–5.
+
+**What ships for v1 Phase B**:
+
+- **B1-B4** (session 1) — data model: `Stage` (resolution / integer-ratio FPS / color space / range), `Screen` (typed `ScreenRole`), `TransportBinding` (`deckLink` / `osDisplay` / `ndi` / `syphon` / `operatorWindow` / `fileRecord`), `ScreenBinding` (Stage→Transport pairing + corner-pin + edge-blend + mirror), `OutputBindingProfile` (per-machine binding registry persisted in `UserDefaults` so opening the same `.splayback` in different venues doesn't dirty the show file), `PlayoutProject.stages + screens` with default-seed semantics.
+- **B5** (session 2) — `TransportSink` protocol + `TransportSinkRouter` fan-out + `DeckLinkTransportSink` / `PreviewTransportSink` + driver shims (`DeckLinkVideoOutputDriver` / `PreviewVideoOutputDriver` reduced to thin wrappers). `PlaybackController.register(sink:) / unregister(sink:)` is the public API for auxiliary sinks. The compositor → driver → device hot path is now uniformly fan-out: every composed frame and every audio block goes through the router, so future B11 NDI / second-DeckLink-port / file-record sinks register a sink rather than re-touching the rendering hot path.
+- **B6 + B6b** (sessions 2 + 5) — DeckLink REF lock state surfaced in `OutputStatusBar` (idle / notSupported / unlocked / locked palette); project-level `PlayoutProject.expectsExternalReference` toggle in the Output inspector tab; escalating red banner ("REF EXPECTED — Output is free-running") above the status row when the toggle is on and the bridge reports `unlocked`. Banner suppresses on `idle` / `notSupported` / `locked` — those aren't contradictions of operator expectation. **REF format-mismatch vs Stage frame rate is deferred** — the v15.3.1 `IDeckLinkOutput` interface used by `SPDeckLinkBridge` does not expose REF input timing; needs a small SDK-API spike against `IDeckLinkProfileAttributes` / `IDeckLinkProfileManager` first.
+- **B8 (logic)** (session 11) — `PlayoutProject.recommendsTenBitOutput` pure-logic computed property keys off any video slide's `flags.tenBitYUV420` (Phase C C1 reuse). Yellow info hint in the Output inspector: "10-bit recommended — at least one clip uses 10-bit YUV 4:2:0." **Applying the recommendation as the default at DeckLink-binding-creation time is deferred** (no UI surface for the binding-creation step today); hardware verification of 10-bit format negotiation against a real card is also deferred (B7-coupled).
+- **B12** (sessions 3 + 4) — three-layer compositor: `CompositorOverlays` data model on `Stage` (bug + message), `CompositorPipeline` pure-logic compose pass (4-corner bug placement, top/lower-third/center message, `{time_left}` countdown), `PlaybackController.submitFrame` runs every frame through compose, Overlays inspector tab + `ShowController.applyCompositorOverlays(_:)` bridge + composed-frame preview rendering. The *base* (pre-overlay) frame is cached so transitions don't double-bake the overlay (decision_log entry "B12: cache base frame, not composed frame"). Bug image cache is invalidated on `bug.media` change; folder-bookmark + bundle-Media URL changes invalidate it through C7d/C8 threading.
+- **B14** — frame-rate conformance evaluator: `Models/FrameRateConformance.swift` pure-logic struct (`severity: .match / .unknown / .mismatch`, 0.1 fps tolerance catching the four canonical fractional/integer pairs). `MediaSlide.nativeFrameRate` populated at import via `AVTrackLoader` (sessions 22-23). Cue inspector renders an FPS conformance chip below the asset row when severity is `.mismatch` (`Views/RootView.swift:1291`). Pre-Show check (E1) reuses the same evaluator via `PreShowCheck.evaluateFrameRateConformance(project:)` — surfaces one row per mismatched cue. **B14 is fully shipped** (the older "pre-show check reuse pending" deferral note in progress.md was stale once E1 landed).
+
+**What's scoped out / deferred for Phase B v1**:
+
+- **B7 — DeckLink format negotiation** — Mid-show change requires re-arm. Requires: (1) `IDeckLinkOutput::DoesSupportVideoMode` spike to confirm we can enumerate supported modes pre-arm (vs the v15.3.1 interface used today), (2) operator-UX choice for the mid-show re-arm flow (modal alert? non-modal banner with "re-arm" affordance? dismiss-with-Esc?). Both blockers — first technical, second product. Best done after a hardware spike + a UX brief, not as a continuous-execution session.
+- **B9 — "Output in use" detection + recovery** — Today a busy DeckLink port silently fails on `EnableVideoOutput`. The `bmdDeckLinkOutputBusyError` HRESULT comes back from the bridge but the surface today is a generic "Output failed to start" — no holding-process disclosure, no "release and retry" affordance. Bridge-side work + UX. Deferred.
+- **B10 — Audio embed channel-pair routing** — Bridge supports SDI audio embed today (`bmdAudioOutputStreamTimestamped`); the operator-facing routing matrix UI does not exist. UX-design heavy.
+- **B11 — NDI Full sender as a `TransportSink`** — Schema exists in `TransportBinding.ndi(senderName:)`; implementation needs the NDI Advanced SDK (license + binary distribution decision). Now genuinely "register an NDISink with the router" — fits the B5 scaffolding cleanly. Deferred until the SDK distribution decision lands.
+- **B13 — Color pipeline** — Per-Screen range/space conversion, gamma-aware crossfade (existing crossfade is linear-RGB), NCLC/ICC respect with operator override, visible color chain in inspector. Today the renderer is BGRA premultiplied-first throughout; per-Stage color tagging is in the data model (`Stage.colorSpace + Stage.range`) but not driven through to the frame conversion path. Substantial — sits on top of B5 + B12. Not autonomy-shippable without hardware verification.
+- **B15 — Hot-unplug handling** — UltraStudio Thunderbolt unplug today surfaces as a generic `bmdDeckLinkOutputDeviceLostError` and `PlaybackController.refreshDevices()` re-enumerates on the next user action. The intended UX is a non-modal "Output device disconnected" banner + automatic re-arm on reconnect. Hardware-bound.
+- **B16 (mock layer)** — `MockTransportSink` test fixture exists in `Simple PlaybackTests/TransportSinkTests.swift` (sinkID, isRunning, framesSubmitted, audioSubmitted, settable startError/frameError/audioError) and is reused across the router fan-out tests. A more sophisticated `MockDeckLinkSink` mirroring the DeckLink-specific surface (referenceState, last-delivered-format, busy-state) is queued for B7/B9 coupled work and not needed today — every Phase B test surface that exists is exercised through `MockTransportSink` or via direct Swift calls into pure-logic services.
+
+**Phase B feature inventory at v1 close**
+
+**Data model + topology (B1-B4)**
+
+- `Stage` — `Models/StageScreen.swift`. Resolution + integer-ratio frame rate (so 23.976 / 29.97 / 59.94 are exact via numerator+denominator) + color space (`sRGB` / `Rec.709` / `Display P3` / `Rec.2020 HLG` / `Rec.2020 PQ`) + range (`limited` / `full`) + `compositorOverlays` (B12).
+- `Screen` — operator-named output destination, typed by `ScreenRole` (`program` / `confidence` / `multiviewer` / `mirror` / `auxiliary` / `streamOut`). References a `Stage.id`. Cues bind to screens by role, never by display index — venue-portable.
+- `TransportBinding` — `deckLink(deviceID, modeID, fillKey, audioEmbed, tenBit)`, `osDisplay(displayID)`, `ndi(senderName)`, `syphon(serverName)`, `operatorWindow`, `fileRecord(url)`.
+- `ScreenBinding` — pairs a Screen with a Transport, plus optional `CornerPin` 4-corner warp, optional `EdgeBlend` (left/right/top/bottom width + gamma + power), optional mirror-of-another-Screen, `enabled` flag.
+- `OutputBindingProfile` — named collection of `ScreenBinding`s for a particular machine, persisted in `UserDefaults`. Project file stays venue-portable; per-machine binding lives separately.
+
+**Render hot path + sink fan-out (B5)**
+
+- `TransportSink` protocol (`Output/TransportSink.swift`) — sinkID, label, status, isRunning, activeStage, start/stop/submit(frame:)/submit(audio:sampleFrameCount:).
+- `TransportSinkStage` — narrow runtime view of `Stage` (width / height / numerator / denominator). Tests can construct one without a full project.
+- `TransportSinkRouter` — `NSLock`-protected sink registry; fan-out captures per-sink errors so one failing transport does not stall the rest.
+- `DeckLinkTransportSink` + `PreviewTransportSink` (`Output/TransportSinks.swift`) — concrete sinks. Each `DeckLinkTransportSink` owns its own `SPDeckLinkBridge`, so multi-port (Fill+Key on a Duo 2; Program+Confidence on separate cards) is "register N sinks" rather than another rewrite.
+- Driver shims — `DeckLinkVideoOutputDriver` and `PreviewVideoOutputDriver` delegate to a sink internally; their public API is unchanged so `OutputSettingsStore`, `RootView`, `OutputPreferencesView` callers compiled clean across the refactor.
+- `PlaybackController.register(sink:) / unregister(sink:)` auto-starts a sink for the active stage if output is already running.
+
+**REF lock state + project-level expectation (B6 + B6b)**
+
+- `SPDeckLinkBridge.referenceState` (new `SPDeckLinkReferenceState` enum: idle / notSupported / unlocked / locked) refreshed via `IDeckLinkOutput_v15_3_1::GetReferenceStatus`. Polled on start and on demand.
+- `DeckLinkTransportSink.referenceState + pollReferenceState()` mirror the bridge enum into a Swift type.
+- `VideoOutputDriver.deckLinkReferenceState` returns the active sink's state (or `nil` for software-only drivers).
+- `PlaybackController.deckLinkReferenceState` is `@Published`; refreshed on `refreshDevices()`, on output start, and cleared on stop.
+- `OutputStatusBar` REF chip palette: green check for `locked`, orange triangle for `unlocked`, secondary for `notSupported` / `idle`. Tooltips explain each state.
+- `PlayoutProject.expectsExternalReference: Bool` (`decodeIfPresent` so legacy projects round-trip cleanly). Output inspector tab Reliability section toggle.
+- `OutputStatusBar.referenceExpected` parameter drives a full-width red banner above the status row when the toggle is on AND the bridge reports `unlocked`. `evaluateFreeRunBanner(referenceExpected:referenceState:)` is the pure helper unit-tested across all 5 (state, expectation) combinations.
+
+**10-bit recommendation logic (B8 logic)**
+
+- `PlayoutProject.recommendsTenBitOutput: Bool` — pure-logic computed property; `true` if any video slide's `MediaFlags.tenBitYUV420 == true`.
+- Output inspector renders a yellow info hint when `recommendsTenBitOutput`: "10-bit recommended — at least one clip uses 10-bit YUV 4:2:0."
+
+**Compositor (B12)**
+
+- `Models/CompositorLayers.swift` — `CompositorOverlays` (`bug: BugOverlay` + `message: MessageOverlay`, `isInert` short-circuit accessor), `BugOverlay` (4-corner placement, marginPercent / sizePercent / opacity / `MediaReference?`), `MessageOverlay` (top / lower-third / center, fontSize / opacity / textColor / optional backgroundColor / optional `countdownTo: Date`), `RGBAColor` (Codable RGBA with `cgColor` accessor + `init(color: SwiftUI.Color)` via `NSColor.usingColorSpace(.sRGB)`).
+- `Stage.compositorOverlays` (codable, defaults to `.empty` for legacy projects).
+- `Playback/CompositorPipeline.swift` — composes media → bug → message onto a base BGRA `RenderedFrame`; inert overlays short-circuit and return the input frame unchanged (zero allocations); buffer convention matches `FrameRenderer` (BGRA premultiplied-first, `byteOrder32Little`, row 0 at visual top). 4-corner bug placement with margin/size as fractions of canvas; cached image resolver invalidated on `BugOverlay.media` change. Message rendering: top / lower-third / center, optional dark-translucent background pad, Core Text drawing with flipped textMatrix to render upright in the y-flipped context. Static helpers `formatCountdown(_:)` (M:SS under 1h, H:MM:SS past 1h, clamps negative to 0:00), `renderedMessageText(overlay:nowDate:)` (substitutes `{time_left}` token).
+- `PlaybackController.compositorOverlays: CompositorOverlays` — mutable; `didSet` flushes the pipeline's bug image cache on `bug.media` change AND re-publishes the composed preview on every overlay edit so the in-app preview tile picks up edits without needing another take.
+- `submitFrame` runs every frame through `CompositorPipeline.compose(...)` before driver / auxiliary-sink hand-off. Cached `currentFrame` is the *base* frame so transitions don't double-bake the overlay.
+- `Views/OverlayInspectorView.swift` — bug + message inspector sections (enable switches, NSOpenPanel image picker, 4-way corner picker, sliders for size / margin / opacity, text field with `{time_left}` token hint, 3-way position picker, color pickers, countdown date/time picker).
+- `RootView` segmented inspector picker (`InspectorMode.selection / .overlays / .output`). Overlays mode binds to `project.stages[0].compositorOverlays`.
+- `ShowController.applyCompositorOverlays(_:)` bridge wired via `.onChange(of: document.project.stages.first?.compositorOverlays)` and called once after `configureShowController()` so freshly opened projects pick up persisted overlays.
+- `firePendingPostDissolveActivation` does NOT nil-clear `transitionPreviewImage` — composed frame stays visible after a dissolve completes.
+- C7d/C8 follow-on: `CompositorPipeline.bundleMediaDirectory + folderBookmarks` synchronized via the existing `cacheLock`; mirror the same lock + invalidation discipline as the bug-image cache. Bundle / folder-bookmark threading flows from `PlaybackController` `didSet` into the compositor on each property change. Read paths consume `MediaReference.resolvedURL(bundleMediaDirectory:folderBookmarks:)` so a moved bundle's managed assets render their bug image overlays correctly.
+
+**Frame-rate conformance (B14)**
+
+- `Models/FrameRateConformance.swift` — `severity: .match / .unknown / .mismatch`, 0.1 fps tolerance catching the four canonical fractional/integer pairs (23.976↔24, 29.97↔30, 47.952↔48, 59.94↔60) as matches.
+- `MediaSlide.nativeFrameRate: Double?` populated at import via `AVTrackLoader.loadFirstVideoTrackInspection` (sessions 22-23). Legacy projects without the field decode to `nil` (severity `.unknown`).
+- `Views/RootView.swift` cue inspector (line 1291) renders an FPS conformance chip below the asset row when severity is `.mismatch`.
+- `Services/PreShowCheck.swift::evaluateFrameRateConformance(project:)` (E1 reuse) — one row per mismatched cue with the same `FrameRateConformance` evaluator; rendered in the Pre-Show check sheet with "Clip 23.976 ≠ Stage 59.94" detail. This is the spec-§3.7 "flag again in pre-show check" requirement.
+
+**Phase B test inventory at v1 close**
+
+735 tests total at HEAD on `development` (session 23). Phase B-direct test surfaces:
+
+- `TransportSinkTests.swift` (~14) — stage derivation, frame-interval clamping, sink lifecycle, router fan-out, error isolation across sinks, removed-sink stop-on-replace, controller register/unregister hooks, `MockTransportSink` test fixture.
+- `OutputStatusBarTests.swift` (~6) — REF banner suppression / visibility across all 5 (state, expectation) combos.
+- `ModelTests.swift` (Phase B portions, ~12) — Stage defaults, ScreenRole completeness, CornerPin identity, TransportBinding labels, project round-trip with stages+screens, ScreenBinding round-trip with DeckLink fill+key + 10-bit, default-seed semantics, `expectsExternalReference` defaults+round-trip, `recommendsTenBitOutput` true/false matrix, B12 round-trip on `compositorOverlays`.
+- `OverlayInspectorTests.swift` (~5) — `RGBAColor(color:)` round-trip, `InspectorMode` cases + labels (now includes `.output`), `ShowController.applyCompositorOverlays(_:)` forwarding, before-frame republish no-op.
+- `CompositorPipelineTests.swift` (~8) — inert short-circuit, bug placement (pixel probes for top-left and bottom-right), missing-media graceful fallback, cache invalidation on `bug.media`, format/substitution edge cases, composed-frame format invariants, `bundleMediaDirectory` change invalidation pin (C7d hardening), folder-bookmark change invalidation pin (C8-6 follow-up).
+- `FrameRateConformanceTests.swift` (~10) — match across all 4 fractional/integer pairs, mismatch matrix, unknown handling, `Stage` initializer convenience, summary text stability, format-helper rounding, decode-if-present legacy round-trip.
+
+Phase E pre-show check tests (`PreShowCheckTests.swift`) reuse the conformance evaluator and are out of scope for the Phase B count.
+
+**Consolidated manual rehearsal steps for Phase B**
+
+These need real DeckLink hardware (the SDI output side), a REF generator (the genlock side), and an SDI reference monitor (the visual confirmation side). Each step exercises a code path that is unit-tested at the model/pipeline layer but never run against a real card at v1.
+
+1. **Output topology venue-portability** — open a project on machine A with a DeckLink output bound, save, reopen on machine B without that DeckLink. Verify the project file decodes cleanly, the per-machine `OutputBindingProfile` falls back to the default Program stage / OS display path, and the show file itself is unchanged on disk.
+2. **REF chip palette** — with a DeckLink card attached, select it as the output and start playback. Verify the REF chip appears in the lower-right of the status row. With a REF generator connected and locked, chip is **green / "REF: Locked"**. With no REF, chip is **orange / "REF: Free-run"**. On a card without external reference input (e.g. UltraStudio Mini Recorder), chip is **gray / "REF: Not supported"**. Stop output → REF chip disappears. Restart → chip re-appears at the new state.
+3. **REF expectation banner** — toggle "Expects external reference (genlock)" on in the Output inspector. With REF disconnected, the red banner ("REF EXPECTED — Output is free-running") appears above the status row. Reconnect REF → banner disappears, chip turns green. On a `notSupported` card with the toggle on, no banner appears (hardware fact ≠ contradiction). Save the project, reopen — toggle persists.
+4. **Compositor overlays at SDI** — open a fresh project, switch the inspector to Overlays. Enable the bug, pick a PNG → bug renders in the in-app preview after the next take, AND on the SDI feed at the chosen corner. Cycle the corner picker (TL/TR/BL/BR) → bug repositions on both surfaces without needing another take. Sliders for size / margin / opacity update both surfaces live.
+5. **Message overlay + countdown at SDI** — enable the message, type `Doors in {time_left}`, set a target 60s in the future → preview shows `Doors in 1:00` and ticks down on both surfaces.
+6. **Crossfade through overlays** — run a crossfade between two video cues with overlays on. Bug + message persist crisply through the dissolve on BOTH the in-app preview and the SDI output (no double-bake on the trailing frame).
+7. **10-bit recommendation hint** — import a 10-bit HEVC Main-10 clip into a project. Output inspector should show the yellow "10-bit recommended" hint. Remove the clip, hint disappears.
+8. **FPS conformance — cue inspector** — import a 23.976 clip into a project whose Stage is 59.94. Cue inspector renders an FPS conformance chip with "FPS: 23.976 → 59.94". Match is suppressed (no chip when within tolerance).
+9. **FPS conformance — pre-show check** — open Pre-Show. The same mismatched cue surfaces a Pre-Show row "Frame rate mismatch: Clip 23.976 ≠ Stage 59.94". Multiple mismatched cues each get their own row.
+10. **TransportSinkRouter fan-out (manual smoke)** — with a DeckLink card attached, start playback. Verify the existing crossfade and take semantics are unchanged — B5 was meant to preserve behavior; a quick smoke-rehearsal of two video cues with crossfade enabled confirms the router did not regress the rendering hot path.
+
+**Hardware-only verification (still needed before promotion to "production-ready")**
+
+These cannot be exercised by autonomy at all and require real hardware + a full rehearsal cycle:
+
+- SDI output looks right on a real reference monitor (B5 / B12 / B13 visual confirmation).
+- Genlock + fill+key on a Duo 2 (B6 / B7 hardware path).
+- 10-bit YUV 4:2:2 format negotiation against a real card (B8 hardware path).
+- "Output in use" recovery when another app holds the port (B9, deferred).
+- Audio embed channel-pair routing against an SDI receiver (B10, deferred).
+- NDI Full sender picked up by a real NDI receiver (B11, deferred).
+- Hot-unplug + reconnect of an UltraStudio Thunderbolt mid-show (B15, deferred).
+- Color pipeline conversion accuracy on a Rec.709 / Rec.2020 HLG / PQ reference monitor (B13, deferred).
+- REF format-mismatch detection vs Stage frame rate (B6 remainder, deferred — needs SDK-API spike).
+
+---
+
+## Session-by-session log
+
 **Status (session 1)**: Data model shipped (B1-B4).
 **Status (session 2 — 2026-05-07)**: TransportSink fan-out shipped (B5). DeckLink REF status surfaced (B6 partial). 161 tests, all green.
 **Status (session 3 — 2026-05-07)**: Compositor pipeline shipped (B12 model + pipeline + integration; UI deferred to B12d). 193 tests, all green.
 **Status (session 4 — 2026-05-07)**: B12 finished — Overlays inspector tab + ShowController bridge + composed-frame preview rendering (B12d/e/f). 197 tests, all green. 3 commits on `development`.
 **Status (session 5 — 2026-05-07)**: B6b (partial) — project-level "expects external reference" toggle + escalating red free-run banner. 202 tests, all green. 1 commit on `development`. Format-mismatch detection vs Stage frame rate still deferred to a future SDK spike.
+**Status (sessions 6–23)**: Phase B itself didn't move further; Phase B–touching work was incidental (compositor's `bundleMediaDirectory` and `folderBookmarks` got threaded as part of C7d / C8, dropped-frame counter + status chip got added in E3+ session 15, the consolidated FPS conformance evaluator got reused in PreShowCheck in session 13). The above session-by-session log captures the active development on Phase B; the consolidated section at the top of this file is the v1 close.
 
 The hot path (compositor → driver → device) now goes through a `TransportSinkRouter` that fans every composed frame and audio block out to N sinks. The primary user-selected output (DeckLink or software preview) still flows through the original `VideoOutputDriver` for backward compatibility, but the driver's concrete classes are now thin shims around `DeckLinkTransportSink` / `PreviewTransportSink`. Future B-phase sub-tasks (B11 NDI, second DeckLink port, file-record sink) register additional `TransportSink`s on `PlaybackController` and pick up frames automatically.
 
