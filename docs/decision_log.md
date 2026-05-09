@@ -1449,3 +1449,37 @@ Architecture polish: `CueStandbyState` + `CueRuntimeRejection` demoted from `pub
 - A real LTC capture surfaces decoder behaviour different from synthesized samples — investigate the 4 deferred cases.
 - The `unicodeScalars`-based CSV quoter proves too aggressive — tighten by listing exact scalars rather than the broad set.
 - AutosaveCheckpointer NSLog noise becomes a problem in production — route through `Services/ShowLog.swift` when the document has a log handle.
+
+---
+
+## 2026-05-09 — Polish-pass coverage extension: dispatcher + HTTPServer parametric tests
+
+**Decision**: After the core polish pass landed, extended test coverage on two operator-facing surfaces the reviewers flagged as load-bearing-but-untested: (1) ShowControlDispatcher action variants and (2) HTTPServer respond shape.
+
+**Why**: The user picked options #1 and #2 from the post-pass menu. Both surfaces ship to operators (Companion / curl / web UIs hit HTTPServer; every show-control transport routes through the dispatcher). Pre-extension, ~20 of 30 dispatcher action variants had no test driving them through `dispatch(...)`, and the entire HTTP control plane had zero direct server tests — only the request-buffer parser was covered.
+
+**What shipped** (881 → 881 baseline; the +23 tests landed in 2 commits):
+
+1. `Simple PlaybackTests/ShowControlDispatcherActionCoverageTests.swift` — 8 tests, parametric over every action variant. Mirrors the array in `ShowControlActionIdempotencyKeyTests` so the two files drift in lock-step. Pins:
+   - Happy path: every variant against an existing cue under full caps returns `.ok`. Fresh runtime + dispatcher per action so prior actions (`.panic` → `panicActive`, `.showMode` → caps strip) don't poison the next.
+   - Unknown-cue branch: every cue-targeted variant against a bogus cue rejects with exactly `unknown_cue`.
+   - The cuePlay divergence (delegates to `runtime.go(targetNumber:)`, conflates failure modes into `play_failed`) is pinned in its own test so a future refactor that aligns rejection reasons trips deliberately.
+   - cueStop on idle cue → `not_running`.
+   - Capability gating: `.edit`-required variants reject under fire-only caps; `.fire`-required reject under read-only caps; read-only variants accept `.read` alone.
+   - Show Mode strips `.edit` even from full-cap callers.
+
+2. `Simple Playback/ShowControl/HTTPServer.swift` refactor + `Simple PlaybackTests/HTTPServerRespondTests.swift` — 15 tests. Extracted:
+   - `HTTPServer.RespondOutcome` enum with cases `.write` / `.writeError` / `.upgradeWebSocket` / `.rejectWebSocketMissingKey`.
+   - `HTTPServer.computeResponse(to:) -> RespondOutcome` — pure-logic; no `NWConnection`, no IO. The IO-side `respond(to:on:)` is now a thin switch.
+   - `HTTPServer.webSocketAcceptKey(for:)` static — extracted so the RFC 6455 §1.3 canonical example pins SHA-1 + base64 cheaply.
+
+   The new tests cover: WS accept-key vs RFC; unknown-route 404; `/state` / `/cues` / `/cueDetail` capability gating + 200 paths; cueDetail unknown-cue 404; action route 503 no_runtime + 200 JSON; WS upgrade missing-key reject + with-key accept; WS upgrade only on `/api/v1/events`; bearer-token auth (unknown token → 401, no token store → default caps); OSCQuery handler first-chance for non-`/api/v1` paths but skipped for `/api/v1`.
+
+**Reversibility**: easy. The dispatcher tests are pure additions. The HTTPServer refactor extracted a pure function from a private one; the IO-side is a thin wrapper that's easy to reinline if the abstraction proves unhelpful — but the test surface it unlocks is a strong reason to keep it.
+
+**What's left after this extension** (per the next-session prompt + decision log):
+- Operator-side: rehearsal cycle, C11-4 UX choice, hardware-bound items.
+- v2: paused at user direction; 12 of 13 candidates not started.
+- Lower-priority follow-ups: ThumbnailGenerator.Failure naming, `.localHotkey` orphan disposition, ShowControlHub per-doc bind stack, the 4 LTC decoder limitations (need hardware), MTC/LTC reader-level tests.
+
+**The honest recommendation in the next-session prompt**: "ask the user whether they want more code or are ready to move to rehearsal. The code is in genuinely polished shape."
