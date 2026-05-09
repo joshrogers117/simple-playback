@@ -31,7 +31,32 @@ struct HTTPRequest {
 
 /// Reassembles complete HTTP/1.1 requests from a TCP byte stream.
 final class HTTPRequestBuffer {
+
+    /// Hard ceiling on a single request's combined header size (excluding
+    /// body). 64 KiB is well above any plausible legitimate request header
+    /// set; without a cap, a peer that sends header bytes without ever
+    /// emitting `\r\n\r\n` would force the server to scan an unbounded
+    /// buffer on every receive callback.
+    static let maxHeaderSize: Int = 64 * 1024
+
+    /// Hard ceiling on a request body's `Content-Length`. The OSC/HTTP
+    /// surface accepts small JSON payloads (cue numbers, scrub values);
+    /// 1 MiB is far above any plausible operator-supplied body. Without
+    /// the cap, a peer claiming Content-Length: 4 GiB would force the
+    /// server to buffer attacker-controlled bytes indefinitely.
+    static let maxBodySize: Int = 1 << 20
+
+    /// Set when `nextRequest()` rejects a request that exceeds either
+    /// `maxHeaderSize` or `maxBodySize`. The server should drop the
+    /// connection on the next callback rather than try to recover.
+    private(set) var didRejectOversizedRequest: Bool = false
+
     private var buffer = Data()
+    /// Where to resume the `\r\n\r\n` scan on the next `nextRequest()` call.
+    /// Without this, an incomplete request growing across N receive
+    /// callbacks would re-scan the whole buffer N times — O(n²) in the
+    /// total bytes received before the headers complete.
+    private var headerScanCursor: Int = 0
 
     func append(_ data: Data) { buffer.append(data) }
 
@@ -40,7 +65,17 @@ final class HTTPRequestBuffer {
     /// only. Chunked transfer encoding is rejected.
     func nextRequest() -> HTTPRequest? {
         // Find header/body separator.
-        guard let headerEnd = findHeaderEnd() else { return nil }
+        guard let headerEnd = findHeaderEnd() else {
+            // Headers still incomplete. If we've buffered more than the
+            // cap allows, surface an oversized-request signal and drop
+            // the buffer so we don't keep growing.
+            if buffer.count > Self.maxHeaderSize {
+                didRejectOversizedRequest = true
+                buffer.removeAll(keepingCapacity: false)
+                headerScanCursor = 0
+            }
+            return nil
+        }
         let headerData = buffer.subdata(in: 0..<headerEnd)
         let headerString = String(data: headerData, encoding: .ascii) ?? String(data: headerData, encoding: .utf8) ?? ""
         let lines = headerString.components(separatedBy: "\r\n")
@@ -58,6 +93,14 @@ final class HTTPRequestBuffer {
             headers[name] = value
         }
         let contentLength = Int(headers["content-length"] ?? "") ?? 0
+        if contentLength < 0 || contentLength > Self.maxBodySize {
+            // Reject and drop — refusing to allocate attacker-controlled
+            // memory is preferable to graceful degradation here.
+            didRejectOversizedRequest = true
+            buffer.removeAll(keepingCapacity: false)
+            headerScanCursor = 0
+            return nil
+        }
         let bodyStart = headerEnd + 4 // skip "\r\n\r\n"
         guard buffer.count >= bodyStart + contentLength else { return nil }
         let body: Data?
@@ -67,8 +110,10 @@ final class HTTPRequestBuffer {
             body = nil
         }
 
-        // Drop the consumed bytes.
+        // Drop the consumed bytes; reset the scan cursor since the next
+        // request starts at offset 0 of the (now smaller) buffer.
         buffer.removeSubrange(0..<(bodyStart + contentLength))
+        headerScanCursor = 0
 
         // Split path and query.
         let (path, query) = splitPathQuery(target)
@@ -86,15 +131,28 @@ final class HTTPRequestBuffer {
     }
 
     private func findHeaderEnd() -> Int? {
-        // Find the first occurrence of "\r\n\r\n".
+        // Resume the `\r\n\r\n` scan from where we left off on the prior
+        // call so a header-set arriving across multiple receive callbacks
+        // reduces from O(n*m) to O(n) total. The cursor is reset to 0
+        // when a request is consumed (the next request starts at offset 0).
         let needle: [UInt8] = [0x0D, 0x0A, 0x0D, 0x0A]
         guard buffer.count >= needle.count else { return nil }
-        let bytes = [UInt8](buffer)
-        for i in 0...(bytes.count - needle.count) {
-            if Array(bytes[i..<(i + needle.count)]) == needle {
+        // Start three bytes earlier than the cursor to handle a separator
+        // straddling the boundary between two appended chunks.
+        let start = max(0, headerScanCursor - (needle.count - 1))
+        let end = buffer.count - needle.count
+        guard end >= start else { return nil }
+        for i in start...end {
+            if buffer[i] == needle[0]
+                && buffer[i + 1] == needle[1]
+                && buffer[i + 2] == needle[2]
+                && buffer[i + 3] == needle[3] {
                 return i
             }
         }
+        // No match this pass — bookmark the (last viable starting offset)
+        // so the next call doesn't redo work.
+        headerScanCursor = max(0, buffer.count - (needle.count - 1))
         return nil
     }
 
