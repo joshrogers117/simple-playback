@@ -31,6 +31,8 @@ struct SimplePlaybackApp: App {
         }
         .commands {
             ProjectDocumentCommands()
+            ShowListVisibilityCommands()
+            DiagnosticsMenuCommands()
 
             if let updater = updaterController?.updater {
                 CommandGroup(after: .appInfo) {
@@ -105,6 +107,40 @@ private struct ProjectDocumentCommands: Commands {
                 NSApplication.shared.sendAction(#selector(NSDocument.saveAs(_:)), to: nil, from: nil)
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
+        }
+    }
+}
+
+private struct ShowListVisibilityCommands: Commands {
+    @AppStorage("ui.showListVisible") private var showListVisible: Bool = true
+
+    var body: some Commands {
+        CommandGroup(after: .sidebar) {
+            Toggle("Show Cue List", isOn: $showListVisible)
+                .keyboardShortcut("l", modifiers: [.command, .option])
+        }
+    }
+}
+
+private struct DiagnosticsMenuCommands: Commands {
+    @FocusedValue(\.diagnosticsSheetBindings) private var bindings
+
+    var body: some Commands {
+        CommandMenu("Diagnostics") {
+            Button("Show Log…") {
+                bindings?.showLogPresented.wrappedValue = true
+            }
+            .disabled(bindings == nil)
+
+            Button("Take History…") {
+                bindings?.takeHistoryPresented.wrappedValue = true
+            }
+            .disabled(bindings == nil)
+
+            Button("Post-Show Summary…") {
+                bindings?.postShowSummaryPresented.wrappedValue = true
+            }
+            .disabled(bindings == nil)
         }
     }
 }
@@ -216,6 +252,8 @@ private struct StartupWindowHider: NSViewRepresentable {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.appearance = NSAppearance(named: .darkAqua)
+
         // Spec §3.16 — autosave every 30 s of edit activity. The setting
         // lives on NSDocumentController; combined with our document's
         // `autosavesInPlace = true`, the OS coalesces edits and writes back

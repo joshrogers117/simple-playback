@@ -71,6 +71,32 @@ struct RootView: View {
     @State private var takeHistoryPresented: Bool = false
 
     @State private var postShowSummaryPresented: Bool = false
+    /// FTB (Fade to Black) toggle state. When true, output has been faded to
+    /// black via a 1 s panic-fade; pressing the button again re-fires the
+    /// captured slide with a 1 s crossfade up.
+    @State private var ftbEngaged: Bool = false
+    /// Slide that was live when FTB was engaged, used to fade back up when
+    /// FTB is disengaged. Nil if nothing was live at engage time.
+    @State private var ftbRestoreSlide: MediaSlide?
+    /// When false, the middle Show List column is hidden so operators who
+    /// just want to click through the Media Palette aren't visually pushed
+    /// toward building cues. Driven by the View menu toggle in
+    /// `SimplePlaybackApp`'s `ShowListVisibilityCommands`.
+    @AppStorage("ui.showListVisible") private var showListVisible: Bool = true
+    /// Persisted width of the cue list panel. Updated as the operator drags
+    /// the HSplitView divider; consumed as `idealWidth` when the panel is
+    /// re-shown after a hide so it opens at the previous width instead of
+    /// snapping back to the default narrow size.
+    @AppStorage("ui.cueListWidth") private var persistedCueListWidth: Double = 360
+    /// Persisted width of the Media Palette pane. Same drag-and-restore
+    /// story as `cueListWidth`.
+    @AppStorage("ui.mediaPaletteWidth") private var persistedMediaPaletteWidth: Double = 460
+    /// Live drag widths. Mirror the @AppStorage values when not dragging;
+    /// during a drag, @State updates drive the frame so the divider doesn't
+    /// trigger a UserDefaults write on every gesture frame (writes were
+    /// causing the visible re-layout stutter).
+    @State private var cueListWidth: Double = 360
+    @State private var mediaPaletteWidth: Double = 460
     /// C7d — non-nil while the Bundle for Travel sheet is on-screen. Holds the
     /// pre-computed plan so summary + progress + result all read off the same
     /// snapshot.
@@ -146,20 +172,21 @@ struct RootView: View {
                 mainLayout(controller: controller)
             } else {
                 ProgressView("Preparing show…")
-                    .frame(minWidth: 980, minHeight: 640)
+                    .frame(minWidth: 1180, minHeight: 640)
                     .onAppear {
                         configureShowController()
                     }
             }
         }
-        .frame(minWidth: 980, minHeight: 640)
+        .frame(minWidth: 1180, minHeight: 640)
         .toolbar {
-            ToolbarItemGroup {
+            ToolbarItemGroup(placement: .navigation) {
                 Button {
                     openMediaPanel()
                 } label: {
                     Label("Add Media", systemImage: "plus")
                 }
+                .help("Add clips, images, or PDFs to the media palette.")
                 .disabled(showController.controller?.showMode == true)
 
                 Button {
@@ -175,35 +202,27 @@ struct RootView: View {
                 } label: {
                     Label("Delete Slide", systemImage: "trash")
                 }
+                .help("Remove the selected slide from the palette.")
                 .disabled(selectedSlideID == nil || showController.controller?.showMode == true)
 
+                Button {
+                    showListVisible.toggle()
+                } label: {
+                    Label(
+                        showListVisible ? "Hide Cue List" : "Show Cue List",
+                        systemImage: showListVisible ? "list.bullet.rectangle.fill" : "list.bullet.rectangle"
+                    )
+                }
+                .help(showListVisible ? "Hide the cue list panel." : "Show the cue list panel.")
+            }
+
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     preShowCheckPresented = true
                 } label: {
                     Label("Pre-Show", systemImage: "checklist")
                 }
                 .help("Run the pre-show check — media resolution, frame-rate conformance, output, system signals.")
-
-                Button {
-                    showLogPresented = true
-                } label: {
-                    Label("Show Log", systemImage: "list.bullet.rectangle")
-                }
-                .help("Open the show log — every cue fire, panic, clear, missing-media, OSC action.")
-
-                Button {
-                    takeHistoryPresented = true
-                } label: {
-                    Label("Take History", systemImage: "clock.arrow.circlepath")
-                }
-                .help("Open the take history — the last 200 cue fires in this session.")
-
-                Button {
-                    postShowSummaryPresented = true
-                } label: {
-                    Label("Post-Show", systemImage: "doc.text.below.ecg")
-                }
-                .help("Open the post-show summary — totals, per-cue runtime, latency histogram, drop / late-take detail.")
 
                 Button {
                     presentBundleForTravelSheet()
@@ -213,19 +232,19 @@ struct RootView: View {
                 .help("Copy linked media into the project bundle so the show is venue-portable.")
                 .disabled(!canBundleForTravel)
 
-                Spacer()
-
-                Toggle(isOn: showModeBinding) {
-                    Label(
-                        showController.controller?.showMode == true ? "Show Mode" : "Edit Mode",
-                        systemImage: showController.controller?.showMode == true ? "lock.fill" : "pencil"
-                    )
-                }
-                .toggleStyle(.button)
-                .help("Toggle Show Mode (Cmd-Shift-L) — disables destructive shortcuts and editing")
-                .keyboardShortcut("l", modifiers: [.command, .shift])
+                showModeToggle
             }
         }
+        .background(WindowFirstResponderClearer())
+        .onAppear {
+            cueListWidth = persistedCueListWidth
+            mediaPaletteWidth = persistedMediaPaletteWidth
+        }
+        .focusedSceneValue(\.diagnosticsSheetBindings, DiagnosticsSheetBindings(
+            showLogPresented: $showLogPresented,
+            takeHistoryPresented: $takeHistoryPresented,
+            postShowSummaryPresented: $postShowSummaryPresented
+        ))
         .onAppear {
             playback.refreshDevices()
             applyOutputDefaults()
@@ -363,7 +382,42 @@ struct RootView: View {
 
     @ViewBuilder
     private func mainLayout(controller: ShowController) -> some View {
-        HSplitView {
+        GeometryReader { geo in
+            let inspectorMin: Double = 320
+            let dividerWidth: Double = 6
+            let dividerCount: Double = showListVisible ? 2 : 1
+            let available = max(
+                720,
+                Double(geo.size.width) - inspectorMin - dividerCount * dividerWidth
+            )
+            // Cue list gets first claim on space (its drag handle is what
+            // most users reach for), then media palette takes the rest down
+            // to its minimum. This keeps the right-divider drag actually
+            // visible: pulling cue list bigger shrinks media palette.
+            let cueW = showListVisible
+                ? max(280, min(cueListWidth, available - 420))
+                : 0
+            let mediaW = max(420, min(mediaPaletteWidth, available - cueW))
+            layoutHStack(
+                controller: controller,
+                mediaW: mediaW,
+                cueW: cueW,
+                cueWMax: max(280, available - 420),
+                mediaWMax: max(420, available - 280)
+            )
+                .transaction { $0.animation = nil }
+        }
+    }
+
+    @ViewBuilder
+    private func layoutHStack(
+        controller: ShowController,
+        mediaW: Double,
+        cueW: Double,
+        cueWMax: Double,
+        mediaWMax: Double
+    ) -> some View {
+        HStack(spacing: 0) {
             SlideGridView(
                 slides: $document.project.slides,
                 selectedSlideID: $selectedSlideID,
@@ -387,27 +441,52 @@ struct RootView: View {
                 },
                 bundleMediaDirectory: bundleMediaDirectory(),
                 folderBookmarks: projectFolderBookmarkLookup(),
-                thumbnailCacheDirectory: thumbnailRootDirectory()
+                thumbnailCacheDirectory: thumbnailRootDirectory(),
+                addMediaAction: { openMediaPanel() },
+                addFolderAction: { openFolderPanel() }
             )
-            .frame(minWidth: 320, idealWidth: 460)
+            .frame(width: mediaW)
 
-            ShowListView(
-                showController: controller,
-                project: $document.project,
-                selectedCueID: $selectedCueID
+            DraggableDivider(
+                onDrag: { delta in
+                    let proposed = mediaW + delta
+                    let clamped = max(420, min(mediaWMax, proposed))
+                    let snapped = (clamped / 4).rounded() * 4
+                    if abs(snapped - mediaPaletteWidth) > 0.5 {
+                        mediaPaletteWidth = snapped
+                    }
+                },
+                onCommit: {
+                    persistedMediaPaletteWidth = mediaPaletteWidth
+                }
             )
-            .frame(minWidth: 280, idealWidth: 360)
+
+            if showListVisible {
+                ShowListView(
+                    showController: controller,
+                    project: $document.project,
+                    selectedCueID: $selectedCueID
+                )
+                .frame(width: cueW)
+
+                DraggableDivider(
+                    onDrag: { delta in
+                        let proposed = cueW + delta
+                        let clamped = max(280, min(cueWMax, proposed))
+                        let snapped = (clamped / 4).rounded() * 4
+                        if abs(snapped - cueListWidth) > 0.5 {
+                            cueListWidth = snapped
+                        }
+                    },
+                    onCommit: {
+                        persistedCueListWidth = cueListWidth
+                    }
+                )
+            }
 
             VStack(spacing: 0) {
                 HStack(spacing: 10) {
-                    Button {
-                        showController.controller?.panic()
-                    } label: {
-                        Label("FTB", systemImage: "exclamationmark.octagon.fill")
-                    }
-                    .tint(.red)
-                    .keyboardShortcut(.escape, modifiers: [])
-                    .help("Fade to Black — fade everything currently on Program down to black (Esc)")
+                    ftbToggleButton
 
                     Spacer()
 
@@ -416,6 +495,7 @@ struct RootView: View {
                     } label: {
                         Label("Clear Output", systemImage: "stop.circle")
                     }
+                    .buttonStyle(.bordered)
                     .keyboardShortcut(".", modifiers: [.command])
                     .disabled(!playback.isRunning)
                 }
@@ -453,7 +533,7 @@ struct RootView: View {
 
                 inspectorContent
             }
-            .frame(minWidth: 320, idealWidth: 380)
+            .frame(minWidth: 320, maxWidth: .infinity)
         }
     }
 
@@ -525,6 +605,77 @@ struct RootView: View {
             showController.controller?.showMode ?? false
         } set: { newValue in
             showController.controller?.showMode = newValue
+        }
+    }
+
+    /// FTB toggle. Off → fade to black over 1 s and remember the live slide.
+    /// On → fade up the remembered slide over 1 s. Bound to Esc as a shortcut.
+    @ViewBuilder
+    private var ftbToggleButton: some View {
+        if ftbEngaged {
+            Button {
+                toggleFTB()
+            } label: {
+                Text("FTB On")
+                    .font(.callout.weight(.semibold))
+                    .frame(minWidth: 60)
+            }
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.escape, modifiers: [])
+            .help("FTB engaged — press to fade up over 1 s (Esc)")
+        } else {
+            Button {
+                toggleFTB()
+            } label: {
+                Text("FTB")
+                    .font(.callout.weight(.semibold))
+                    .frame(minWidth: 60)
+            }
+            .buttonStyle(.bordered)
+            .keyboardShortcut(.escape, modifiers: [])
+            .help("Fade to Black — fade output to black over 1 s (Esc)")
+        }
+    }
+
+    private func toggleFTB() {
+        if ftbEngaged {
+            if let slide = ftbRestoreSlide {
+                var settings = document.project.transitionSettings
+                settings.crossfadeEnabled = true
+                settings.crossfadeDuration = 1.0
+                playback.take(
+                    slide: slide,
+                    deviceID: outputSettings.selectedDeviceID,
+                    modeID: outputSettings.selectedModeID,
+                    transitionSettings: settings
+                )
+            }
+            ftbRestoreSlide = nil
+            ftbEngaged = false
+        } else {
+            if let liveSlideID = playback.liveSlideID {
+                ftbRestoreSlide = document.project.slides.first(where: { $0.id == liveSlideID })
+            } else {
+                ftbRestoreSlide = nil
+            }
+            showController.controller?.panic(fade: 1.0)
+            ftbEngaged = true
+        }
+    }
+
+    /// The Edit ↔ Show mode toggle. Lives in the toolbar's primary-action
+    /// cluster as a single styled button — when active it tints red so the
+    /// operator can tell at a glance that destructive shortcuts are locked.
+    @ViewBuilder
+    private var showModeToggle: some View {
+        if let controller = showController.controller {
+            ShowModeToolbarButton(controller: controller)
+        } else {
+            Button {} label: {
+                Label("Edit Mode", systemImage: "lock.open.fill")
+            }
+            .disabled(true)
+            .buttonStyle(.borderedProminent)
         }
     }
 
@@ -1239,6 +1390,116 @@ struct RootView: View {
             }
         }
     }
+}
+
+/// Edit ↔ Show Mode toolbar button. Observes the ShowController directly so
+/// the icon / tint update immediately when `showMode` flips. The parent
+/// RootView only sees the @StateObject holder, not the controller's
+/// @Published properties, so without this dedicated subview the toolbar
+/// button stays stale.
+private struct ShowModeToolbarButton: View {
+    @ObservedObject var controller: ShowController
+
+    var body: some View {
+        let isShowMode = controller.showMode
+        Button {
+            controller.showMode.toggle()
+        } label: {
+            Label(
+                isShowMode ? "Show Mode" : "Edit Mode",
+                systemImage: isShowMode ? "lock.fill" : "lock.open.fill"
+            )
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(isShowMode ? .red : .accentColor)
+        .help(isShowMode
+              ? "In Show Mode — destructive shortcuts and editing are locked. Click to return to Edit Mode (⇧⌘L)."
+              : "Switch to Show Mode — locks destructive shortcuts and editing for the live show (⇧⌘L).")
+        .keyboardShortcut("l", modifiers: [.command, .shift])
+    }
+}
+
+/// 1-pt vertical separator with a 6-pt-wide invisible hit area that emits
+/// per-frame width deltas via `onDrag`. Used to build the main layout's
+/// resizable column dividers without HSplitView (which won't honor a child's
+/// fixed `.frame(width:)` and so breaks per-pane width persistence).
+private struct DraggableDivider: View {
+    let onDrag: (Double) -> Void
+    var onCommit: (() -> Void)? = nil
+    @State private var lastTranslation: Double = 0
+
+    var body: some View {
+        Rectangle()
+            .fill(Color(nsColor: .separatorColor).opacity(0.5))
+            .frame(width: 6)
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.resizeLeftRight.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let total = Double(value.translation.width)
+                        onDrag(total - lastTranslation)
+                        lastTranslation = total
+                    }
+                    .onEnded { _ in
+                        lastTranslation = 0
+                        onCommit?()
+                    }
+            )
+    }
+}
+
+/// Bindings exposed via FocusedValue so the menu-bar Diagnostics commands in
+/// `SimplePlaybackApp` can present the show-log / take-history / post-show
+/// summary sheets owned by the active document's RootView.
+struct DiagnosticsSheetBindings {
+    var showLogPresented: Binding<Bool>
+    var takeHistoryPresented: Binding<Bool>
+    var postShowSummaryPresented: Binding<Bool>
+}
+
+private struct DiagnosticsSheetBindingsKey: FocusedValueKey {
+    typealias Value = DiagnosticsSheetBindings
+}
+
+extension FocusedValues {
+    var diagnosticsSheetBindings: DiagnosticsSheetBindings? {
+        get { self[DiagnosticsSheetBindingsKey.self] }
+        set { self[DiagnosticsSheetBindingsKey.self] = newValue }
+    }
+}
+
+/// Clears the document window's first responder once on appear so AppKit's
+/// default "auto-focus the first focusable subview" rule doesn't leave the
+/// crossfade duration TextField selected at launch. Also centers the window
+/// on the active display the first time it appears.
+private struct WindowFirstResponderClearer: NSViewRepresentable {
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator {
+        var didCenter = false
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            guard let window = view.window else { return }
+            window.makeFirstResponder(nil)
+            if !context.coordinator.didCenter {
+                context.coordinator.didCenter = true
+                window.center()
+            }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 /// SwiftUI `@StateObject` requires the wrapped value to be initialized eagerly, but our

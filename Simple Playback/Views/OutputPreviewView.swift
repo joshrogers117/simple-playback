@@ -8,14 +8,21 @@ struct OutputPreviewView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Output")
-                    .font(.headline)
-                Spacer()
-                Text(playback.liveTitle)
-                    .font(.callout)
+            HStack(spacing: 8) {
+                Image(systemName: "tv")
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                Text("Program")
+                    .font(.headline)
+                if !playback.liveTitle.isEmpty {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text(playback.liveTitle)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer()
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
