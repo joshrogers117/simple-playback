@@ -253,8 +253,9 @@ cat > "${pages_dir}/index.html" <<EOF
         <div class="notes">
           <h2>Release Notes</h2>
           <ul>
-            <li>New Blur effect for image and video output, adjustable per slide in the Inspector.</li>
-            <li>Blur amount and crossfade duration can now be set with a slider or by typing an exact value.</li>
+            <li>Blur and other slide adjustments now update the live output immediately, without re-taking the slide.</li>
+            <li>Blur effect for image and video output, adjustable per slide in the Inspector.</li>
+            <li>Blur amount and crossfade duration can be set with a slider or by typing an exact value.</li>
             <li>Requires macOS 26.0 or later.</li>
           </ul>
         </div>

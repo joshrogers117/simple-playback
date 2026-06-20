@@ -167,6 +167,30 @@ final class PlaybackController: ObservableObject {
         }
     }
 
+    // Re-applies edited settings to the slide that is currently on air, so
+    // changes like blur/scale/offset update the live output without re-taking.
+    // Live video frames pick up `activeSettings` on the next tick; a live still
+    // is re-rendered and re-submitted once.
+    func applyLiveSettings(_ settings: SlideSettings, forSlide slideID: UUID) {
+        guard slideID == liveSlideID else { return }
+        let image = previewImage
+        let isImageLive = previewPlayer == nil
+        let outputSize = activeOutputSize
+        outputQueue.async { [weak self] in
+            guard let self else { return }
+            self.activeSettings = settings
+            guard isImageLive, let image, self.activeTransition == nil else { return }
+            guard let frame = self.renderer.renderImage(image, settings: settings, outputSize: outputSize) else { return }
+            do {
+                try self.submitFrame(frame)
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    self?.status = error.localizedDescription
+                }
+            }
+        }
+    }
+
     func clear() {
         cancelPendingVideoPreparation()
         stopMediaOnly()

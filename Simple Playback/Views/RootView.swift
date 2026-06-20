@@ -16,6 +16,14 @@ struct RootView: View {
         return $document.project.slides[index]
     }
 
+    private var liveSlideSettings: SlideSettings? {
+        guard let liveSlideID = playback.liveSlideID,
+              let slide = document.project.slides.first(where: { $0.id == liveSlideID }) else {
+            return nil
+        }
+        return slide.settings
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             SlideGridView(
@@ -82,6 +90,10 @@ struct RootView: View {
         .onChange(of: outputSettings.selectedDeviceID) {
             playback.refreshDevices()
             outputSettings.applyDefaults(using: playback)
+        }
+        .onChange(of: liveSlideSettings) { _, newValue in
+            guard let liveSlideID = playback.liveSlideID, let newValue else { return }
+            playback.applyLiveSettings(newValue, forSlide: liveSlideID)
         }
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $dropTargeted) { providers in
             handleDrop(providers: providers)
