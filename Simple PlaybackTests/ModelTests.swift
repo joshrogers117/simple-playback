@@ -331,6 +331,63 @@ final class ModelTests: XCTestCase {
         XCTAssertNotEqual(Array(plain.data), Array(hued.data), "a hue shift should change the rendered pixels")
     }
 
+    func testSlideSettingsDecodesMissingTemperatureTintToDefault() throws {
+        var settings = SlideSettings()
+        settings.saturation = 120
+        let data = try JSONEncoder.simplePlayback.encode(settings)
+
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "temperature")
+        object.removeValue(forKey: "tint")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        let decoded = try JSONDecoder.simplePlayback.decode(SlideSettings.self, from: legacyData)
+        XCTAssertEqual(decoded.temperature, 0, accuracy: 0.001)
+        XCTAssertEqual(decoded.tint, 0, accuracy: 0.001)
+        XCTAssertEqual(decoded.saturation, 120, accuracy: 0.001)
+    }
+
+    func testSlideSettingsRoundTripsTemperatureAndTint() throws {
+        var settings = SlideSettings()
+        settings.temperature = 40
+        settings.tint = -25
+
+        let data = try JSONEncoder.simplePlayback.encode(settings)
+        let decoded = try JSONDecoder.simplePlayback.decode(SlideSettings.self, from: data)
+
+        XCTAssertEqual(decoded.temperature, 40, accuracy: 0.001)
+        XCTAssertEqual(decoded.tint, -25, accuracy: 0.001)
+    }
+
+    func testFrameRendererTemperatureWarmsAndCools() throws {
+        let renderer = FrameRenderer()
+        let gray = try XCTUnwrap(makeSolidColorImage(red: 0.5, green: 0.5, blue: 0.5))
+        let size = CGSize(width: 2, height: 2)
+
+        var warm = SlideSettings(); warm.scaleMode = .stretch; warm.temperature = 100
+        var cool = SlideSettings(); cool.scaleMode = .stretch; cool.temperature = -100
+
+        let warmFrame = try XCTUnwrap(renderer.render(cgImage: gray, settings: warm, outputSize: size))
+        let coolFrame = try XCTUnwrap(renderer.render(cgImage: gray, settings: cool, outputSize: size))
+
+        // BGRA: data[2] = red, data[0] = blue.
+        XCTAssertGreaterThan(Int(warmFrame.data[2]), Int(warmFrame.data[0]), "warming should make red exceed blue")
+        XCTAssertLessThan(Int(coolFrame.data[2]), Int(coolFrame.data[0]), "cooling should make blue exceed red")
+    }
+
+    func testFrameRendererTintShiftsTowardMagenta() throws {
+        let renderer = FrameRenderer()
+        let gray = try XCTUnwrap(makeSolidColorImage(red: 0.5, green: 0.5, blue: 0.5))
+        let size = CGSize(width: 2, height: 2)
+
+        var magenta = SlideSettings(); magenta.scaleMode = .stretch; magenta.tint = 100
+        let frame = try XCTUnwrap(renderer.render(cgImage: gray, settings: magenta, outputSize: size))
+
+        // BGRA: magenta raises red+blue above green.
+        let blue = Int(frame.data[0]), green = Int(frame.data[1]), red = Int(frame.data[2])
+        XCTAssertGreaterThan((red + blue) / 2, green, "+tint should push toward magenta")
+    }
+
     private func makeSolidColorImage(red: CGFloat, green: CGFloat, blue: CGFloat) -> CGImage? {
         let width = 2
         let height = 2

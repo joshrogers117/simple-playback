@@ -253,8 +253,8 @@ cat > "${pages_dir}/index.html" <<EOF
         <div class="notes">
           <h2>Release Notes</h2>
           <ul>
-            <li>New per-slide Hue and Saturation controls in the Inspector, applied to image and video output.</li>
-            <li>Blur, hue, and saturation adjust the live output immediately and can be set with a slider or by typing a value.</li>
+            <li>New per-slide Temperature (white balance) and Tint controls in the Inspector, applied to image and video output.</li>
+            <li>Per-slide color and blur effects — blur, hue, saturation, temperature, tint — adjust the live output immediately, via slider or typed value.</li>
             <li>Requires macOS 26.0 or later.</li>
           </ul>
         </div>

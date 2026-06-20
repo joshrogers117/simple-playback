@@ -165,6 +165,8 @@ final class FrameRenderer {
         settings.blurRadius > 0
             || abs(settings.hueShift) > 0.0001
             || abs(settings.saturation - 100) > 0.0001
+            || abs(settings.temperature) > 0.0001
+            || abs(settings.tint) > 0.0001
     }
 
     // Applies saturation, hue, and blur to the composed BGRA frame in a single
@@ -183,6 +185,14 @@ final class FrameRenderer {
             colorSpace: colorSpace
         )
 
+        if abs(settings.temperature) > 0.0001 || abs(settings.tint) > 0.0001 {
+            // Shift the target neutral: a lower target temperature warms the
+            // image, so +temperature -> warmer. +tint -> magenta, -tint -> green.
+            image = image.applyingFilter("CITemperatureAndTint", parameters: [
+                "inputNeutral": CIVector(x: 6500, y: 0),
+                "inputTargetNeutral": CIVector(x: 6500 - settings.temperature * 30, y: -settings.tint)
+            ])
+        }
         if abs(settings.saturation - 100) > 0.0001 {
             image = image.applyingFilter("CIColorControls", parameters: [
                 kCIInputSaturationKey: settings.saturation / 100.0

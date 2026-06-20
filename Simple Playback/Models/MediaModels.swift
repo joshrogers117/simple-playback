@@ -92,6 +92,8 @@ struct SlideSettings: Codable, Hashable {
     var blurRadius: Double = 0
     var hueShift: Double = 0       // degrees, -180...180
     var saturation: Double = 100   // percent, 0 = grayscale, 100 = unchanged
+    var temperature: Double = 0    // -100 (cool/blue) ... +100 (warm/orange), 0 = neutral
+    var tint: Double = 0           // -100 (green) ... +100 (magenta), 0 = neutral
 
     init() {}
 
@@ -106,6 +108,8 @@ struct SlideSettings: Codable, Hashable {
         case blurRadius
         case hueShift
         case saturation
+        case temperature
+        case tint
     }
 
     // Decodes missing keys to their defaults so projects saved by older
@@ -122,6 +126,8 @@ struct SlideSettings: Codable, Hashable {
         blurRadius = try container.decodeIfPresent(Double.self, forKey: .blurRadius) ?? 0
         hueShift = try container.decodeIfPresent(Double.self, forKey: .hueShift) ?? 0
         saturation = try container.decodeIfPresent(Double.self, forKey: .saturation) ?? 100
+        temperature = try container.decodeIfPresent(Double.self, forKey: .temperature) ?? 0
+        tint = try container.decodeIfPresent(Double.self, forKey: .tint) ?? 0
     }
 }
 

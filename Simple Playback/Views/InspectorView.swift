@@ -88,6 +88,24 @@ struct InspectorView: View {
                             rounding: 1,
                             decimals: 0
                         )
+                        EffectSliderField(
+                            title: "Temperature",
+                            value: slide.settings.temperature,
+                            sliderRange: -100...100,
+                            typeBounds: -100...100,
+                            unit: "",
+                            rounding: 1,
+                            decimals: 0
+                        )
+                        EffectSliderField(
+                            title: "Tint",
+                            value: slide.settings.tint,
+                            sliderRange: -100...100,
+                            typeBounds: -100...100,
+                            unit: "",
+                            rounding: 1,
+                            decimals: 0
+                        )
                     }
 
                     if slide.wrappedValue.mediaKind == .video {
