@@ -61,7 +61,33 @@ struct InspectorView: View {
                     }
 
                     Section("Effects") {
-                        BlurControl(blurRadius: slide.settings.blurRadius)
+                        EffectSliderField(
+                            title: "Blur",
+                            value: slide.settings.blurRadius,
+                            sliderRange: 0...SlideSettings.blurSliderMaximum,
+                            typeBounds: 0...SlideSettings.maximumBlurRadius,
+                            unit: "px",
+                            rounding: 1,
+                            decimals: 0
+                        )
+                        EffectSliderField(
+                            title: "Hue",
+                            value: slide.settings.hueShift,
+                            sliderRange: -180...180,
+                            typeBounds: -180...180,
+                            unit: "°",
+                            rounding: 1,
+                            decimals: 0
+                        )
+                        EffectSliderField(
+                            title: "Saturation",
+                            value: slide.settings.saturation,
+                            sliderRange: 0...200,
+                            typeBounds: 0...200,
+                            unit: "%",
+                            rounding: 1,
+                            decimals: 0
+                        )
                     }
 
                     if slide.wrappedValue.mediaKind == .video {
@@ -84,61 +110,94 @@ struct InspectorView: View {
     }
 }
 
-private struct BlurControl: View {
-    @Binding var blurRadius: Double
-    @State private var text: String = ""
-    @FocusState private var amountIsFocused: Bool
+// A labeled slider paired with an editable value box. The field updates live as
+// the slider is dragged, and the slider re-lays-out when a value is typed.
+// `sliderRange` bounds the slider; `typeBounds` (>= sliderRange) bounds what can
+// be typed, so values past the slider's max peg the thumb at the end.
+private struct EffectSliderField: View {
+    let title: String
+    @Binding var value: Double
+    let sliderRange: ClosedRange<Double>
+    let typeBounds: ClosedRange<Double>
+    let unit: String
+    let rounding: Double
+    let decimals: Int
+
+    @State private var text: String
+    @FocusState private var isFocused: Bool
+
+    init(
+        title: String,
+        value: Binding<Double>,
+        sliderRange: ClosedRange<Double>,
+        typeBounds: ClosedRange<Double>,
+        unit: String,
+        rounding: Double,
+        decimals: Int
+    ) {
+        self.title = title
+        self._value = value
+        self.sliderRange = sliderRange
+        self.typeBounds = typeBounds
+        self.unit = unit
+        self.rounding = rounding
+        self.decimals = decimals
+        // Seed the field at construction so it always shows the value, even for
+        // rows that are realized lazily below the fold (onAppear isn't reliable).
+        self._text = State(initialValue: Self.format(value.wrappedValue, decimals: decimals))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Blur")
+            Text(title)
             HStack(spacing: 8) {
                 // No `step:` so macOS doesn't draw the tick-mark rail; round in
-                // the setter to keep whole-pixel values. The slider tops out at
-                // 15px; larger values can still be typed into the field and peg
-                // the thumb at the maximum.
+                // the setter instead.
                 Slider(
                     value: Binding(
-                        get: { min(blurRadius, SlideSettings.blurSliderMaximum) },
-                        set: { blurRadius = $0.rounded() }
+                        get: { min(max(value, sliderRange.lowerBound), sliderRange.upperBound) },
+                        set: { value = rounded($0) }
                     ),
-                    in: 0...SlideSettings.blurSliderMaximum
+                    in: sliderRange
                 )
 
-                TextField("Blur", text: $text)
+                TextField("", text: $text)
                     .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.trailing)
                     .font(.callout.monospacedDigit())
                     .frame(width: 52)
-                    .focused($amountIsFocused)
+                    .focused($isFocused)
                     .onSubmit(commit)
-                    .onChange(of: amountIsFocused) { _, focused in
+                    .onChange(of: isFocused) { _, focused in
                         if !focused { commit() }
                     }
 
-                Text("px")
+                Text(unit)
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
         }
-        .onAppear { text = Self.string(blurRadius) }
         // Keep the field in sync when the value changes elsewhere (slider drag,
         // selecting a different slide) — but never stomp on the user mid-edit.
-        .onChange(of: blurRadius) { _, newValue in
-            if !amountIsFocused { text = Self.string(newValue) }
+        .onChange(of: value) { _, newValue in
+            if !isFocused { text = Self.format(newValue, decimals: decimals) }
         }
     }
 
-    private func commit() {
-        let parsed = Double(text.trimmingCharacters(in: .whitespaces)) ?? blurRadius
-        let clamped = min(SlideSettings.maximumBlurRadius, max(0, parsed))
-        blurRadius = clamped
-        text = Self.string(clamped)
-        // Resign focus so the slider re-lays-out to the committed position.
-        amountIsFocused = false
+    private func rounded(_ raw: Double) -> Double {
+        guard rounding > 0 else { return raw }
+        return (raw / rounding).rounded() * rounding
     }
 
-    private static func string(_ value: Double) -> String {
-        String(Int(value.rounded()))
+    private func commit() {
+        let parsed = Double(text.trimmingCharacters(in: .whitespaces)) ?? value
+        value = min(typeBounds.upperBound, max(typeBounds.lowerBound, rounded(parsed)))
+        text = Self.format(value, decimals: decimals)
+        // Resign focus so the slider re-lays-out to the committed position.
+        isFocused = false
+    }
+
+    private static func format(_ value: Double, decimals: Int) -> String {
+        decimals <= 0 ? String(Int(value.rounded())) : String(format: "%.\(decimals)f", value)
     }
 }

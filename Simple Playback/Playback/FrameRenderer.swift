@@ -156,35 +156,54 @@ final class FrameRenderer {
 
         guard didRender else { return nil }
 
-        if settings.blurRadius > 0 {
-            applyGaussianBlur(to: &data, width: width, height: height, rowBytes: rowBytes, sigma: settings.blurRadius)
-        }
+        applyEffects(to: &data, width: width, height: height, rowBytes: rowBytes, settings: settings)
 
         return RenderedFrame(data: data, width: width, height: height, rowBytes: rowBytes)
     }
 
-    // Blurs the composed BGRA frame in output pixel space so the amount is
-    // consistent regardless of the source image resolution. Clamping to the
-    // frame extent keeps the canvas edges from darkening as they blur.
-    private func applyGaussianBlur(to data: inout Data, width: Int, height: Int, rowBytes: Int, sigma: Double) {
+    static func hasColorOrBlurEffects(_ settings: SlideSettings) -> Bool {
+        settings.blurRadius > 0
+            || abs(settings.hueShift) > 0.0001
+            || abs(settings.saturation - 100) > 0.0001
+    }
+
+    // Applies saturation, hue, and blur to the composed BGRA frame in a single
+    // CoreImage pass. Saturation/hue leave black letterbox bars untouched; the
+    // blur is clamped to the frame extent so the canvas edges don't darken.
+    private func applyEffects(to data: inout Data, width: Int, height: Int, rowBytes: Int, settings: SlideSettings) {
+        guard FrameRenderer.hasColorOrBlurEffects(settings) else { return }
+
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bounds = CGRect(x: 0, y: 0, width: width, height: height)
-        let inputImage = CIImage(
+        var image = CIImage(
             bitmapData: data,
             bytesPerRow: rowBytes,
             size: CGSize(width: width, height: height),
             format: .BGRA8,
             colorSpace: colorSpace
         )
-        let blurred = inputImage
-            .clampedToExtent()
-            .applyingGaussianBlur(sigma: sigma)
-            .cropped(to: bounds)
+
+        if abs(settings.saturation - 100) > 0.0001 {
+            image = image.applyingFilter("CIColorControls", parameters: [
+                kCIInputSaturationKey: settings.saturation / 100.0
+            ])
+        }
+        if abs(settings.hueShift) > 0.0001 {
+            image = image.applyingFilter("CIHueAdjust", parameters: [
+                kCIInputAngleKey: settings.hueShift * Double.pi / 180.0
+            ])
+        }
+        if settings.blurRadius > 0 {
+            image = image
+                .clampedToExtent()
+                .applyingGaussianBlur(sigma: settings.blurRadius)
+                .cropped(to: bounds)
+        }
 
         data.withUnsafeMutableBytes { rawBuffer in
             guard let baseAddress = rawBuffer.baseAddress else { return }
             ciContext.render(
-                blurred,
+                image,
                 toBitmap: baseAddress,
                 rowBytes: rowBytes,
                 bounds: bounds,
@@ -241,8 +260,8 @@ final class FrameRenderer {
     }
 
     private func usesWholeOutputFrame(_ settings: SlideSettings) -> Bool {
-        // A blur needs the CoreImage path, so skip the straight-copy fast path.
-        guard settings.blurRadius <= 0,
+        // Color/blur effects need the CoreImage path, so skip the straight-copy fast path.
+        guard !FrameRenderer.hasColorOrBlurEffects(settings),
               abs(settings.offsetX) < 0.001,
               abs(settings.offsetY) < 0.001 else {
             return false

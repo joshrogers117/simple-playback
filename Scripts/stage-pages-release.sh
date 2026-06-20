@@ -253,10 +253,8 @@ cat > "${pages_dir}/index.html" <<EOF
         <div class="notes">
           <h2>Release Notes</h2>
           <ul>
-            <li>The value box beside the blur and crossfade sliders now updates live as you drag.</li>
-            <li>Blur slider ranges up to 15px; type a higher value for stronger blur.</li>
-            <li>Blur and other slide adjustments update the live output immediately, without re-taking the slide.</li>
-            <li>Blur effect for image and video output, adjustable per slide in the Inspector.</li>
+            <li>New per-slide Hue and Saturation controls in the Inspector, applied to image and video output.</li>
+            <li>Blur, hue, and saturation adjust the live output immediately and can be set with a slider or by typing a value.</li>
             <li>Requires macOS 26.0 or later.</li>
           </ul>
         </div>

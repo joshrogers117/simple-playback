@@ -90,6 +90,8 @@ struct SlideSettings: Codable, Hashable {
     var loopVideo: Bool = false
     var volume: Double = 1.0
     var blurRadius: Double = 0
+    var hueShift: Double = 0       // degrees, -180...180
+    var saturation: Double = 100   // percent, 0 = grayscale, 100 = unchanged
 
     init() {}
 
@@ -102,6 +104,8 @@ struct SlideSettings: Codable, Hashable {
         case loopVideo
         case volume
         case blurRadius
+        case hueShift
+        case saturation
     }
 
     // Decodes missing keys to their defaults so projects saved by older
@@ -116,6 +120,8 @@ struct SlideSettings: Codable, Hashable {
         loopVideo = try container.decodeIfPresent(Bool.self, forKey: .loopVideo) ?? false
         volume = try container.decodeIfPresent(Double.self, forKey: .volume) ?? 1.0
         blurRadius = try container.decodeIfPresent(Double.self, forKey: .blurRadius) ?? 0
+        hueShift = try container.decodeIfPresent(Double.self, forKey: .hueShift) ?? 0
+        saturation = try container.decodeIfPresent(Double.self, forKey: .saturation) ?? 100
     }
 }
 

@@ -271,6 +271,86 @@ final class ModelTests: XCTestCase {
         return context.makeImage()
     }
 
+    func testSlideSettingsDecodesMissingHueSaturationToDefault() throws {
+        var settings = SlideSettings()
+        settings.blurRadius = 5
+        let data = try JSONEncoder.simplePlayback.encode(settings)
+
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "hueShift")
+        object.removeValue(forKey: "saturation")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        let decoded = try JSONDecoder.simplePlayback.decode(SlideSettings.self, from: legacyData)
+        XCTAssertEqual(decoded.hueShift, 0, accuracy: 0.001)
+        XCTAssertEqual(decoded.saturation, 100, accuracy: 0.001)
+        XCTAssertEqual(decoded.blurRadius, 5, accuracy: 0.001)
+    }
+
+    func testSlideSettingsRoundTripsHueAndSaturation() throws {
+        var settings = SlideSettings()
+        settings.hueShift = -45
+        settings.saturation = 150
+
+        let data = try JSONEncoder.simplePlayback.encode(settings)
+        let decoded = try JSONDecoder.simplePlayback.decode(SlideSettings.self, from: data)
+
+        XCTAssertEqual(decoded.hueShift, -45, accuracy: 0.001)
+        XCTAssertEqual(decoded.saturation, 150, accuracy: 0.001)
+    }
+
+    func testFrameRendererDesaturatesToGray() throws {
+        let renderer = FrameRenderer()
+        let red = try XCTUnwrap(makeSolidColorImage(red: 1, green: 0, blue: 0))
+        var settings = SlideSettings()
+        settings.scaleMode = .stretch
+        settings.saturation = 0
+
+        let frame = try XCTUnwrap(renderer.render(cgImage: red, settings: settings, outputSize: CGSize(width: 2, height: 2)))
+
+        // BGRA: saturation 0 yields a gray pixel, so blue == green == red.
+        let blue = Int(frame.data[0]), green = Int(frame.data[1]), redOut = Int(frame.data[2])
+        XCTAssertLessThanOrEqual(abs(blue - green), 1)
+        XCTAssertLessThanOrEqual(abs(green - redOut), 1)
+        XCTAssertLessThan(redOut, 200, "red channel should drop once desaturated")
+    }
+
+    func testFrameRendererHueShiftChangesColor() throws {
+        let renderer = FrameRenderer()
+        let red = try XCTUnwrap(makeSolidColorImage(red: 1, green: 0, blue: 0))
+        let size = CGSize(width: 2, height: 2)
+
+        var base = SlideSettings()
+        base.scaleMode = .stretch
+        var shifted = base
+        shifted.hueShift = 120
+
+        let plain = try XCTUnwrap(renderer.render(cgImage: red, settings: base, outputSize: size))
+        let hued = try XCTUnwrap(renderer.render(cgImage: red, settings: shifted, outputSize: size))
+
+        XCTAssertNotEqual(Array(plain.data), Array(hued.data), "a hue shift should change the rendered pixels")
+    }
+
+    private func makeSolidColorImage(red: CGFloat, green: CGFloat, blue: CGFloat) -> CGImage? {
+        let width = 2
+        let height = 2
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
+        context.setFillColor(CGColor(red: red, green: green, blue: blue, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()
+    }
+
     func testFillScalingCropsMedia() {
         let rect = ScalingGeometry.mediaRect(
             sourceSize: CGSize(width: 1000, height: 1000),
