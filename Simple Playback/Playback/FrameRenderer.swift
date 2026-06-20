@@ -155,7 +155,43 @@ final class FrameRenderer {
         }
 
         guard didRender else { return nil }
+
+        if settings.blurRadius > 0 {
+            applyGaussianBlur(to: &data, width: width, height: height, rowBytes: rowBytes, sigma: settings.blurRadius)
+        }
+
         return RenderedFrame(data: data, width: width, height: height, rowBytes: rowBytes)
+    }
+
+    // Blurs the composed BGRA frame in output pixel space so the amount is
+    // consistent regardless of the source image resolution. Clamping to the
+    // frame extent keeps the canvas edges from darkening as they blur.
+    private func applyGaussianBlur(to data: inout Data, width: Int, height: Int, rowBytes: Int, sigma: Double) {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bounds = CGRect(x: 0, y: 0, width: width, height: height)
+        let inputImage = CIImage(
+            bitmapData: data,
+            bytesPerRow: rowBytes,
+            size: CGSize(width: width, height: height),
+            format: .BGRA8,
+            colorSpace: colorSpace
+        )
+        let blurred = inputImage
+            .clampedToExtent()
+            .applyingGaussianBlur(sigma: sigma)
+            .cropped(to: bounds)
+
+        data.withUnsafeMutableBytes { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress else { return }
+            ciContext.render(
+                blurred,
+                toBitmap: baseAddress,
+                rowBytes: rowBytes,
+                bounds: bounds,
+                format: .BGRA8,
+                colorSpace: colorSpace
+            )
+        }
     }
 
     private func renderPixelBufferFast(_ pixelBuffer: CVPixelBuffer, settings: SlideSettings, outputSize: CGSize) -> RenderedFrame? {
@@ -205,7 +241,9 @@ final class FrameRenderer {
     }
 
     private func usesWholeOutputFrame(_ settings: SlideSettings) -> Bool {
-        guard abs(settings.offsetX) < 0.001,
+        // A blur needs the CoreImage path, so skip the straight-copy fast path.
+        guard settings.blurRadius <= 0,
+              abs(settings.offsetX) < 0.001,
               abs(settings.offsetY) < 0.001 else {
             return false
         }

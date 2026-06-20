@@ -63,23 +63,8 @@ struct SlideGridView: View {
 
 private struct PaletteTransitionControls: View {
     @Binding var settings: PlayoutTransitionSettings
+    @State private var durationText: String = ""
     @FocusState private var durationIsFocused: Bool
-
-    private var duration: Binding<Double> {
-        Binding {
-            settings.crossfadeDuration
-        } set: { value in
-            settings.crossfadeDuration = PlayoutTransitionSettings.clampedDuration(value)
-        }
-    }
-
-    private static let durationFormatter: NumberFormatter = {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = 1
-        formatter.maximumFractionDigits = 1
-        return formatter
-    }()
 
     var body: some View {
         HStack(spacing: 10) {
@@ -87,20 +72,21 @@ private struct PaletteTransitionControls: View {
                 .toggleStyle(.switch)
 
             Slider(
-                value: duration,
+                value: $settings.crossfadeDuration,
                 in: PlayoutTransitionSettings.minimumDuration...PlayoutTransitionSettings.maximumDuration,
                 step: 0.1
             )
                 .frame(width: 96)
 
-            TextField("Seconds", value: duration, formatter: Self.durationFormatter)
+            TextField("Seconds", text: $durationText)
                 .textFieldStyle(.roundedBorder)
                 .multilineTextAlignment(.trailing)
                 .font(.callout.monospacedDigit())
                 .frame(width: 56)
                 .focused($durationIsFocused)
-                .onSubmit {
-                    durationIsFocused = false
+                .onSubmit(commit)
+                .onChange(of: durationIsFocused) { _, focused in
+                    if !focused { commit() }
                 }
 
             Text("sec")
@@ -112,6 +98,24 @@ private struct PaletteTransitionControls: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .background(.bar)
+        .onAppear { durationText = Self.string(settings.crossfadeDuration) }
+        // Mirror external changes (slider drag) into the field, but never while editing.
+        .onChange(of: settings.crossfadeDuration) { _, newValue in
+            if !durationIsFocused { durationText = Self.string(newValue) }
+        }
+    }
+
+    private func commit() {
+        let parsed = Double(durationText.trimmingCharacters(in: .whitespaces)) ?? settings.crossfadeDuration
+        let clamped = PlayoutTransitionSettings.clampedDuration(parsed)
+        settings.crossfadeDuration = clamped
+        durationText = Self.string(clamped)
+        // Resign focus so the slider re-lays-out to the committed position.
+        durationIsFocused = false
+    }
+
+    private static func string(_ value: Double) -> String {
+        String(format: "%.1f", value)
     }
 }
 

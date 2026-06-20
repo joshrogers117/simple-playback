@@ -165,6 +165,112 @@ final class ModelTests: XCTestCase {
         ])
     }
 
+    func testSlideSettingsDecodesMissingBlurRadiusToDefault() throws {
+        var settings = SlideSettings()
+        settings.scaleMode = .fill
+        settings.volume = 0.5
+        let data = try JSONEncoder.simplePlayback.encode(settings)
+
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "blurRadius")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        let decoded = try JSONDecoder.simplePlayback.decode(SlideSettings.self, from: legacyData)
+        XCTAssertEqual(decoded.scaleMode, .fill)
+        XCTAssertEqual(decoded.volume, 0.5, accuracy: 0.001)
+        XCTAssertEqual(decoded.blurRadius, 0, accuracy: 0.001)
+    }
+
+    func testSlideSettingsRoundTripsBlurRadius() throws {
+        var settings = SlideSettings()
+        settings.blurRadius = 24
+
+        let data = try JSONEncoder.simplePlayback.encode(settings)
+        let decoded = try JSONDecoder.simplePlayback.decode(SlideSettings.self, from: data)
+
+        XCTAssertEqual(decoded.blurRadius, 24, accuracy: 0.001)
+    }
+
+    func testFrameRendererBlursAcrossHardEdge() throws {
+        let renderer = FrameRenderer()
+        let cgImage = try XCTUnwrap(makeHorizontalSplitImage())
+        let outputSize = CGSize(width: 2, height: 1)
+
+        var sharpSettings = SlideSettings()
+        sharpSettings.scaleMode = .stretch
+        var blurSettings = sharpSettings
+        blurSettings.blurRadius = 5
+
+        let sharp = try XCTUnwrap(renderer.render(cgImage: cgImage, settings: sharpSettings, outputSize: outputSize))
+        let blurred = try XCTUnwrap(renderer.render(cgImage: cgImage, settings: blurSettings, outputSize: outputSize))
+
+        // Output is BGRA: byte 0 is the blue channel of the left pixel,
+        // byte 4 is the blue channel of the right pixel.
+        XCTAssertEqual(sharp.data[0], 255, "left pixel should start fully white")
+        XCTAssertEqual(sharp.data[4], 0, "right pixel should start fully black")
+        XCTAssertLessThan(blurred.data[0], 255, "blur should pull black into the white pixel")
+        XCTAssertGreaterThan(blurred.data[4], 0, "blur should pull white into the black pixel")
+    }
+
+    func testFrameRendererBlursVideoPixelBufferAcrossHardEdge() throws {
+        var pixelBuffer: CVPixelBuffer?
+        let createResult = CVPixelBufferCreate(nil, 2, 1, kCVPixelFormatType_32BGRA, nil, &pixelBuffer)
+        try XCTSkipIf(createResult != kCVReturnSuccess || pixelBuffer == nil, "CVPixelBufferCreate is not available in this environment")
+        let buffer = try XCTUnwrap(pixelBuffer)
+
+        CVPixelBufferLockBaseAddress(buffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        let baseAddress = try XCTUnwrap(CVPixelBufferGetBaseAddress(buffer))
+        let bytes = baseAddress.assumingMemoryBound(to: UInt8.self)
+        func writePixel(x: Int, value: UInt8) {
+            let offset = x * 4
+            bytes[offset] = value
+            bytes[offset + 1] = value
+            bytes[offset + 2] = value
+            bytes[offset + 3] = 255
+        }
+        writePixel(x: 0, value: 255) // white
+        writePixel(x: 1, value: 0)   // black
+
+        let renderer = FrameRenderer()
+        let outputSize = CGSize(width: 2, height: 1)
+
+        var blurSettings = SlideSettings()
+        blurSettings.blurRadius = 5
+
+        // No blur takes the straight-copy fast path and is exact.
+        let sharp = try XCTUnwrap(renderer.renderPixelBuffer(buffer, settings: SlideSettings(), outputSize: outputSize))
+        // Blur forces the CoreImage path, which blends across the edge.
+        let blurred = try XCTUnwrap(renderer.renderPixelBuffer(buffer, settings: blurSettings, outputSize: outputSize))
+
+        XCTAssertEqual(sharp.data[0], 255, "fast path should copy the white pixel verbatim")
+        XCTAssertEqual(sharp.data[4], 0, "fast path should copy the black pixel verbatim")
+        XCTAssertLessThan(blurred.data[0], 255, "blur should pull black into the white pixel")
+        XCTAssertGreaterThan(blurred.data[4], 0, "blur should pull white into the black pixel")
+    }
+
+    private func makeHorizontalSplitImage() -> CGImage? {
+        let width = 2
+        let height = 1
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
+        context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
+        context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 1, y: 0, width: 1, height: 1))
+        return context.makeImage()
+    }
+
     func testFillScalingCropsMedia() {
         let rect = ScalingGeometry.mediaRect(
             sourceSize: CGSize(width: 1000, height: 1000),

@@ -79,6 +79,8 @@ struct MediaReference: Codable, Hashable {
 }
 
 struct SlideSettings: Codable, Hashable {
+    static let maximumBlurRadius = 100.0
+
     var scaleMode: ScaleMode = .fit
     var alignment: AlignmentPreset = .center
     var customScale: Double = 1.0
@@ -86,6 +88,34 @@ struct SlideSettings: Codable, Hashable {
     var offsetY: Double = 0
     var loopVideo: Bool = false
     var volume: Double = 1.0
+    var blurRadius: Double = 0
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case scaleMode
+        case alignment
+        case customScale
+        case offsetX
+        case offsetY
+        case loopVideo
+        case volume
+        case blurRadius
+    }
+
+    // Decodes missing keys to their defaults so projects saved by older
+    // versions (which predate fields like blurRadius) still load.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        scaleMode = try container.decodeIfPresent(ScaleMode.self, forKey: .scaleMode) ?? .fit
+        alignment = try container.decodeIfPresent(AlignmentPreset.self, forKey: .alignment) ?? .center
+        customScale = try container.decodeIfPresent(Double.self, forKey: .customScale) ?? 1.0
+        offsetX = try container.decodeIfPresent(Double.self, forKey: .offsetX) ?? 0
+        offsetY = try container.decodeIfPresent(Double.self, forKey: .offsetY) ?? 0
+        loopVideo = try container.decodeIfPresent(Bool.self, forKey: .loopVideo) ?? false
+        volume = try container.decodeIfPresent(Double.self, forKey: .volume) ?? 1.0
+        blurRadius = try container.decodeIfPresent(Double.self, forKey: .blurRadius) ?? 0
+    }
 }
 
 struct MediaSlide: Identifiable, Codable, Hashable {
