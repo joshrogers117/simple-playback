@@ -388,6 +388,62 @@ final class ModelTests: XCTestCase {
         XCTAssertGreaterThan((red + blue) / 2, green, "+tint should push toward magenta")
     }
 
+    func testSlideSettingsDecodesMissingBrightnessContrastToDefault() throws {
+        var settings = SlideSettings()
+        settings.temperature = 20
+        let data = try JSONEncoder.simplePlayback.encode(settings)
+
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "brightness")
+        object.removeValue(forKey: "contrast")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        let decoded = try JSONDecoder.simplePlayback.decode(SlideSettings.self, from: legacyData)
+        XCTAssertEqual(decoded.brightness, 0, accuracy: 0.001)
+        XCTAssertEqual(decoded.contrast, 100, accuracy: 0.001)
+        XCTAssertEqual(decoded.temperature, 20, accuracy: 0.001)
+    }
+
+    func testSlideSettingsRoundTripsBrightnessAndContrast() throws {
+        var settings = SlideSettings()
+        settings.brightness = -30
+        settings.contrast = 175
+
+        let data = try JSONEncoder.simplePlayback.encode(settings)
+        let decoded = try JSONDecoder.simplePlayback.decode(SlideSettings.self, from: data)
+
+        XCTAssertEqual(decoded.brightness, -30, accuracy: 0.001)
+        XCTAssertEqual(decoded.contrast, 175, accuracy: 0.001)
+    }
+
+    func testFrameRendererBrightnessLightensAndDarkens() throws {
+        let renderer = FrameRenderer()
+        let gray = try XCTUnwrap(makeSolidColorImage(red: 0.5, green: 0.5, blue: 0.5))
+        let size = CGSize(width: 2, height: 2)
+
+        var bright = SlideSettings(); bright.scaleMode = .stretch; bright.brightness = 50
+        var dark = SlideSettings(); dark.scaleMode = .stretch; dark.brightness = -50
+
+        let brightFrame = try XCTUnwrap(renderer.render(cgImage: gray, settings: bright, outputSize: size))
+        let darkFrame = try XCTUnwrap(renderer.render(cgImage: gray, settings: dark, outputSize: size))
+
+        XCTAssertGreaterThan(Int(brightFrame.data[1]), Int(darkFrame.data[1]), "raising brightness should lighten the pixel")
+    }
+
+    func testFrameRendererContrastExpandsHighlights() throws {
+        let renderer = FrameRenderer()
+        let lightGray = try XCTUnwrap(makeSolidColorImage(red: 0.75, green: 0.75, blue: 0.75))
+        let size = CGSize(width: 2, height: 2)
+
+        var normal = SlideSettings(); normal.scaleMode = .stretch
+        var high = SlideSettings(); high.scaleMode = .stretch; high.contrast = 200
+
+        let normalFrame = try XCTUnwrap(renderer.render(cgImage: lightGray, settings: normal, outputSize: size))
+        let highFrame = try XCTUnwrap(renderer.render(cgImage: lightGray, settings: high, outputSize: size))
+
+        XCTAssertGreaterThan(Int(highFrame.data[1]), Int(normalFrame.data[1]), "raising contrast should push a light tone brighter")
+    }
+
     private func makeSolidColorImage(red: CGFloat, green: CGFloat, blue: CGFloat) -> CGImage? {
         let width = 2
         let height = 2

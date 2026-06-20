@@ -1,2 +1,2 @@
-8b833eb6d8ca7e75caf9d6f0ce26463455acebecf46f6bf09814cf8c6c8e7b2e  docs/Simple Playback-0.1.7.dmg
-0fd73c55f0b1a3da0e99e093a9d5436429e74f41f60bb5f2e5929c3e143b3c5b  docs/Simple Playback-0.1.7.zip
+114a35fb8b6e205af5e657084e75440ae31092650ce48e2f0071ff4062acbf9c  docs/Simple Playback-0.1.8.dmg
+9f58cfc8215d83f861d89bc73e5e6321779c0654ce2abc7076163f7feca36996  docs/Simple Playback-0.1.8.zip

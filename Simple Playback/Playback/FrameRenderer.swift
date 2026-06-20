@@ -165,6 +165,8 @@ final class FrameRenderer {
         settings.blurRadius > 0
             || abs(settings.hueShift) > 0.0001
             || abs(settings.saturation - 100) > 0.0001
+            || abs(settings.brightness) > 0.0001
+            || abs(settings.contrast - 100) > 0.0001
             || abs(settings.temperature) > 0.0001
             || abs(settings.tint) > 0.0001
     }
@@ -193,9 +195,13 @@ final class FrameRenderer {
                 "inputTargetNeutral": CIVector(x: 6500 - settings.temperature * 30, y: -settings.tint)
             ])
         }
-        if abs(settings.saturation - 100) > 0.0001 {
+        if abs(settings.saturation - 100) > 0.0001
+            || abs(settings.brightness) > 0.0001
+            || abs(settings.contrast - 100) > 0.0001 {
             image = image.applyingFilter("CIColorControls", parameters: [
-                kCIInputSaturationKey: settings.saturation / 100.0
+                kCIInputSaturationKey: settings.saturation / 100.0,
+                kCIInputBrightnessKey: settings.brightness / 100.0,
+                kCIInputContrastKey: settings.contrast / 100.0
             ])
         }
         if abs(settings.hueShift) > 0.0001 {

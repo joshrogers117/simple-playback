@@ -89,6 +89,24 @@ struct InspectorView: View {
                             decimals: 0
                         )
                         EffectSliderField(
+                            title: "Brightness",
+                            value: slide.settings.brightness,
+                            sliderRange: -100...100,
+                            typeBounds: -100...100,
+                            unit: "",
+                            rounding: 1,
+                            decimals: 0
+                        )
+                        EffectSliderField(
+                            title: "Contrast",
+                            value: slide.settings.contrast,
+                            sliderRange: 0...200,
+                            typeBounds: 0...200,
+                            unit: "%",
+                            rounding: 1,
+                            decimals: 0
+                        )
+                        EffectSliderField(
                             title: "Temperature",
                             value: slide.settings.temperature,
                             sliderRange: -100...100,
