@@ -93,7 +93,17 @@ private struct BlurControl: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Blur")
             HStack(spacing: 8) {
-                Slider(value: $blurRadius, in: 0...SlideSettings.maximumBlurRadius, step: 1)
+                // No `step:` so macOS doesn't draw the tick-mark rail; round in
+                // the setter to keep whole-pixel values. The slider tops out at
+                // 15px; larger values can still be typed into the field and peg
+                // the thumb at the maximum.
+                Slider(
+                    value: Binding(
+                        get: { min(blurRadius, SlideSettings.blurSliderMaximum) },
+                        set: { blurRadius = $0.rounded() }
+                    ),
+                    in: 0...SlideSettings.blurSliderMaximum
+                )
 
                 TextField("Blur", text: $text)
                     .textFieldStyle(.roundedBorder)

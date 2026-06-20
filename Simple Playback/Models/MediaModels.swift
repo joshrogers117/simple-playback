@@ -80,6 +80,7 @@ struct MediaReference: Codable, Hashable {
 
 struct SlideSettings: Codable, Hashable {
     static let maximumBlurRadius = 100.0
+    static let blurSliderMaximum = 15.0
 
     var scaleMode: ScaleMode = .fit
     var alignment: AlignmentPreset = .center

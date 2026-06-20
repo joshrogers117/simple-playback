@@ -72,9 +72,11 @@ private struct PaletteTransitionControls: View {
                 .toggleStyle(.switch)
 
             Slider(
-                value: $settings.crossfadeDuration,
-                in: PlayoutTransitionSettings.minimumDuration...PlayoutTransitionSettings.maximumDuration,
-                step: 0.1
+                value: Binding(
+                    get: { settings.crossfadeDuration },
+                    set: { settings.crossfadeDuration = (($0 * 10).rounded() / 10) }
+                ),
+                in: PlayoutTransitionSettings.minimumDuration...PlayoutTransitionSettings.maximumDuration
             )
                 .frame(width: 96)
 
